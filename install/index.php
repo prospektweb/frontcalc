@@ -7,18 +7,30 @@ use Bitrix\Main\Localization\Loc;
 
 Loc::loadMessages(__FILE__);
 
-class front_calculator extends CModule
+class prospektweb_frontcalc extends CModule
 {
     public const DEFAULT_PROPERTY_CODE = 'CALC_CONFIG';
     public const TARGET_PRICES_FILE = '/bitrix/modules/aspro.premier/lib/product/prices.php';
     public const TARGET_PRICES_BACKUP_FILE = '/bitrix/modules/aspro.premier/lib/product/prices_original.php';
 
-    public $MODULE_ID = 'front.calculator';
-    public $MODULE_NAME = 'Front calculator';
-    public $MODULE_DESCRIPTION = 'Module installer for Front calculator integration';
-    public $MODULE_VERSION = '1.0.0';
+    public $MODULE_ID = 'prospektweb.frontcalc';
+    public $MODULE_NAME = 'Калькулятор себестоимости';
+    public $MODULE_DESCRIPTION = 'Калькулятор и модификатор цен для Aspro Premier';
+    public $MODULE_VERSION = '1.0.1';
     public $MODULE_VERSION_DATE = '2026-04-23';
-    public $PARTNER_NAME = 'Front calculator';
+    public $PARTNER_NAME = 'PROSPEKT-WEB';
+
+    public function __construct()
+    {
+        $versionFile = __DIR__ . '/version.php';
+        if (is_file($versionFile)) {
+            include $versionFile;
+            if (is_array($arModuleVersion)) {
+                $this->MODULE_VERSION = $arModuleVersion['VERSION'];
+                $this->MODULE_VERSION_DATE = $arModuleVersion['VERSION_DATE'];
+            }
+        }
+    }
 
     public function DoInstall(): void
     {
@@ -210,3 +222,8 @@ class front_calculator extends CModule
         @rename($backup, $target);
     }
 }
+
+
+// Backward compatibility aliases for old installer class names.
+class prospektweb_calc extends prospektweb_frontcalc {}
+class front_calculator extends prospektweb_frontcalc {}

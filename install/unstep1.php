@@ -12,7 +12,7 @@ if (!check_bitrix_sessid()) {
     <p>
         <label>
             <input type="checkbox" name="delete_calc_property" value="Y">
-            Удалить свойство <?= front_calculator::DEFAULT_PROPERTY_CODE; ?> из инфоблока товаров
+            Удалить свойство <?= prospektweb_frontcalc::DEFAULT_PROPERTY_CODE; ?> из инфоблока товаров
         </label>
     </p>
 
