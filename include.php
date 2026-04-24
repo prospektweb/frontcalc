@@ -2,7 +2,5 @@
 
 use Bitrix\Main\Loader;
 
-Loader::registerAutoLoadClasses(
-    'prospektweb.frontcalc',
-    []
-);
+// Минимально: файл должен существовать; можно оставить пустой autoload map.
+Loader::registerAutoloadClasses('prospektweb.frontcalc', []);
