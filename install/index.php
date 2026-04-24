@@ -2,7 +2,12 @@
 
 use Bitrix\Main\Config\Option;
 use Bitrix\Main\Loader;
+use Bitrix\Main\Localization\Loc;
 use Bitrix\Main\ModuleManager;
+
+if (!defined('B_PROLOG_INCLUDED') || B_PROLOG_INCLUDED !== true) {
+    die();
+}
 
 if (!defined('B_PROLOG_INCLUDED') || B_PROLOG_INCLUDED !== true) {
     die();
@@ -13,10 +18,10 @@ class prospektweb_frontcalc extends CModule
     public $MODULE_ID = 'prospektweb.frontcalc';
     public $MODULE_VERSION;
     public $MODULE_VERSION_DATE;
-    public $MODULE_NAME = 'PROSPEKT-WEB: FrontCalc';
-    public $MODULE_DESCRIPTION = 'Минимальный baseline модуля Bitrix';
-    public $PARTNER_NAME = 'PROSPEKT-WEB';
-    public $PARTNER_URI = 'https://prospekt-web.ru';
+    public $MODULE_NAME;
+    public $MODULE_DESCRIPTION;
+    public $PARTNER_NAME;
+    public $PARTNER_URI;
     public $MODULE_GROUP_RIGHTS = 'N';
 
     public function __construct()
@@ -26,6 +31,10 @@ class prospektweb_frontcalc extends CModule
 
         $this->MODULE_VERSION = $arModuleVersion['VERSION'];
         $this->MODULE_VERSION_DATE = $arModuleVersion['VERSION_DATE'];
+        $this->MODULE_NAME = Loc::getMessage('PROSPEKTWEB_FRONTCALC_MODULE_NAME') ?: 'PROSPEKT-WEB: FrontCalc';
+        $this->MODULE_DESCRIPTION = Loc::getMessage('PROSPEKTWEB_FRONTCALC_MODULE_DESCRIPTION') ?: 'Модуль калькулятора печатной продукции';
+        $this->PARTNER_NAME = 'PROSPEKT-WEB';
+        $this->PARTNER_URI = 'https://prospektweb.ru';
     }
 
     public function DoInstall()
