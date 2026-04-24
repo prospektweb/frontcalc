@@ -9,7 +9,7 @@ Loc::loadMessages(__FILE__);
 
 class prospektweb_frontcalc extends CModule
 {
-    public const DEFAULT_PROPERTY_CODE = 'CALC_CONFIG';
+    public const DEFAULT_PROPERTY_CODE = 'FRONTCALC_CONFIG';
     public const TARGET_PRICES_FILE = '/bitrix/modules/aspro.premier/lib/product/prices.php';
     public const TARGET_PRICES_BACKUP_FILE = '/bitrix/modules/aspro.premier/lib/product/prices_original.php';
 
@@ -222,8 +222,3 @@ class prospektweb_frontcalc extends CModule
         @rename($backup, $target);
     }
 }
-
-
-// Backward compatibility aliases for old installer class names.
-class prospektweb_calc extends prospektweb_frontcalc {}
-class front_calculator extends prospektweb_frontcalc {}
