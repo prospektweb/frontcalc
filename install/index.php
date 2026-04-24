@@ -14,8 +14,8 @@ class prospektweb_frontcalc extends CModule
     public const TARGET_PRICES_BACKUP_FILE = '/bitrix/modules/aspro.premier/lib/product/prices_original.php';
 
     public $MODULE_ID = 'prospektweb.frontcalc';
-    public $MODULE_NAME = 'Калькулятор себестоимости';
-    public $MODULE_DESCRIPTION = 'Калькулятор и модификатор цен для Aspro Premier';
+    public $MODULE_NAME = 'Клиентский калькулятор на основе ТП';
+    public $MODULE_DESCRIPTION = 'Калькулятор позволяет посчитать стоимость ТП с произвольным значениями на основе опорных расчётов';
     public $MODULE_VERSION = '1.0.1';
     public $MODULE_VERSION_DATE = '2026-04-23';
     public $PARTNER_NAME = 'PROSPEKT-WEB';
