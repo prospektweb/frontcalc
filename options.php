@@ -223,7 +223,7 @@ $editorSchema = Option::get($moduleId, 'CALC_EDITOR_SCHEMA', '');
                         <label class="fc-pill"><input type="checkbox" class="js-show-presets" checked> Показывать пресеты</label>
                         <label class="fc-pill"><input type="checkbox" class="js-show-unit" checked> Показывать ед. изм.</label>
                         <label class="fc-pill"><input type="checkbox" class="js-concat-unit"> Склеивать значение с ед. изм.</label>
-                        <label class="fc-pill"><input type="checkbox" class="js-group-enabled"> Группа инпутов</label>
+                        <input type="hidden" class="js-group-enabled" value="N">
                     </div>
 
                     <div class="js-group-settings" style="display:none;">
@@ -275,22 +275,14 @@ $editorSchema = Option::get($moduleId, 'CALC_EDITOR_SCHEMA', '');
                 const clone = row.cloneNode(true);
                 clone.querySelectorAll('input').forEach(function(input) { input.value = ''; });
                 container.appendChild(clone);
-            }
-        });
-
-        root.addEventListener('change', function(event) {
-            const group = event.target.closest('.js-group-enabled');
-            if (group) {
-                const card = group.closest('.fc-card');
-                const panel = card.querySelector('.js-group-settings');
-                if (panel) {
-                    panel.style.display = group.checked ? 'block' : 'none';
-                }
+                syncGroupState(card);
             }
         });
     }
 
     if (form && schemaInput) {
+        tryApplySavedSchema();
+
         form.addEventListener('submit', function() {
             const schema = [];
             document.querySelectorAll('.fc-card').forEach(function(card) {
@@ -298,6 +290,7 @@ $editorSchema = Option::get($moduleId, 'CALC_EDITOR_SCHEMA', '');
                 const propertySelect = card.querySelector('.js-fc-prop-select');
                 const selectedCode = propertySelect ? propertySelect.value : propertyCode;
                 const rows = [];
+                const isGroup = getInputRows(card).length > 1;
 
                 card.querySelectorAll('.js-fc-input-row').forEach(function(row) {
                     rows.push({
@@ -315,13 +308,110 @@ $editorSchema = Option::get($moduleId, 'CALC_EDITOR_SCHEMA', '');
                     show_presets: !!(card.querySelector('.js-show-presets') || {}).checked,
                     show_unit: !!(card.querySelector('.js-show-unit') || {}).checked,
                     concat_unit: !!(card.querySelector('.js-concat-unit') || {}).checked,
-                    is_group: !!(card.querySelector('.js-group-enabled') || {}).checked,
+                    is_group: isGroup,
                     group_code: ((card.querySelector('.js-group-code') || {}).value || ''),
                     group_delimiter: ((card.querySelector('.js-group-delimiter') || {}).value || '')
                 });
             });
 
             schemaInput.value = JSON.stringify({version: 1, fields: schema});
+        });
+    }
+
+    function getInputRows(card) {
+        return Array.prototype.slice.call(card.querySelectorAll('.js-fc-input-row'));
+    }
+
+    function syncGroupState(card) {
+        const hiddenGroupFlag = card.querySelector('.js-group-enabled');
+        const groupPanel = card.querySelector('.js-group-settings');
+        const isGroup = getInputRows(card).length > 1;
+
+        if (hiddenGroupFlag) {
+            hiddenGroupFlag.value = isGroup ? 'Y' : 'N';
+        }
+
+        if (groupPanel) {
+            groupPanel.style.display = isGroup ? 'block' : 'none';
+        }
+    }
+
+    function setInputRowValues(row, inputData) {
+        (row.querySelector('.js-inp-code') || {}).value = inputData.code || '';
+        (row.querySelector('.js-inp-min') || {}).value = inputData.min || '';
+        (row.querySelector('.js-inp-max') || {}).value = inputData.max || '';
+        (row.querySelector('.js-inp-step') || {}).value = inputData.step || '';
+        (row.querySelector('.js-inp-unit') || {}).value = inputData.unit || '';
+    }
+
+    function tryApplySavedSchema() {
+        if (!schemaInput.value) {
+            document.querySelectorAll('.fc-card').forEach(syncGroupState);
+            return;
+        }
+
+        let parsed = null;
+        try {
+            parsed = JSON.parse(schemaInput.value);
+        } catch (e) {
+            document.querySelectorAll('.fc-card').forEach(syncGroupState);
+            return;
+        }
+
+        const fields = parsed && Array.isArray(parsed.fields) ? parsed.fields : [];
+        const byCode = {};
+        fields.forEach(function(field) {
+            if (field && field.property_code) {
+                byCode[field.property_code] = field;
+            }
+        });
+
+        document.querySelectorAll('.fc-card').forEach(function(card) {
+            const propertyCode = card.dataset.propCode || '';
+            const field = byCode[propertyCode];
+
+            if (!field) {
+                syncGroupState(card);
+                return;
+            }
+
+            if (card.querySelector('.js-show-presets')) {
+                card.querySelector('.js-show-presets').checked = !!field.show_presets;
+            }
+            if (card.querySelector('.js-show-unit')) {
+                card.querySelector('.js-show-unit').checked = !!field.show_unit;
+            }
+            if (card.querySelector('.js-concat-unit')) {
+                card.querySelector('.js-concat-unit').checked = !!field.concat_unit;
+            }
+            if (card.querySelector('.js-group-code')) {
+                card.querySelector('.js-group-code').value = field.group_code || '';
+            }
+            if (card.querySelector('.js-group-delimiter')) {
+                card.querySelector('.js-group-delimiter').value = field.group_delimiter || 'x';
+            }
+
+            const inputs = Array.isArray(field.inputs) && field.inputs.length ? field.inputs : [];
+            if (!inputs.length) {
+                syncGroupState(card);
+                return;
+            }
+
+            const container = card.querySelector('.js-fc-inputs');
+            const baseRow = card.querySelector('.js-fc-input-row');
+            if (!container || !baseRow) {
+                syncGroupState(card);
+                return;
+            }
+
+            container.innerHTML = '';
+            inputs.forEach(function(input, index) {
+                const row = index === 0 ? baseRow : baseRow.cloneNode(true);
+                setInputRowValues(row, input || {});
+                container.appendChild(row);
+            });
+
+            syncGroupState(card);
         });
     }
 })();
