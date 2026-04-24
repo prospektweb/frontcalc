@@ -13,6 +13,10 @@ if (!defined('B_PROLOG_INCLUDED') || B_PROLOG_INCLUDED !== true) {
     die();
 }
 
+if (!defined('B_PROLOG_INCLUDED') || B_PROLOG_INCLUDED !== true) {
+    die();
+}
+
 class prospektweb_frontcalc extends CModule
 {
     public $MODULE_ID = 'prospektweb.frontcalc';
