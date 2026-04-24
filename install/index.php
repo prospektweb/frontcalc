@@ -1,9 +1,14 @@
 <?php
 
 use Bitrix\Main\Config\Option;
+use Bitrix\Main\EventManager;
 use Bitrix\Main\Loader;
 use Bitrix\Main\Localization\Loc;
 use Bitrix\Main\ModuleManager;
+
+if (!defined('B_PROLOG_INCLUDED') || B_PROLOG_INCLUDED !== true) {
+    die();
+}
 
 if (!defined('B_PROLOG_INCLUDED') || B_PROLOG_INCLUDED !== true) {
     die();
@@ -116,16 +121,23 @@ class prospektweb_frontcalc extends CModule
 
         Option::set($this->MODULE_ID, 'PRODUCTS_IBLOCK_ID', (string)$productsIblockId);
         Option::set($this->MODULE_ID, 'OFFERS_IBLOCK_ID', (string)$offersIblockId);
+        Option::set($this->MODULE_ID, 'CALC_PROPERTY_CODE', 'FRONTCALC_CONFIG');
 
-        // Пример "сущности модуля", чтобы показать удаление/сохранение при uninstall
-        Option::set($this->MODULE_ID, 'EXAMPLE_ENTITY_CREATED', 'Y');
+        $this->ensureCalcConfigProperty($productsIblockId, 'FRONTCALC_CONFIG');
+        $this->registerAdminHandlers();
 
         return true;
     }
 
     public function UnInstallDB($removeData = false)
     {
+        $productsIblockId = (int)Option::get($this->MODULE_ID, 'PRODUCTS_IBLOCK_ID', '0');
+        $propertyCode = (string)Option::get($this->MODULE_ID, 'CALC_PROPERTY_CODE', 'FRONTCALC_CONFIG');
+
+        $this->unregisterAdminHandlers();
+
         if ($removeData) {
+            $this->removeCalcConfigProperty($productsIblockId, $propertyCode);
             Option::delete($this->MODULE_ID);
         } else {
             // Служебно помечаем, что uninstall прошёл с сохранением данных
@@ -133,6 +145,79 @@ class prospektweb_frontcalc extends CModule
         }
 
         return true;
+    }
+
+    protected function registerAdminHandlers()
+    {
+        EventManager::getInstance()->registerEventHandlerCompatible(
+            'main',
+            'OnAdminContextMenuShow',
+            $this->MODULE_ID,
+            '\\Prospektweb\\Frontcalc\\Admin\\ProductCardButton',
+            'onAdminContextMenuShow'
+        );
+    }
+
+    protected function unregisterAdminHandlers()
+    {
+        EventManager::getInstance()->unRegisterEventHandler(
+            'main',
+            'OnAdminContextMenuShow',
+            $this->MODULE_ID,
+            '\\Prospektweb\\Frontcalc\\Admin\\ProductCardButton',
+            'onAdminContextMenuShow'
+        );
+    }
+
+    protected function ensureCalcConfigProperty($productsIblockId, $propertyCode)
+    {
+        $productsIblockId = (int)$productsIblockId;
+        $propertyCode = (string)$propertyCode;
+
+        if ($productsIblockId <= 0 || $propertyCode === '' || !Loader::includeModule('iblock')) {
+            return;
+        }
+
+        $existing = \CIBlockProperty::GetList(
+            ['ID' => 'ASC'],
+            ['IBLOCK_ID' => $productsIblockId, 'CODE' => $propertyCode]
+        )->Fetch();
+
+        if ($existing) {
+            return;
+        }
+
+        $property = new \CIBlockProperty();
+        $property->Add([
+            'IBLOCK_ID' => $productsIblockId,
+            'NAME' => 'Конфиг калькулятора',
+            'ACTIVE' => 'Y',
+            'SORT' => 500,
+            'CODE' => $propertyCode,
+            'PROPERTY_TYPE' => 'S',
+            'USER_TYPE' => 'HTML',
+            'MULTIPLE' => 'N',
+            'IS_REQUIRED' => 'N',
+        ]);
+    }
+
+    protected function removeCalcConfigProperty($productsIblockId, $propertyCode)
+    {
+        $productsIblockId = (int)$productsIblockId;
+        $propertyCode = (string)$propertyCode;
+
+        if ($productsIblockId <= 0 || $propertyCode === '' || !Loader::includeModule('iblock')) {
+            return;
+        }
+
+        $existing = \CIBlockProperty::GetList(
+            ['ID' => 'ASC'],
+            ['IBLOCK_ID' => $productsIblockId, 'CODE' => $propertyCode]
+        )->Fetch();
+
+        if ($existing && isset($existing['ID'])) {
+            \CIBlockProperty::Delete((int)$existing['ID']);
+        }
     }
 
     protected function checkDependencies()

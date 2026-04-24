@@ -2,5 +2,6 @@
 
 use Bitrix\Main\Loader;
 
-// Минимально: файл должен существовать; можно оставить пустой autoload map.
-Loader::registerAutoloadClasses('prospektweb.frontcalc', []);
+Loader::registerAutoloadClasses('prospektweb.frontcalc', [
+    '\\Prospektweb\\Frontcalc\\Admin\\ProductCardButton' => 'lib/Admin/ProductCardButton.php',
+]);
