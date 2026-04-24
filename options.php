@@ -1,20 +1,49 @@
 <?php
 
-use Bitrix\Main\Localization\Loc;
+use Bitrix\Main\Config\Option;
+use Bitrix\Main\Loader;
 
-Loc::loadMessages(__FILE__);
+require_once $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_before.php';
 
 $moduleId = 'prospektweb.frontcalc';
+Loader::includeModule($moduleId);
 
-if ($REQUEST_METHOD === 'POST' && check_bitrix_sessid()) {
-    if (isset($_POST['RestoreDefaults']) && $_POST['RestoreDefaults'] === 'Y') {
-        COption::RemoveOption($moduleId);
-    }
+/** @global CMain $APPLICATION */
+/** @global CUser $USER */
+global $APPLICATION, $USER;
+
+if (!$USER->IsAdmin()) {
+    $APPLICATION->AuthForm('Access denied');
 }
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && check_bitrix_sessid()) {
+    Option::set($moduleId, 'PRODUCTS_IBLOCK_ID', trim((string)($_POST['PRODUCTS_IBLOCK_ID'] ?? '0')));
+    Option::set($moduleId, 'OFFERS_IBLOCK_ID', trim((string)($_POST['OFFERS_IBLOCK_ID'] ?? '0')));
+    LocalRedirect($APPLICATION->GetCurPage() . '?mid=' . urlencode($moduleId) . '&lang=' . LANGUAGE_ID . '&saved=Y');
+}
+
+require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_after.php';
+
+$products = Option::get($moduleId, 'PRODUCTS_IBLOCK_ID', '0');
+$offers = Option::get($moduleId, 'OFFERS_IBLOCK_ID', '0');
 ?>
-<form method="post" action="<?= htmlspecialcharsbx($APPLICATION->GetCurPage()) ?>?mid=<?= urlencode($moduleId) ?>&lang=<?= LANGUAGE_ID ?>">
+<?php if (($_GET['saved'] ?? '') === 'Y'): ?>
+    <div class="adm-info-message-wrap success"><div class="adm-info-message">Сохранено</div></div>
+<?php endif; ?>
+
+<form method="post" action="<?= $APPLICATION->GetCurPage() ?>?mid=<?= urlencode($moduleId) ?>&lang=<?= LANGUAGE_ID ?>">
     <?= bitrix_sessid_post(); ?>
-    <p><?= htmlspecialcharsbx('Настройки модуля сохраняются автоматически при установке.') ?></p>
-    <input type="hidden" name="RestoreDefaults" value="Y">
-    <input type="submit" class="adm-btn" value="<?= htmlspecialcharsbx(GetMessage('MAIN_RESTORE_DEFAULTS') ?: 'Сбросить настройки') ?>">
+    <table class="adm-detail-content-table edit-table">
+        <tr>
+            <td width="40%">PRODUCTS_IBLOCK_ID</td>
+            <td><input type="text" name="PRODUCTS_IBLOCK_ID" value="<?= htmlspecialcharsbx($products) ?>" size="8"></td>
+        </tr>
+        <tr>
+            <td>OFFERS_IBLOCK_ID</td>
+            <td><input type="text" name="OFFERS_IBLOCK_ID" value="<?= htmlspecialcharsbx($offers) ?>" size="8"></td>
+        </tr>
+    </table>
+    <input type="submit" value="Сохранить" class="adm-btn-save">
 </form>
+
+<?php require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/epilog_admin.php'; ?>
