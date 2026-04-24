@@ -1,4 +1,3 @@
 <?php
-
-// The file is required by Bitrix module skeleton and can be used
-// as a shared include for module templates.
+// Опциональный entrypoint для шаблона.
+// Для минимального baseline оставляем пустым.

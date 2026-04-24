@@ -1,185 +1,185 @@
 <?php
 
-use Bitrix\Main\Application;
 use Bitrix\Main\Config\Option;
+use Bitrix\Main\EventManager;
 use Bitrix\Main\Loader;
 use Bitrix\Main\Localization\Loc;
+use Bitrix\Main\ModuleManager;
+
+if (!defined('B_PROLOG_INCLUDED') || B_PROLOG_INCLUDED !== true) {
+    die();
+}
 
 Loc::loadMessages(__FILE__);
 
 class prospektweb_frontcalc extends CModule
 {
-    public const DEFAULT_PROPERTY_CODE = 'FRONTCALC_CONFIG';
-    public const TARGET_PRICES_FILE = '/bitrix/modules/aspro.premier/lib/product/prices.php';
-    public const TARGET_PRICES_BACKUP_FILE = '/bitrix/modules/aspro.premier/lib/product/prices_original.php';
-
     public $MODULE_ID = 'prospektweb.frontcalc';
-    public $MODULE_NAME = 'Клиентский калькулятор на основе ТП';
-    public $MODULE_DESCRIPTION = 'Калькулятор позволяет посчитать стоимость ТП с произвольным значениями на основе опорных расчётов';
-    public $MODULE_VERSION = '1.0.1';
-    public $MODULE_VERSION_DATE = '2026-04-23';
-    public $PARTNER_NAME = 'PROSPEKT-WEB';
+    public $MODULE_VERSION;
+    public $MODULE_VERSION_DATE;
+    public $MODULE_NAME;
+    public $MODULE_DESCRIPTION;
+    public $PARTNER_NAME;
+    public $PARTNER_URI;
+    public $MODULE_GROUP_RIGHTS = 'N';
 
     public function __construct()
     {
-        $versionFile = __DIR__ . '/version.php';
-        if (is_file($versionFile)) {
-            include $versionFile;
-            if (is_array($arModuleVersion)) {
-                $this->MODULE_VERSION = $arModuleVersion['VERSION'];
-                $this->MODULE_VERSION_DATE = $arModuleVersion['VERSION_DATE'];
-            }
-        }
+        $arModuleVersion = [];
+        include __DIR__ . '/version.php';
+
+        $this->MODULE_VERSION = $arModuleVersion['VERSION'];
+        $this->MODULE_VERSION_DATE = $arModuleVersion['VERSION_DATE'];
+        $this->MODULE_NAME = Loc::getMessage('PROSPEKTWEB_FRONTCALC_MODULE_NAME') ?: 'PROSPEKT-WEB: FrontCalc';
+        $this->MODULE_DESCRIPTION = Loc::getMessage('PROSPEKTWEB_FRONTCALC_MODULE_DESCRIPTION') ?: 'Модуль калькулятора печатной продукции';
+        $this->PARTNER_NAME = 'PROSPEKT-WEB';
+        $this->PARTNER_URI = 'https://prospektweb.ru';
     }
 
-    public function DoInstall(): void
+    public function DoInstall()
     {
         global $APPLICATION;
 
         if (!$this->checkDependencies()) {
-            return;
+            return false;
         }
 
-        RegisterModule($this->MODULE_ID);
-        $this->InstallDB();
+        $step = (int)($_REQUEST['step'] ?? 1);
 
-        $APPLICATION->IncludeAdminFile('Модуль установлен', __DIR__ . '/step.php');
+        if ($step < 2) {
+            $APPLICATION->IncludeAdminFile(
+                'Установка модуля ' . $this->MODULE_ID,
+                __DIR__ . '/step.php'
+            );
+            return true;
+        }
+
+        ModuleManager::registerModule($this->MODULE_ID);
+
+        try {
+            $this->InstallDB();
+        } catch (\Throwable $e) {
+            ModuleManager::unRegisterModule($this->MODULE_ID);
+            $APPLICATION->ThrowException($e->getMessage());
+            return false;
+        }
+
+        $APPLICATION->IncludeAdminFile(
+            'Установка модуля ' . $this->MODULE_ID,
+            __DIR__ . '/step.php'
+        );
+
+        return true;
     }
 
-    public function DoUninstall(): void
+    public function DoUninstall()
     {
         global $APPLICATION;
 
-        $request = Application::getInstance()->getContext()->getRequest();
-        $step = (int)$request->get('step');
+        $step = (int)($_REQUEST['step'] ?? 1);
 
         if ($step < 2) {
-            $APPLICATION->IncludeAdminFile('Удаление модуля', __DIR__ . '/unstep1.php');
+            $APPLICATION->IncludeAdminFile(
+                'Удаление модуля ' . $this->MODULE_ID,
+                __DIR__ . '/unstep1.php'
+            );
             return;
         }
 
-        $this->UnInstallDB([
-            'delete_calc_property' => $request->getPost('delete_calc_property') === 'Y',
-        ]);
+        $removeData = (isset($_REQUEST['remove_data']) && $_REQUEST['remove_data'] === 'Y');
 
-        UnRegisterModule($this->MODULE_ID);
+        $this->UnInstallDB($removeData);
+        ModuleManager::unRegisterModule($this->MODULE_ID);
 
-        $APPLICATION->IncludeAdminFile('Модуль удален', __DIR__ . '/unstep2.php');
+        $APPLICATION->IncludeAdminFile(
+            'Удаление модуля ' . $this->MODULE_ID,
+            __DIR__ . '/unstep2.php'
+        );
     }
 
-    public function InstallDB(): bool
+    public function InstallDB()
     {
-        [$productsIblockId, $offersIblockId] = $this->resolveCatalogIblocks();
+        if (!$this->checkDependencies()) {
+            throw new \RuntimeException('Не выполнены зависимости iblock/catalog/sale');
+        }
+
+        [$productsIblockId, $offersIblockId] = $this->resolveIblocks();
 
         Option::set($this->MODULE_ID, 'PRODUCTS_IBLOCK_ID', (string)$productsIblockId);
         Option::set($this->MODULE_ID, 'OFFERS_IBLOCK_ID', (string)$offersIblockId);
+        Option::set($this->MODULE_ID, 'CALC_PROPERTY_CODE', 'FRONTCALC_CONFIG');
 
-        if ($productsIblockId > 0) {
-            $this->createCalcConfigProperty($productsIblockId);
-        }
-
-        $this->replacePricesFile();
+        $this->ensureCalcConfigProperty($productsIblockId, 'FRONTCALC_CONFIG');
+        $this->registerAdminHandlers();
 
         return true;
     }
 
-    public function UnInstallDB(array $params = []): bool
+    public function UnInstallDB($removeData = false)
     {
-        $deleteProperty = !empty($params['delete_calc_property']);
         $productsIblockId = (int)Option::get($this->MODULE_ID, 'PRODUCTS_IBLOCK_ID', '0');
+        $propertyCode = (string)Option::get($this->MODULE_ID, 'CALC_PROPERTY_CODE', 'FRONTCALC_CONFIG');
 
-        if ($deleteProperty && $productsIblockId > 0 && Loader::includeModule('iblock')) {
-            $property = CIBlockProperty::GetList(
-                [],
-                [
-                    'IBLOCK_ID' => $productsIblockId,
-                    'CODE' => self::DEFAULT_PROPERTY_CODE,
-                ]
-            )->Fetch();
+        $this->unregisterAdminHandlers();
 
-            if ($property && isset($property['ID'])) {
-                CIBlockProperty::Delete((int)$property['ID']);
-            }
-        }
-
-        Option::delete($this->MODULE_ID, ['name' => 'PRODUCTS_IBLOCK_ID']);
-        Option::delete($this->MODULE_ID, ['name' => 'OFFERS_IBLOCK_ID']);
-
-        $this->restorePricesFile();
-
-        return true;
-    }
-
-    protected function checkDependencies(): bool
-    {
-        global $APPLICATION;
-
-        $requiredModules = ['iblock', 'catalog', 'sale'];
-        foreach ($requiredModules as $moduleId) {
-            if (!Loader::includeModule($moduleId)) {
-                $APPLICATION->ThrowException(sprintf('Не установлен обязательный модуль: %s', $moduleId));
-                return false;
-            }
+        if ($removeData) {
+            $this->removeCalcConfigProperty($productsIblockId, $propertyCode);
+            Option::delete($this->MODULE_ID);
+        } else {
+            // Служебно помечаем, что uninstall прошёл с сохранением данных
+            Option::set($this->MODULE_ID, 'UNINSTALLED_AT', date('c'));
         }
 
         return true;
     }
 
-    protected function resolveCatalogIblocks(): array
+    protected function registerAdminHandlers()
     {
-        $productsIblockId = 0;
-        $offersIblockId = 0;
-
-        if (!Loader::includeModule('catalog')) {
-            return [$productsIblockId, $offersIblockId];
-        }
-
-        $catalogRows = \Bitrix\Catalog\CatalogIblockTable::getList([
-            'select' => ['IBLOCK_ID', 'PRODUCT_IBLOCK_ID'],
-            'order' => ['IBLOCK_ID' => 'ASC'],
-        ]);
-
-        while ($row = $catalogRows->fetch()) {
-            $iblockId = (int)$row['IBLOCK_ID'];
-            $productIblockId = (int)$row['PRODUCT_IBLOCK_ID'];
-
-            if ($productIblockId > 0) {
-                $offersIblockId = $offersIblockId ?: $iblockId;
-                $productsIblockId = $productsIblockId ?: $productIblockId;
-                continue;
-            }
-
-            $productsIblockId = $productsIblockId ?: $iblockId;
-        }
-
-        return [$productsIblockId, $offersIblockId];
+        EventManager::getInstance()->registerEventHandlerCompatible(
+            'main',
+            'OnAdminContextMenuShow',
+            $this->MODULE_ID,
+            '\\Prospektweb\\Frontcalc\\Admin\\ProductCardButton',
+            'onAdminContextMenuShow'
+        );
     }
 
-    protected function createCalcConfigProperty(int $iblockId): void
+    protected function unregisterAdminHandlers()
     {
-        if (!Loader::includeModule('iblock')) {
+        EventManager::getInstance()->unRegisterEventHandler(
+            'main',
+            'OnAdminContextMenuShow',
+            $this->MODULE_ID,
+            '\\Prospektweb\\Frontcalc\\Admin\\ProductCardButton',
+            'onAdminContextMenuShow'
+        );
+    }
+
+    protected function ensureCalcConfigProperty($productsIblockId, $propertyCode)
+    {
+        $productsIblockId = (int)$productsIblockId;
+        $propertyCode = (string)$propertyCode;
+
+        if ($productsIblockId <= 0 || $propertyCode === '' || !Loader::includeModule('iblock')) {
             return;
         }
 
-        $exists = CIBlockProperty::GetList(
-            [],
-            [
-                'IBLOCK_ID' => $iblockId,
-                'CODE' => self::DEFAULT_PROPERTY_CODE,
-            ]
+        $existing = \CIBlockProperty::GetList(
+            ['ID' => 'ASC'],
+            ['IBLOCK_ID' => $productsIblockId, 'CODE' => $propertyCode]
         )->Fetch();
 
-        if ($exists) {
+        if ($existing) {
             return;
         }
 
-        $property = new CIBlockProperty();
+        $property = new \CIBlockProperty();
         $property->Add([
-            'IBLOCK_ID' => $iblockId,
+            'IBLOCK_ID' => $productsIblockId,
             'NAME' => 'Конфиг калькулятора',
             'ACTIVE' => 'Y',
             'SORT' => 500,
-            'CODE' => self::DEFAULT_PROPERTY_CODE,
+            'CODE' => $propertyCode,
             'PROPERTY_TYPE' => 'S',
             'USER_TYPE' => 'HTML',
             'MULTIPLE' => 'N',
@@ -187,38 +187,109 @@ class prospektweb_frontcalc extends CModule
         ]);
     }
 
-    protected function replacePricesFile(): void
+    protected function removeCalcConfigProperty($productsIblockId, $propertyCode)
     {
-        $source = dirname(__DIR__) . '/source/prices.php';
-        $target = $_SERVER['DOCUMENT_ROOT'] . self::TARGET_PRICES_FILE;
-        $backup = $_SERVER['DOCUMENT_ROOT'] . self::TARGET_PRICES_BACKUP_FILE;
+        $productsIblockId = (int)$productsIblockId;
+        $propertyCode = (string)$propertyCode;
 
-        if (!is_file($source) || !is_file($target)) {
+        if ($productsIblockId <= 0 || $propertyCode === '' || !Loader::includeModule('iblock')) {
             return;
         }
 
-        if (!is_file($backup)) {
-            @rename($target, $backup);
-        } else {
-            @unlink($target);
-        }
+        $existing = \CIBlockProperty::GetList(
+            ['ID' => 'ASC'],
+            ['IBLOCK_ID' => $productsIblockId, 'CODE' => $propertyCode]
+        )->Fetch();
 
-        @copy($source, $target);
+        if ($existing && isset($existing['ID'])) {
+            \CIBlockProperty::Delete((int)$existing['ID']);
+        }
     }
 
-    protected function restorePricesFile(): void
+    protected function checkDependencies()
     {
-        $target = $_SERVER['DOCUMENT_ROOT'] . self::TARGET_PRICES_FILE;
-        $backup = $_SERVER['DOCUMENT_ROOT'] . self::TARGET_PRICES_BACKUP_FILE;
+        global $APPLICATION;
 
-        if (!is_file($backup)) {
-            return;
+        $required = ['iblock', 'catalog', 'sale'];
+        $errors = [];
+
+        foreach ($required as $moduleId) {
+            if (!Loader::includeModule($moduleId)) {
+                $errors[] = 'Не найден обязательный модуль: ' . $moduleId;
+            }
         }
 
-        if (is_file($target)) {
-            @unlink($target);
+        if (!empty($errors)) {
+            $APPLICATION->ThrowException(implode('<br>', $errors));
+            return false;
         }
 
-        @rename($backup, $target);
+        return true;
+    }
+
+    /**
+     * Возвращает [PRODUCTS_IBLOCK_ID, OFFERS_IBLOCK_ID]
+     */
+    protected function resolveIblocks()
+    {
+        $productsIblockId = (int)($_REQUEST['PRODUCTS_IBLOCK_ID'] ?? 0);
+        $offersIblockId = (int)($_REQUEST['OFFERS_IBLOCK_ID'] ?? 0);
+
+        // 1) Если руками передали оба ID — используем их
+        if ($productsIblockId > 0 && $offersIblockId > 0) {
+            return [$productsIblockId, $offersIblockId];
+        }
+
+        // 2) Основной путь: таблица catalog_iblock (D7)
+        if (Loader::includeModule('catalog')) {
+            $row = \Bitrix\Catalog\CatalogIblockTable::getList([
+                'select' => ['IBLOCK_ID', 'PRODUCT_IBLOCK_ID'],
+                'filter' => ['!=PRODUCT_IBLOCK_ID' => 0],
+                'order' => ['IBLOCK_ID' => 'ASC'],
+                'limit' => 1,
+            ])->fetch();
+
+            if ($row) {
+                $offersFromTable = (int)$row['IBLOCK_ID'];
+                $productsFromTable = (int)$row['PRODUCT_IBLOCK_ID'];
+
+                if ($offersIblockId <= 0) {
+                    $offersIblockId = $offersFromTable;
+                }
+                if ($productsIblockId <= 0) {
+                    $productsIblockId = $productsFromTable;
+                }
+            }
+        }
+
+        // 3) Если известен offers -> пытаемся получить product через CCatalogSKU
+        if ($offersIblockId > 0 && $productsIblockId <= 0 && Loader::includeModule('catalog')) {
+            $sku = \CCatalogSKU::GetInfoByOfferIBlock($offersIblockId);
+            if (is_array($sku) && !empty($sku['PRODUCT_IBLOCK_ID'])) {
+                $productsIblockId = (int)$sku['PRODUCT_IBLOCK_ID'];
+            }
+        }
+
+        // 4) Fallback: ищем SKU-связь через свойство USER_TYPE=SKU (iblock)
+        if (($productsIblockId <= 0 || $offersIblockId <= 0) && Loader::includeModule('iblock')) {
+            $propRes = \CIBlockProperty::GetList(
+                ['ID' => 'ASC'],
+                ['ACTIVE' => 'Y', 'PROPERTY_TYPE' => 'E', 'USER_TYPE' => 'SKU']
+            );
+            if ($prop = $propRes->Fetch()) {
+                if ($offersIblockId <= 0) {
+                    $offersIblockId = (int)$prop['IBLOCK_ID'];
+                }
+                if ($productsIblockId <= 0) {
+                    $productsIblockId = (int)$prop['LINK_IBLOCK_ID'];
+                }
+            }
+        }
+
+        // 5) Последний fallback — 0 (админ поправит в options.php)
+        return [
+            max(0, (int)$productsIblockId),
+            max(0, (int)$offersIblockId),
+        ];
     }
 }

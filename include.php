@@ -2,7 +2,6 @@
 
 use Bitrix\Main\Loader;
 
-Loader::registerAutoLoadClasses(
-    'prospektweb.frontcalc',
-    []
-);
+Loader::registerAutoloadClasses('prospektweb.frontcalc', [
+    '\\Prospektweb\\Frontcalc\\Admin\\ProductCardButton' => 'lib/Admin/ProductCardButton.php',
+]);
