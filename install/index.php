@@ -26,6 +26,10 @@ if (!defined('B_PROLOG_INCLUDED') || B_PROLOG_INCLUDED !== true) {
     die();
 }
 
+if (!defined('B_PROLOG_INCLUDED') || B_PROLOG_INCLUDED !== true) {
+    die();
+}
+
 class prospektweb_frontcalc extends CModule
 {
     public $MODULE_ID = 'prospektweb.frontcalc';
@@ -71,8 +75,10 @@ class prospektweb_frontcalc extends CModule
         ModuleManager::registerModule($this->MODULE_ID);
 
         try {
+            $this->InstallFiles();
             $this->InstallDB();
         } catch (\Throwable $e) {
+            $this->UnInstallFiles();
             ModuleManager::unRegisterModule($this->MODULE_ID);
             $APPLICATION->ThrowException($e->getMessage());
             return false;
@@ -103,6 +109,7 @@ class prospektweb_frontcalc extends CModule
         $removeData = (isset($_REQUEST['remove_data']) && $_REQUEST['remove_data'] === 'Y');
 
         $this->UnInstallDB($removeData);
+        $this->UnInstallFiles();
         ModuleManager::unRegisterModule($this->MODULE_ID);
 
         $APPLICATION->IncludeAdminFile(
@@ -218,6 +225,33 @@ class prospektweb_frontcalc extends CModule
         if ($existing && isset($existing['ID'])) {
             \CIBlockProperty::Delete((int)$existing['ID']);
         }
+    }
+
+    public function InstallFiles()
+    {
+        $adminTarget = $_SERVER['DOCUMENT_ROOT'] . '/bitrix/admin/prospektweb_frontcalc_editor.php';
+        $moduleAdminFile = $_SERVER['DOCUMENT_ROOT'] . '/local/modules/' . $this->MODULE_ID . '/admin/prospektweb_frontcalc_editor.php';
+
+        if (!is_file($moduleAdminFile)) {
+            throw new \RuntimeException('Не найден файл admin/prospektweb_frontcalc_editor.php');
+        }
+
+        $content = "<?php\nrequire_once \$_SERVER['DOCUMENT_ROOT'] . '/local/modules/" . $this->MODULE_ID . "/admin/prospektweb_frontcalc_editor.php';\n";
+        if (@file_put_contents($adminTarget, $content) === false) {
+            throw new \RuntimeException('Не удалось создать /bitrix/admin/prospektweb_frontcalc_editor.php');
+        }
+
+        return true;
+    }
+
+    public function UnInstallFiles()
+    {
+        $adminTarget = $_SERVER['DOCUMENT_ROOT'] . '/bitrix/admin/prospektweb_frontcalc_editor.php';
+        if (is_file($adminTarget)) {
+            @unlink($adminTarget);
+        }
+
+        return true;
     }
 
     protected function checkDependencies()

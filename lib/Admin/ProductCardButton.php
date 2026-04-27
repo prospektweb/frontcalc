@@ -25,12 +25,14 @@ class ProductCardButton
             return;
         }
 
-        $url = '/local/modules/prospektweb.frontcalc/admin/editor.php?IBLOCK_ID=' . $iblockId . '&ID=' . $elementId . '&lang=' . urlencode((string)($_REQUEST['lang'] ?? 'ru'));
+        $url = '/bitrix/admin/prospektweb_frontcalc_editor.php?IBLOCK_ID=' . $iblockId . '&ID=' . $elementId . '&lang=' . urlencode((string)($_REQUEST['lang'] ?? 'ru'));
+        $jsOpen = "if (window.BX && BX.SidePanel && BX.SidePanel.Instance) { BX.SidePanel.Instance.open('{$url}', {cacheable:false, width:980}); return false; } window.location.href='{$url}'; return false;";
 
         $items[] = [
             'TEXT' => 'Настроить калькулятор',
             'TITLE' => 'Настроить калькулятор',
             'LINK' => $url,
+            'ONCLICK' => $jsOpen,
             'ICON' => 'btn_new',
         ];
     }
