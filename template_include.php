@@ -41,17 +41,19 @@ if (!function_exists('frontcalc_render_runtime_assets')) {
 }
 .frontcalc-calculate-button:disabled{opacity:.65;cursor:wait;}
 .frontcalc-aspro-popup .popup-window-content{padding:0;}
+.frontcalc-aspro-popup.popup-window{border-radius:16px;overflow:hidden;}
 .frontcalc-popup-shell{width:480px;max-width:calc(100vw - 32px);}
-.frontcalc-popup-shell.form.popup{display:block;padding:0;background:#fff;border-radius:12px;overflow:hidden;}
-.frontcalc-popup-shell .form-header{padding:28px 32px 0;}
-.frontcalc-popup-shell .form-header .title{font-size:40px;line-height:46px;font-weight:500;}
-.frontcalc-popup-content{min-height:220px;padding:20px 32px 32px;}
+.frontcalc-popup-shell.form.popup{display:block;padding:0;background:#fff;}
+.frontcalc-popup-shell .form-header{padding:32px 32px 0;}
+.frontcalc-popup-shell .form-header .title{margin:0;}
+.frontcalc-popup-content{min-height:220px;padding:16px 32px 32px;}
 .frontcalc-preloader{display:flex;align-items:center;gap:12px;padding:28px 0;color:#5f6a83;}
 .frontcalc-preloader__spinner{width:28px;height:28px;border-radius:50%;border:3px solid rgba(42,101,208,.2);border-top-color:var(--theme-base-color,#2a65d0);animation:frontcalc-spin .8s linear infinite;}
 .frontcalc-empty{padding:8px 0;color:#5f6a83;}
-.frontcalc-summary{font-size:18px;line-height:28px;color:#555;}
+.frontcalc-summary{font-size:16px;line-height:24px;color:#555;}
 .frontcalc-summary strong{font-weight:600;color:#333;}
 .frontcalc-summary ul{margin:8px 0 0;padding-left:18px;}
+.frontcalc-overlay-blur{backdrop-filter:blur(3px);}
 @keyframes frontcalc-spin{to{transform:rotate(360deg);}}
 </style>
 <script>
@@ -85,7 +87,25 @@ if (!function_exists('frontcalc_render_runtime_assets')) {
                 closeIcon: true,
                 contentNoPaddings: true,
                 content: contentHtml,
-                width: 520
+                width: 480,
+                events: {
+                    onAfterPopupShow: function() {
+                        var overlayNode = frontcalcPopupInstance && frontcalcPopupInstance.overlay && frontcalcPopupInstance.overlay.element
+                            ? frontcalcPopupInstance.overlay.element
+                            : null;
+                        if (overlayNode && overlayNode.classList) {
+                            overlayNode.classList.add('frontcalc-overlay-blur');
+                        }
+                    },
+                    onPopupClose: function() {
+                        var overlayNode = frontcalcPopupInstance && frontcalcPopupInstance.overlay && frontcalcPopupInstance.overlay.element
+                            ? frontcalcPopupInstance.overlay.element
+                            : null;
+                        if (overlayNode && overlayNode.classList) {
+                            overlayNode.classList.remove('frontcalc-overlay-blur');
+                        }
+                    }
+                }
             });
             return frontcalcPopupInstance;
         }
