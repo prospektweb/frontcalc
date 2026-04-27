@@ -30,6 +30,10 @@ if (!defined('B_PROLOG_INCLUDED') || B_PROLOG_INCLUDED !== true) {
     die();
 }
 
+if (!defined('B_PROLOG_INCLUDED') || B_PROLOG_INCLUDED !== true) {
+    die();
+}
+
 class prospektweb_frontcalc extends CModule
 {
     public $MODULE_ID = 'prospektweb.frontcalc';
@@ -230,13 +234,21 @@ class prospektweb_frontcalc extends CModule
     public function InstallFiles()
     {
         $adminTarget = $_SERVER['DOCUMENT_ROOT'] . '/bitrix/admin/prospektweb_frontcalc_editor.php';
-        $moduleAdminFile = $_SERVER['DOCUMENT_ROOT'] . '/local/modules/' . $this->MODULE_ID . '/admin/prospektweb_frontcalc_editor.php';
-
+        $moduleAdminFile = dirname(__DIR__) . '/admin/prospektweb_frontcalc_editor.php';
         if (!is_file($moduleAdminFile)) {
             throw new \RuntimeException('Не найден файл admin/prospektweb_frontcalc_editor.php');
         }
 
-        $content = "<?php\nrequire_once \$_SERVER['DOCUMENT_ROOT'] . '/local/modules/" . $this->MODULE_ID . "/admin/prospektweb_frontcalc_editor.php';\n";
+        $content = "<?php\n"
+            . "\$localPath = \$_SERVER['DOCUMENT_ROOT'] . '/local/modules/" . $this->MODULE_ID . "/admin/prospektweb_frontcalc_editor.php';\n"
+            . "\$bitrixPath = \$_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/" . $this->MODULE_ID . "/admin/prospektweb_frontcalc_editor.php';\n"
+            . "if (is_file(\$localPath)) {\n"
+            . "    require_once \$localPath;\n"
+            . "} elseif (is_file(\$bitrixPath)) {\n"
+            . "    require_once \$bitrixPath;\n"
+            . "} else {\n"
+            . "    die('admin/prospektweb_frontcalc_editor.php not found');\n"
+            . "}\n";
         if (@file_put_contents($adminTarget, $content) === false) {
             throw new \RuntimeException('Не удалось создать /bitrix/admin/prospektweb_frontcalc_editor.php');
         }
