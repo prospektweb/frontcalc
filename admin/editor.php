@@ -113,13 +113,15 @@ foreach ($initialFields as $field) {
 require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_after.php';
 ?>
 <style>
-.fc-wrap{max-width:100%;overflow-x:hidden;}
+.fc-wrap{max-width:980px;width:100%;margin:0 auto;overflow-x:hidden;}
 .fc-soft-wrap {background: linear-gradient(180deg,#f8fbff 0%,#f3f7ff 100%);border:1px solid #dce7ff;border-radius:16px;padding:16px;box-shadow:0 10px 24px rgba(34,71,156,.08);margin-bottom:12px;}
 .fc-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .fc-card {border-radius:14px;border:1px solid #d9e3f8;background:#fff;box-shadow:0 6px 16px rgba(36,69,146,.08);transition:transform .18s ease, box-shadow .18s ease;overflow:hidden;margin-bottom:10px;}
 .fc-card:hover {transform:translateY(-2px);box-shadow:0 12px 24px rgba(30,64,145,.16);} 
 .fc-card-head {width:100%;border:0;background:linear-gradient(180deg,#fff 0%,#f2f6ff 100%);text-align:left;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:14px;font-weight:600;cursor:pointer;}
 .fc-card-title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;max-width:100%;}
+.fc-head-actions{display:flex;align-items:center;gap:8px;}
+.fc-btn-inline{height:30px;padding:0 10px;border:1px solid #d3ddee;background:#f6f9ff;border-radius:8px;cursor:pointer;font-size:13px;color:#455a84;}
 .fc-card-body{padding:12px;border-top:1px solid #e8efff;display:none;} .fc-card.open .fc-card-body{display:block;}
 .fc-input,.fc-select{width:100%;height:38px;border:1px solid #cfd9f1;border-radius:10px;padding:0 10px;background:#fff;box-sizing:border-box;min-width:0;}
 .fc-input:focus,.fc-select:focus{border-color:#2f6cff;box-shadow:0 0 0 3px rgba(47,108,255,.18);outline:none;}
@@ -128,6 +130,9 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
 .fc-pill{display:flex;align-items:center;gap:8px;border:1px solid #d7e2fb;background:#f8fbff;border-radius:10px;min-height:38px;padding:0 10px;font-size:13px;}
 .fc-subtitle{margin:12px 0 8px;font-size:13px;color:#4d5d7d;font-weight:600;}
 .fc-actions{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;}
+.fc-input-block{border:1px dashed #d7e2fb;border-radius:10px;padding:8px;margin-bottom:8px;background:#fbfdff;}
+.fc-input-row-actions{display:flex;justify-content:flex-end;margin-top:6px;}
+.fc-btn-remove-input{height:30px;padding:0 10px;border:1px solid #f2c1c1;background:#fff5f5;color:#a93434;border-radius:8px;cursor:pointer;}
 @media (max-width: 900px){.fc-row,.fc-pills{grid-template-columns:1fr;}}
 </style>
 
@@ -173,21 +178,26 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
             <div class="fc-card<?= $index === 0 ? ' open' : '' ?>" data-prop-code="<?= htmlspecialcharsbx($code) ?>">
                 <button type="button" class="fc-card-head js-fc-toggle">
                     <span class="fc-card-title"><?= htmlspecialcharsbx($prop['NAME']) ?> <small style="opacity:.65; font-weight:400;">(<?= htmlspecialcharsbx($code) ?>)</small></span>
-                    <span>
-                        <button type="button" class="adm-btn js-remove-prop">Удалить</button>
-                        ▾
+                    <span class="fc-head-actions">
+                        <button type="button" class="fc-btn-inline js-remove-prop">Удалить</button>
+                        <span>▾</span>
                     </span>
                 </button>
                 <div class="fc-card-body">
                     <div class="fc-subtitle">Инпуты поля</div>
                     <div class="js-fc-inputs">
                         <?php foreach ($inputs as $input): ?>
-                            <div class="fc-row js-fc-input-row">
-                                <input class="fc-input js-inp-code" placeholder="Кодовое название" value="<?= htmlspecialcharsbx((string)($input['code'] ?? '')) ?>">
-                                <input class="fc-input js-inp-min" placeholder="Минимум" value="<?= htmlspecialcharsbx((string)($input['min'] ?? '')) ?>">
-                                <input class="fc-input js-inp-max" placeholder="Максимум" value="<?= htmlspecialcharsbx((string)($input['max'] ?? '')) ?>">
-                                <input class="fc-input js-inp-step" placeholder="Шаг" value="<?= htmlspecialcharsbx((string)($input['step'] ?? '')) ?>">
-                                <input class="fc-input js-inp-unit" placeholder="Ед. изм." value="<?= htmlspecialcharsbx((string)($input['unit'] ?? '')) ?>">
+                            <div class="fc-input-block js-fc-input-row">
+                                <div class="fc-row">
+                                    <input class="fc-input js-inp-code" placeholder="Кодовое название" value="<?= htmlspecialcharsbx((string)($input['code'] ?? '')) ?>">
+                                    <input class="fc-input js-inp-min" placeholder="Минимум" value="<?= htmlspecialcharsbx((string)($input['min'] ?? '')) ?>">
+                                    <input class="fc-input js-inp-max" placeholder="Максимум" value="<?= htmlspecialcharsbx((string)($input['max'] ?? '')) ?>">
+                                    <input class="fc-input js-inp-step" placeholder="Шаг" value="<?= htmlspecialcharsbx((string)($input['step'] ?? '')) ?>">
+                                    <input class="fc-input js-inp-unit" placeholder="Ед. изм." value="<?= htmlspecialcharsbx((string)($input['unit'] ?? '')) ?>">
+                                </div>
+                                <div class="fc-input-row-actions">
+                                    <button type="button" class="fc-btn-remove-input js-remove-input">Удалить инпут</button>
+                                </div>
                             </div>
                         <?php endforeach; ?>
                     </div>
@@ -241,9 +251,16 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
     function getRows(card){ return Array.from(card.querySelectorAll('.js-fc-input-row')); }
     function syncGroup(card){
         const group = card.querySelector('.js-group-settings');
+        const rows = getRows(card);
         if (group) {
-            group.style.display = getRows(card).length > 1 ? 'block' : 'none';
+            group.style.display = rows.length > 1 ? 'block' : 'none';
         }
+        rows.forEach(function(row){
+            const removeBtn = row.querySelector('.js-remove-input');
+            if (removeBtn) {
+                removeBtn.style.display = rows.length > 1 ? 'inline-flex' : 'none';
+            }
+        });
     }
 
     function availableCodesInCards(){
@@ -280,17 +297,20 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
         const html = '\n<div class="fc-card open" data-prop-code="' + escapeHtml(prop.CODE) + '">\n'
             + '  <button type="button" class="fc-card-head js-fc-toggle">\n'
             + '    <span class="fc-card-title">' + escapeHtml(prop.NAME) + ' <small style="opacity:.65; font-weight:400;">(' + escapeHtml(prop.CODE) + ')</small></span>\n'
-            + '    <span><button type="button" class="adm-btn js-remove-prop">Удалить</button> ▾</span>\n'
+            + '    <span class="fc-head-actions"><button type="button" class="fc-btn-inline js-remove-prop">Удалить</button> <span>▾</span></span>\n'
             + '  </button>\n'
             + '  <div class="fc-card-body">\n'
             + '    <div class="fc-subtitle">Инпуты поля</div>\n'
             + '    <div class="js-fc-inputs">\n'
-            + '      <div class="fc-row js-fc-input-row">\n'
-            + '        <input class="fc-input js-inp-code" placeholder="Кодовое название" value="' + escapeHtml(prop.CODE.replace('CALC_PROP_', '').toLowerCase()) + '">\n'
-            + '        <input class="fc-input js-inp-min" placeholder="Минимум">\n'
-            + '        <input class="fc-input js-inp-max" placeholder="Максимум">\n'
-            + '        <input class="fc-input js-inp-step" placeholder="Шаг">\n'
-            + '        <input class="fc-input js-inp-unit" placeholder="Ед. изм.">\n'
+            + '      <div class="fc-input-block js-fc-input-row">\n'
+            + '        <div class="fc-row">\n'
+            + '          <input class="fc-input js-inp-code" placeholder="Кодовое название" value="' + escapeHtml(prop.CODE.replace('CALC_PROP_', '').toLowerCase()) + '">\n'
+            + '          <input class="fc-input js-inp-min" placeholder="Минимум">\n'
+            + '          <input class="fc-input js-inp-max" placeholder="Максимум">\n'
+            + '          <input class="fc-input js-inp-step" placeholder="Шаг">\n'
+            + '          <input class="fc-input js-inp-unit" placeholder="Ед. изм.">\n'
+            + '        </div>\n'
+            + '        <div class="fc-input-row-actions"><button type="button" class="fc-btn-remove-input js-remove-input">Удалить инпут</button></div>\n'
             + '      </div>\n'
             + '    </div>\n'
             + '    <div class="fc-actions"><button type="button" class="adm-btn js-add-input">+ Добавить инпут</button></div>\n'
@@ -345,6 +365,17 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
                 clone.querySelectorAll('input').forEach(inp => inp.value = '');
                 rows.appendChild(clone);
                 syncGroup(card);
+                return;
+            }
+
+            const removeInput = event.target.closest('.js-remove-input');
+            if (removeInput) {
+                const card = removeInput.closest('.fc-card');
+                const row = removeInput.closest('.js-fc-input-row');
+                if (card && row) {
+                    row.remove();
+                    syncGroup(card);
+                }
                 return;
             }
 
