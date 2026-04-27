@@ -40,8 +40,6 @@ if (!function_exists('frontcalc_render_runtime_assets')) {
     color:var(--button_color_text,#fff);
 }
 .frontcalc-calculate-button:disabled{opacity:.65;cursor:wait;}
-.frontcalc-aspro-popup .popup-window-content{padding:0;}
-.frontcalc-aspro-popup.popup-window{border-radius:16px;overflow:hidden;}
 .frontcalc-popup-shell{width:480px;max-width:calc(100vw - 32px);}
 .frontcalc-popup-shell.form.popup{display:block;padding:0;background:#fff;}
 .frontcalc-popup-shell .form-header{padding:32px 32px 0;}
@@ -53,7 +51,6 @@ if (!function_exists('frontcalc_render_runtime_assets')) {
 .frontcalc-summary{font-size:16px;line-height:24px;color:#555;}
 .frontcalc-summary strong{font-weight:600;color:#333;}
 .frontcalc-summary ul{margin:8px 0 0;padding-left:18px;}
-.frontcalc-overlay-blur{backdrop-filter:blur(3px);}
 @keyframes frontcalc-spin{to{transform:rotate(360deg);}}
 </style>
 <script>
@@ -69,48 +66,84 @@ if (!function_exists('frontcalc_render_runtime_assets')) {
         });
     }
 
+    function closePopup(){
+        if (!frontcalcPopupInstance) {
+            return;
+        }
+
+        if (frontcalcPopupInstance.windowEl && frontcalcPopupInstance.windowEl.parentNode) {
+            frontcalcPopupInstance.windowEl.parentNode.removeChild(frontcalcPopupInstance.windowEl);
+        }
+        if (frontcalcPopupInstance.overlayEl && frontcalcPopupInstance.overlayEl.parentNode) {
+            frontcalcPopupInstance.overlayEl.parentNode.removeChild(frontcalcPopupInstance.overlayEl);
+        }
+
+        document.body.classList.remove('jqm-initied');
+        document.body.classList.remove('swipeignore');
+        frontcalcPopupInstance = null;
+    }
+
     function ensurePopup(){
         if (frontcalcPopupInstance) { return frontcalcPopupInstance; }
 
-        if (window.BX && BX.PopupWindowManager) {
-            var contentHtml = ''
-                + '<div class="form popup frontcalc-popup-shell">'
-                + '  <div class="form-header"><div class="text"><div class="title">Калькулятор стоимости</div></div></div>'
-                + '  <div class="frontcalc-popup-content js-frontcalc-popup-content"></div>'
-                + '</div>';
-
-            frontcalcPopupInstance = BX.PopupWindowManager.create('frontcalc-popup', null, {
-                autoHide: true,
-                closeByEsc: true,
-                overlay: true,
-                className: 'frontcalc-aspro-popup',
-                closeIcon: true,
-                contentNoPaddings: true,
-                content: contentHtml,
-                width: 480,
-                events: {
-                    onAfterPopupShow: function() {
-                        var overlayNode = frontcalcPopupInstance && frontcalcPopupInstance.overlay && frontcalcPopupInstance.overlay.element
-                            ? frontcalcPopupInstance.overlay.element
-                            : null;
-                        if (overlayNode && overlayNode.classList) {
-                            overlayNode.classList.add('frontcalc-overlay-blur');
-                        }
-                    },
-                    onPopupClose: function() {
-                        var overlayNode = frontcalcPopupInstance && frontcalcPopupInstance.overlay && frontcalcPopupInstance.overlay.element
-                            ? frontcalcPopupInstance.overlay.element
-                            : null;
-                        if (overlayNode && overlayNode.classList) {
-                            overlayNode.classList.remove('frontcalc-overlay-blur');
-                        }
-                    }
-                }
-            });
-            return frontcalcPopupInstance;
+        var wrapper = document.getElementById('popup_iframe_wrapper');
+        if (!wrapper) {
+            wrapper = document.createElement('div');
+            wrapper.id = 'popup_iframe_wrapper';
+            document.body.appendChild(wrapper);
         }
+        wrapper.style.zIndex = '3000';
+        wrapper.style.display = 'flex';
 
-        return null;
+        var overlayEl = document.createElement('div');
+        overlayEl.className = 'jqmOverlay';
+        overlayEl.style.height = '100%';
+        overlayEl.style.width = '100%';
+        overlayEl.style.position = 'fixed';
+        overlayEl.style.left = '0';
+        overlayEl.style.top = '0';
+        overlayEl.style.zIndex = '2999';
+        overlayEl.style.opacity = '0.5';
+
+        var windowEl = document.createElement('div');
+        windowEl.className = 'question_frame jqmWindow jqmWindow--mobile-fill popup jqm-init show';
+        windowEl.setAttribute('data-popup', '0');
+        windowEl.style.zIndex = '3000';
+        windowEl.style.opacity = '1';
+
+        windowEl.innerHTML = ''
+            + '<span class="jqmClose top-close fill-grey-hover" title="Закрыть"><i class="svg inline inline" aria-hidden="true">×</i></span>'
+            + '<div class="scrollbar">'
+            + '  <div class="flexbox">'
+            + '    <div class="form popup frontcalc-popup-shell">'
+            + '      <div class="form-header"><div class="text"><div class="title switcher-title font_24 color_222">Калькулятор стоимости</div></div></div>'
+            + '      <div class="frontcalc-popup-content js-frontcalc-popup-content"></div>'
+            + '    </div>'
+            + '  </div>'
+            + '</div>';
+
+        wrapper.appendChild(overlayEl);
+        wrapper.appendChild(windowEl);
+
+        overlayEl.addEventListener('click', closePopup);
+        windowEl.querySelector('.jqmClose').addEventListener('click', function(event){
+            event.preventDefault();
+            closePopup();
+        });
+
+        document.body.classList.add('jqm-initied');
+        document.body.classList.add('swipeignore');
+
+        frontcalcPopupInstance = {
+            wrapper: wrapper,
+            overlayEl: overlayEl,
+            windowEl: windowEl,
+            contentNode: windowEl.querySelector('.js-frontcalc-popup-content'),
+            show: function(){},
+            close: closePopup
+        };
+
+        return frontcalcPopupInstance;
     }
 
     function findCalculateButton(target){
@@ -224,7 +257,7 @@ if (!function_exists('frontcalc_render_runtime_assets')) {
         }
 
         currentPopup.show();
-        var contentNode = currentPopup.popupContainer.querySelector('.js-frontcalc-popup-content');
+        var contentNode = currentPopup.contentNode;
         if (!contentNode) {
             button.disabled = false;
             return;
