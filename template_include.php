@@ -51,7 +51,7 @@ if (!function_exists('frontcalc_render_runtime_assets')) {
     if(window.__frontcalcReady){return;}
     window.__frontcalcReady = true;
 
-    var popup = null;
+    var frontcalcPopupInstance = null;
 
     function escapeHtml(str){
         return String(str || '').replace(/[&<>"']/g, function(ch){
@@ -60,10 +60,10 @@ if (!function_exists('frontcalc_render_runtime_assets')) {
     }
 
     function ensurePopup(){
-        if (popup) { return popup; }
+        if (frontcalcPopupInstance) { return frontcalcPopupInstance; }
 
         if (window.BX && BX.PopupWindowManager) {
-            popup = BX.PopupWindowManager.create('frontcalc-popup', null, {
+            frontcalcPopupInstance = BX.PopupWindowManager.create('frontcalc-popup', null, {
                 autoHide: true,
                 closeByEsc: true,
                 overlay: true,
@@ -72,7 +72,27 @@ if (!function_exists('frontcalc_render_runtime_assets')) {
                 content: '<div class="frontcalc-popup-content js-frontcalc-popup-content"></div>',
                 width: 760
             });
-            return popup;
+            return frontcalcPopupInstance;
+        }
+
+        return null;
+    }
+
+    function findCalculateButton(target){
+        if (!target) {
+            return null;
+        }
+
+        if (target.closest) {
+            return target.closest('.js-frontcalc-calculate');
+        }
+
+        var node = target;
+        while (node && node !== document) {
+            if (node.classList && node.classList.contains('js-frontcalc-calculate')) {
+                return node;
+            }
+            node = node.parentNode;
         }
 
         return null;
@@ -143,7 +163,7 @@ if (!function_exists('frontcalc_render_runtime_assets')) {
     }
 
     document.addEventListener('click', function(event){
-        var button = event.target && event.target.closest ? event.target.closest('.js-frontcalc-calculate') : null;
+        var button = findCalculateButton(event.target);
         if (!button) { return; }
 
         event.preventDefault();
