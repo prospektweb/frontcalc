@@ -184,7 +184,20 @@ class prospektweb_frontcalc extends CModule
         }
 
         $startMarker = '/* FRONTCALC_BUTTON_START */';
+        $snippet = $this->buildFrontcalcBasketSnippet();
+
         if (strpos($content, $startMarker) !== false) {
+            $replacePattern = '#<\?php\s*/\*\s*FRONTCALC_BUTTON_START\s*\*/\s*\?>[\s\S]*?<\?php\s*/\*\s*FRONTCALC_BUTTON_END\s*\*/\s*\?>#';
+            $replaced = preg_replace($replacePattern, trim($snippet), $content, -1, $replaceCount);
+
+            if (!is_string($replaced) || $replaceCount < 1) {
+                throw new \RuntimeException('Не удалось обновить существующий блок FrontCalc в файле: ' . $basketPath);
+            }
+
+            if (@file_put_contents($basketPath, $replaced) === false) {
+                throw new \RuntimeException('Не удалось записать обновлённый патч в файл: ' . $basketPath);
+            }
+
             return;
         }
 
@@ -197,7 +210,6 @@ class prospektweb_frontcalc extends CModule
 
         $anchorMatches = $matches[0];
 
-        $snippet = $this->buildFrontcalcBasketSnippet();
         $offsetShift = 0;
         $patchCount = 0;
 
@@ -223,14 +235,31 @@ class prospektweb_frontcalc extends CModule
 
     protected function buildFrontcalcBasketSnippet()
     {
-        return "\n<?php /* FRONTCALC_BUTTON_START */ ?>\n"
-            . "<?php if (\\Bitrix\\Main\\Loader::includeModule('prospektweb.frontcalc')): ?>\n"
-            . "<?php \$frontcalcPayload = (new \\Prospektweb\\Frontcalc\\Service\\CalculatorAvailability())->getLightPayload((int)(\$arConfig['ITEM_ID'] ?? 0), (int)(\$arConfig['CATALOG_IBLOCK_ID'] ?? 0)); ?>\n"
-            . "<?php if (!empty(\$frontcalcPayload['is_available'])): ?>\n"
-            . "<button type=\"button\" class=\"frontcalc-calculate-button js-frontcalc-calculate\" data-frontcalc-product-id=\"<?= (int)\$frontcalcPayload['product_id'] ?>\" data-frontcalc-ajax-url=\"<?= htmlspecialcharsbx((string)\$frontcalcPayload['ajax_url']) ?>\">Рассчитать стоимость</button>\n"
-            . "<?php endif; ?>\n"
-            . "<?php endif; ?>\n"
-            . "<?php /* FRONTCALC_BUTTON_END */ ?>\n";
+        return "
+<?php /* FRONTCALC_BUTTON_START */ ?>
+"
+            . "<?php if (\Bitrix\Main\Loader::includeModule('prospektweb.frontcalc')): ?>
+"
+            . "<?php \$frontcalcTemplateIncludeLocal = \$_SERVER['DOCUMENT_ROOT'] . '/local/modules/prospektweb.frontcalc/template_include.php'; ?>
+"
+            . "<?php \$frontcalcTemplateIncludeBitrix = \$_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/prospektweb.frontcalc/template_include.php'; ?>
+"
+            . "<?php if (is_file(\$frontcalcTemplateIncludeLocal)) { require_once \$frontcalcTemplateIncludeLocal; } elseif (is_file(\$frontcalcTemplateIncludeBitrix)) { require_once \$frontcalcTemplateIncludeBitrix; } ?>
+"
+            . "<?php if (function_exists('frontcalc_render_runtime_assets')) { echo frontcalc_render_runtime_assets(); } ?>
+"
+            . "<?php \$frontcalcPayload = (new \Prospektweb\Frontcalc\Service\CalculatorAvailability())->getLightPayload((int)(\$arConfig['ITEM_ID'] ?? 0), (int)(\$arConfig['CATALOG_IBLOCK_ID'] ?? 0)); ?>
+"
+            . "<?php if (!empty(\$frontcalcPayload['is_available'])): ?>
+"
+            . "<button type=\"button\" class=\"btn btn-default btn-transparent-bg btn-wide frontcalc-calculate-button js-frontcalc-calculate\" data-frontcalc-product-id=\"<?= (int)\$frontcalcPayload['product_id'] ?>\" data-frontcalc-ajax-url=\"<?= htmlspecialcharsbx((string)\$frontcalcPayload['ajax_url']) ?>\">Рассчитать стоимость</button>
+"
+            . "<?php endif; ?>
+"
+            . "<?php endif; ?>
+"
+            . "<?php /* FRONTCALC_BUTTON_END */ ?>
+";
     }
 
     protected function registerAdminHandlers()
@@ -328,6 +357,29 @@ class prospektweb_frontcalc extends CModule
             throw new \RuntimeException('Не удалось создать /bitrix/admin/prospektweb_frontcalc_editor.php');
         }
 
+        $ajaxTarget = $_SERVER['DOCUMENT_ROOT'] . '/local/ajax/frontcalc.php';
+        $ajaxDir = dirname($ajaxTarget);
+        if (!is_dir($ajaxDir) && !@mkdir($ajaxDir, 0775, true) && !is_dir($ajaxDir)) {
+            throw new \RuntimeException('Не удалось создать каталог /local/ajax для frontcalc endpoint');
+        }
+
+        $ajaxContent = "<?php\n"
+            . "\$localPath = \$_SERVER['DOCUMENT_ROOT'] . '/local/modules/" . $this->MODULE_ID . "/ajax/frontcalc.php';\n"
+            . "\$bitrixPath = \$_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/" . $this->MODULE_ID . "/ajax/frontcalc.php';\n"
+            . "if (is_file(\$localPath)) {\n"
+            . "    require_once \$localPath;\n"
+            . "} elseif (is_file(\$bitrixPath)) {\n"
+            . "    require_once \$bitrixPath;\n"
+            . "} else {\n"
+            . "    http_response_code(500);\n"
+            . "    header('Content-Type: application/json; charset=UTF-8');\n"
+            . "    echo json_encode(['success' => false, 'message' => 'frontcalc ajax endpoint not found'], JSON_UNESCAPED_UNICODE);\n"
+            . "}\n";
+
+        if (@file_put_contents($ajaxTarget, $ajaxContent) === false) {
+            throw new \RuntimeException('Не удалось создать /local/ajax/frontcalc.php');
+        }
+
         return true;
     }
 
@@ -336,6 +388,11 @@ class prospektweb_frontcalc extends CModule
         $adminTarget = $_SERVER['DOCUMENT_ROOT'] . '/bitrix/admin/prospektweb_frontcalc_editor.php';
         if (is_file($adminTarget)) {
             @unlink($adminTarget);
+        }
+
+        $ajaxTarget = $_SERVER['DOCUMENT_ROOT'] . '/local/ajax/frontcalc.php';
+        if (is_file($ajaxTarget)) {
+            @unlink($ajaxTarget);
         }
 
         return true;
