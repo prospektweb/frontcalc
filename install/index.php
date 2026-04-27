@@ -184,7 +184,20 @@ class prospektweb_frontcalc extends CModule
         }
 
         $startMarker = '/* FRONTCALC_BUTTON_START */';
+        $snippet = $this->buildFrontcalcBasketSnippet();
+
         if (strpos($content, $startMarker) !== false) {
+            $replacePattern = '#<\?php\s*/\*\s*FRONTCALC_BUTTON_START\s*\*/\s*\?>[\s\S]*?<\?php\s*/\*\s*FRONTCALC_BUTTON_END\s*\*/\s*\?>#';
+            $replaced = preg_replace($replacePattern, trim($snippet), $content, -1, $replaceCount);
+
+            if (!is_string($replaced) || $replaceCount < 1) {
+                throw new \RuntimeException('Не удалось обновить существующий блок FrontCalc в файле: ' . $basketPath);
+            }
+
+            if (@file_put_contents($basketPath, $replaced) === false) {
+                throw new \RuntimeException('Не удалось записать обновлённый патч в файл: ' . $basketPath);
+            }
+
             return;
         }
 
@@ -197,7 +210,6 @@ class prospektweb_frontcalc extends CModule
 
         $anchorMatches = $matches[0];
 
-        $snippet = $this->buildFrontcalcBasketSnippet();
         $offsetShift = 0;
         $patchCount = 0;
 
@@ -240,7 +252,7 @@ class prospektweb_frontcalc extends CModule
 "
             . "<?php if (!empty(\$frontcalcPayload['is_available'])): ?>
 "
-            . "<button type=\"button\" class=\"frontcalc-calculate-button js-frontcalc-calculate\" data-frontcalc-product-id=\"<?= (int)\$frontcalcPayload['product_id'] ?>\" data-frontcalc-ajax-url=\"<?= htmlspecialcharsbx((string)\$frontcalcPayload['ajax_url']) ?>\">Рассчитать стоимость</button>
+            . "<button type=\"button\" class=\"btn btn-default btn-transparent-bg btn-wide frontcalc-calculate-button js-frontcalc-calculate\" data-frontcalc-product-id=\"<?= (int)\$frontcalcPayload['product_id'] ?>\" data-frontcalc-ajax-url=\"<?= htmlspecialcharsbx((string)\$frontcalcPayload['ajax_url']) ?>\">Рассчитать стоимость</button>
 "
             . "<?php endif; ?>
 "

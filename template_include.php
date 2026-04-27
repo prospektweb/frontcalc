@@ -14,6 +14,9 @@ if (!function_exists('frontcalc_render_runtime_assets')) {
         return <<<'HTML'
 <style>
 .frontcalc-calculate-button{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
     width:100%;
     margin-top:10px;
     min-height:52px;
@@ -26,7 +29,8 @@ if (!function_exists('frontcalc_render_runtime_assets')) {
     font-weight:600;
     line-height:1.2;
     cursor:pointer;
-    transition:all .2s ease;
+    transition:color .2s ease,background-color .2s ease,border-color .2s ease,box-shadow .2s ease;
+    box-shadow:none;
 }
 .frontcalc-calculate-button:hover,
 .frontcalc-calculate-button:focus,
@@ -210,7 +214,7 @@ if (!function_exists('frontcalc_render_calculate_button')) {
         }
 
         return frontcalc_render_runtime_assets() . sprintf(
-            '<button type="button" class="frontcalc-calculate-button js-frontcalc-calculate" data-frontcalc-product-id="%d" data-frontcalc-ajax-url="%s">%s</button>',
+            '<button type="button" class="btn btn-default btn-transparent-bg btn-wide frontcalc-calculate-button js-frontcalc-calculate" data-frontcalc-product-id="%d" data-frontcalc-ajax-url="%s">%s</button>',
             (int)$payload['product_id'],
             htmlspecialcharsbx((string)$payload['ajax_url']),
             htmlspecialcharsbx($caption)
