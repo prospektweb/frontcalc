@@ -93,6 +93,7 @@ class prospektweb_frontcalc extends CModule
         try {
             $this->InstallFiles();
             $this->InstallDB();
+            $this->patchAsproBasketFile();
         } catch (\Throwable $e) {
             $this->UnInstallFiles();
             ModuleManager::unRegisterModule($this->MODULE_ID);
@@ -168,6 +169,68 @@ class prospektweb_frontcalc extends CModule
         }
 
         return true;
+    }
+
+    protected function patchAsproBasketFile()
+    {
+        $basketPath = $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/aspro.premier/lib/product/basket.php';
+        if (!is_file($basketPath)) {
+            throw new \RuntimeException('Не найден файл Aspro для патча: ' . $basketPath);
+        }
+
+        $content = (string)file_get_contents($basketPath);
+        if ($content === '') {
+            throw new \RuntimeException('Файл Aspro пуст или не читается: ' . $basketPath);
+        }
+
+        $startMarker = '/* FRONTCALC_BUTTON_START */';
+        if (strpos($content, $startMarker) !== false) {
+            return;
+        }
+
+        $anchorPattern = '#<\?(?:php)?\s*if\s*\(\s*\$arConfig\[\s*[\'"]SHOW_BASKET_LINK[\'"]\s*\]\s*===\s*[\'"]Y[\'"]\s*\)\s*:\s*\?>#i';
+        if (!preg_match_all($anchorPattern, $content, $matches, PREG_OFFSET_CAPTURE)) {
+            throw new \RuntimeException(
+                'Шаблон Aspro обновился: не найдены подходящие сигнатуры "<?if ($arConfig[\'SHOW_BASKET_LINK\'] === \'Y\'):?>" в файле ' . $basketPath
+            );
+        }
+
+        $anchorMatches = $matches[0];
+
+        $snippet = $this->buildFrontcalcBasketSnippet();
+        $offsetShift = 0;
+        $patchCount = 0;
+
+        for ($i = 0; $i < count($anchorMatches); $i++) {
+            $matchOffset = (int)$anchorMatches[$i][1] + $offsetShift;
+            $insertPosition = $matchOffset;
+            $content = substr($content, 0, $insertPosition) . $snippet . substr($content, $insertPosition);
+
+            $offsetShift += strlen($snippet);
+            $patchCount++;
+        }
+
+        if ($patchCount < 1) {
+            throw new \RuntimeException(
+                'Шаблон Aspro обновился: не удалось вставить FrontCalc перед SHOW_BASKET_LINK в файле ' . $basketPath
+            );
+        }
+
+        if (@file_put_contents($basketPath, $content) === false) {
+            throw new \RuntimeException('Не удалось записать патч в файл: ' . $basketPath);
+        }
+    }
+
+    protected function buildFrontcalcBasketSnippet()
+    {
+        return "\n<?php /* FRONTCALC_BUTTON_START */ ?>\n"
+            . "<?php if (\\Bitrix\\Main\\Loader::includeModule('prospektweb.frontcalc')): ?>\n"
+            . "<?php \$frontcalcPayload = (new \\Prospektweb\\Frontcalc\\Service\\CalculatorAvailability())->getLightPayload((int)(\$arConfig['ITEM_ID'] ?? 0), (int)(\$arConfig['CATALOG_IBLOCK_ID'] ?? 0)); ?>\n"
+            . "<?php if (!empty(\$frontcalcPayload['is_available'])): ?>\n"
+            . "<button type=\"button\" class=\"frontcalc-calculate-button js-frontcalc-calculate\" data-frontcalc-product-id=\"<?= (int)\$frontcalcPayload['product_id'] ?>\" data-frontcalc-ajax-url=\"<?= htmlspecialcharsbx((string)\$frontcalcPayload['ajax_url']) ?>\">Рассчитать стоимость</button>\n"
+            . "<?php endif; ?>\n"
+            . "<?php endif; ?>\n"
+            . "<?php /* FRONTCALC_BUTTON_END */ ?>\n";
     }
 
     protected function registerAdminHandlers()
