@@ -40,10 +40,18 @@ if (!function_exists('frontcalc_render_runtime_assets')) {
     color:var(--button_color_text,#fff);
 }
 .frontcalc-calculate-button:disabled{opacity:.65;cursor:wait;}
-.frontcalc-preloader{display:flex;align-items:center;justify-content:center;gap:12px;padding:28px 0;color:#5f6a83;}
+.frontcalc-aspro-popup .popup-window-content{padding:0;}
+.frontcalc-popup-shell{width:480px;max-width:calc(100vw - 32px);}
+.frontcalc-popup-shell.form.popup{display:block;padding:0;background:#fff;border-radius:12px;overflow:hidden;}
+.frontcalc-popup-shell .form-header{padding:28px 32px 0;}
+.frontcalc-popup-shell .form-header .title{font-size:40px;line-height:46px;font-weight:500;}
+.frontcalc-popup-content{min-height:220px;padding:20px 32px 32px;}
+.frontcalc-preloader{display:flex;align-items:center;gap:12px;padding:28px 0;color:#5f6a83;}
 .frontcalc-preloader__spinner{width:28px;height:28px;border-radius:50%;border:3px solid rgba(42,101,208,.2);border-top-color:var(--theme-base-color,#2a65d0);animation:frontcalc-spin .8s linear infinite;}
-.frontcalc-popup-content{min-height:220px;}
 .frontcalc-empty{padding:8px 0;color:#5f6a83;}
+.frontcalc-summary{font-size:18px;line-height:28px;color:#555;}
+.frontcalc-summary strong{font-weight:600;color:#333;}
+.frontcalc-summary ul{margin:8px 0 0;padding-left:18px;}
 @keyframes frontcalc-spin{to{transform:rotate(360deg);}}
 </style>
 <script>
@@ -63,14 +71,21 @@ if (!function_exists('frontcalc_render_runtime_assets')) {
         if (frontcalcPopupInstance) { return frontcalcPopupInstance; }
 
         if (window.BX && BX.PopupWindowManager) {
+            var contentHtml = ''
+                + '<div class="form popup frontcalc-popup-shell">'
+                + '  <div class="form-header"><div class="text"><div class="title">Калькулятор стоимости</div></div></div>'
+                + '  <div class="frontcalc-popup-content js-frontcalc-popup-content"></div>'
+                + '</div>';
+
             frontcalcPopupInstance = BX.PopupWindowManager.create('frontcalc-popup', null, {
                 autoHide: true,
                 closeByEsc: true,
                 overlay: true,
-                closeIcon: { right: '16px', top: '16px' },
-                titleBar: { content: BX.create('span', { text: 'Калькулятор стоимости' }) },
-                content: '<div class="frontcalc-popup-content js-frontcalc-popup-content"></div>',
-                width: 760
+                className: 'frontcalc-aspro-popup',
+                closeIcon: true,
+                contentNoPaddings: true,
+                content: contentHtml,
+                width: 520
             });
             return frontcalcPopupInstance;
         }
@@ -117,7 +132,7 @@ if (!function_exists('frontcalc_render_runtime_assets')) {
             return;
         }
 
-        var html = '';
+        var html = '<div class="frontcalc-summary">';
         html += '<div><strong>Товар ID:</strong> ' + escapeHtml(data.product_id) + '</div>';
         html += '<div style="margin-top:6px;"><strong>Полей в конфиге:</strong> ' + escapeHtml(fields.length) + '</div>';
         html += '<div style="margin-top:6px;"><strong>Торговых предложений:</strong> ' + escapeHtml(offers.length) + '</div>';
@@ -126,7 +141,7 @@ if (!function_exists('frontcalc_render_runtime_assets')) {
         for (var i = 0; i < fields.length; i++) {
             html += '<li>' + escapeHtml(fields[i].property_code || ('Поле ' + (i + 1))) + '</li>';
         }
-        html += '</ul>';
+        html += '</ul></div>';
 
         contentNode.innerHTML = html;
     }
