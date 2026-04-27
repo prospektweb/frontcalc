@@ -188,39 +188,31 @@ class prospektweb_frontcalc extends CModule
             return;
         }
 
-        $buttonPattern = '#(<(?:button|a)[^>]*>[\s\S]{0,400}?В\s*корзину[\s\S]{0,120}?<\/(?:button|a)>)#ui';
-        if (!preg_match_all($buttonPattern, $content, $matches, PREG_OFFSET_CAPTURE)) {
+        $anchorPattern = '#<\?(?:php)?\s*if\s*\(\s*\$arConfig\[\s*[\'"]SHOW_BASKET_LINK[\'"]\s*\]\s*===\s*[\'"]Y[\'"]\s*\)\s*:\s*\?>#i';
+        if (!preg_match_all($anchorPattern, $content, $matches, PREG_OFFSET_CAPTURE)) {
             throw new \RuntimeException(
-                'Шаблон Aspro обновился: не найдены подходящие сигнатуры в файле ' . $basketPath
+                'Шаблон Aspro обновился: не найдены подходящие сигнатуры "<?if ($arConfig[\'SHOW_BASKET_LINK\'] === \'Y\'):?>" в файле ' . $basketPath
             );
         }
 
-        $buttonMatches = $matches[1];
-        if (count($buttonMatches) < 2) {
-            throw new \RuntimeException(
-                'Шаблон Aspro обновился: найдено недостаточно сигнатур кнопки "В корзину" в файле ' . $basketPath
-            );
-        }
+        $anchorMatches = $matches[0];
 
         $snippet = $this->buildFrontcalcBasketSnippet();
         $offsetShift = 0;
         $patchCount = 0;
 
-        for ($i = 0; $i < count($buttonMatches) && $patchCount < 2; $i++) {
-            $fullMatch = (string)$buttonMatches[$i][0];
-            $matchOffset = (int)$buttonMatches[$i][1] + $offsetShift;
-            $matchLength = strlen($fullMatch);
-
-            $insertPosition = $matchOffset + $matchLength;
+        for ($i = 0; $i < count($anchorMatches); $i++) {
+            $matchOffset = (int)$anchorMatches[$i][1] + $offsetShift;
+            $insertPosition = $matchOffset;
             $content = substr($content, 0, $insertPosition) . $snippet . substr($content, $insertPosition);
 
             $offsetShift += strlen($snippet);
             $patchCount++;
         }
 
-        if ($patchCount < 2) {
+        if ($patchCount < 1) {
             throw new \RuntimeException(
-                'Шаблон Aspro обновился: не удалось вставить FrontCalc в две точки рендера файла ' . $basketPath
+                'Шаблон Aspro обновился: не удалось вставить FrontCalc перед SHOW_BASKET_LINK в файле ' . $basketPath
             );
         }
 
