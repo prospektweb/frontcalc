@@ -546,18 +546,24 @@
         $section.append($chips);
 
         if (showPresetsBySetting && presets.length) {
+          var presetInteractionInProgress = false;
           $chips.hide();
+          $chips.on("mousedown touchstart", ".frontcalc-chip", function () {
+            presetInteractionInProgress = true;
+          });
           $section.on("focusin", ".frontcalc-num-input", function () {
             $chips.show();
           });
           $section.on("focusout", ".frontcalc-num-input", function () {
             setTimeout(function () {
+              if (presetInteractionInProgress) return;
               if ($(document.activeElement).hasClass("frontcalc-num-input")) return;
               $chips.hide();
             }, 0);
           });
 
           $chips.on("click", ".frontcalc-chip", function () {
+            presetInteractionInProgress = false;
             $chips.hide();
             this.blur();
           });
