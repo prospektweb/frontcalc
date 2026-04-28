@@ -3,6 +3,7 @@
 namespace Prospektweb\Frontcalc\Admin;
 
 use Bitrix\Main\Config\Option;
+use Bitrix\Main\Loader;
 
 class ProductCardButton
 {
@@ -23,7 +24,7 @@ class ProductCardButton
         $iblockId = (int)($_REQUEST['IBLOCK_ID'] ?? 0);
         $productsIblockId = (int)Option::get('prospektweb.frontcalc', 'PRODUCTS_IBLOCK_ID', '0');
 
-        if ($elementId > 0 && $iblockId <= 0 && class_exists('\CIBlockElement')) {
+        if ($elementId > 0 && $iblockId <= 0 && Loader::includeModule('iblock') && class_exists('\CIBlockElement')) {
             $iblockId = (int)\CIBlockElement::GetIBlockByID($elementId);
         }
 
