@@ -130,6 +130,28 @@
     return map;
   }
 
+  function makeCodeOrderMapFromMeta(propertyMetaList) {
+    var map = {};
+    (Array.isArray(propertyMetaList) ? propertyMetaList : []).forEach(function (meta, index) {
+      var code = String((meta && meta.code) || "").trim();
+      if (code && map[code] === undefined) {
+        map[code] = index;
+      }
+    });
+    return map;
+  }
+
+  function makeCodeOrderMapFromFields(fields) {
+    var map = {};
+    (Array.isArray(fields) ? fields : []).forEach(function (field, index) {
+      var code = getFieldCode(field);
+      if (code && map[code] === undefined) {
+        map[code] = index;
+      }
+    });
+    return map;
+  }
+
   function buildPresetsByProperty(offers, hiddenByProperty) {
     var byCode = {};
     offers.forEach(function (offer) {
@@ -393,6 +415,8 @@
 
     var fields = Array.isArray(config.fields) ? config.fields : [];
     var fieldByCode = makeFieldIndexMap(fields);
+    var metaOrderByCode = makeCodeOrderMapFromMeta(propertyMeta);
+    var fieldOrderByCode = makeCodeOrderMapFromFields(fields);
     var hiddenByProperty = buildHiddenPresetMap(config);
     var presetsByCode = buildPresetsByProperty(offers, hiddenByProperty);
     mergePresets(presetsByCode, buildPresetsFromConfigFields(fields, hiddenByProperty));
@@ -419,7 +443,17 @@
           propertyMetaByCode[b] && (propertyMetaByCode[b].sort || propertyMetaByCode[b].SORT),
           parseNumber(fieldByCode[b] && (fieldByCode[b].sort || fieldByCode[b].SORT), 500)
         );
-        if (sortA === sortB) return a.localeCompare(b);
+        if (sortA === sortB) {
+          var metaOrderA = parseNumber(metaOrderByCode[a], Number.POSITIVE_INFINITY);
+          var metaOrderB = parseNumber(metaOrderByCode[b], Number.POSITIVE_INFINITY);
+          if (metaOrderA !== metaOrderB) return metaOrderA - metaOrderB;
+
+          var fieldOrderA = parseNumber(fieldOrderByCode[a], Number.POSITIVE_INFINITY);
+          var fieldOrderB = parseNumber(fieldOrderByCode[b], Number.POSITIVE_INFINITY);
+          if (fieldOrderA !== fieldOrderB) return fieldOrderA - fieldOrderB;
+
+          return a.localeCompare(b);
+        }
         return sortA - sortB;
       });
 
@@ -459,12 +493,17 @@
       var showPresets = !isTruthyFlag(fieldConfig.hide_presets);
       if (!presets.length || !showPresets) $chips.hide();
 
-      var groupItems = Array.isArray(fieldConfig.group_inputs) ? fieldConfig.group_inputs : [];
+      var groupItems = Array.isArray(fieldConfig.group_inputs)
+        ? fieldConfig.group_inputs
+        : Array.isArray(fieldConfig.inputs)
+        ? fieldConfig.inputs
+        : [];
       var hasInputFlag =
         isTruthyFlag(fieldConfig.enable_input) ||
         isTruthyFlag(fieldConfig.input_enabled) ||
         isTruthyFlag(fieldConfig.allow_input) ||
         isTruthyFlag(fieldConfig.show_input) ||
+        isTruthyFlag(fieldConfig.show_inputs) ||
         isTruthyFlag(fieldConfig.custom_input_enabled) ||
         isTruthyFlag(fieldConfig.enable_custom_input) ||
         String(fieldConfig.type || "").toLowerCase() === "input" ||
@@ -539,6 +578,10 @@
         onHide: function (hash) {
           hash.w.remove();
           hash.o && hash.o.remove();
+          var $wrapper = $("#popup_iframe_wrapper");
+          if ($wrapper.find(".jqmWindow").length === 0 && $wrapper.find(".jqmOverlay").length === 0) {
+            $wrapper.css({ "z-index": "", display: "" });
+          }
           $("body").removeClass("jqm-initied swipeignore");
         },
       });
