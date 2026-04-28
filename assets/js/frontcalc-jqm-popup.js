@@ -21,7 +21,7 @@
   function createFrame() {
     ensureWrapper();
     return $(
-      '<div class="frontcalc_frame jqmWindow jqmWindow--mobile-fill popup"><span class="jqmClose top-close fill-grey-hover" title="Закрыть"><i class="svg inline inline" aria-hidden="true">×</i></span><div class="scrollbar"><div class="flexbox"><div class="form popup frontcalc-popup-shell"><div class="form-header"><div class="text"><div class="title switcher-title font_24 color_222">Калькулятор стоимости</div></div></div><div class="frontcalc-popup-content js-frontcalc-popup-content"></div></div></div></div></div>'
+      '<div class="frontcalc_frame jqmWindow jqmWindow--mobile-fill popup"><span class="jqmClose top-close fill-grey-hover" title="Закрыть"><i class="svg inline inline" aria-hidden="true">×</i></span><div class="scrollbar"><div class="flexbox"><div class="form popup frontcalc-popup-shell"><div class="frontcalc-popup-content js-frontcalc-popup-content"></div></div></div></div></div>'
     ).appendTo("#popup_iframe_wrapper");
   }
 
@@ -105,14 +105,26 @@
     return base + Math.round((value - base) / step) * step;
   }
 
-  function getFieldLabel(field) {
-    return field.label || field.title || field.name || field.property_code || "Параметр";
+  function isTruthyFlag(value) {
+    return value === true || value === "Y" || value === "1" || value === 1 || value === "true";
+  }
+
+  function getFieldCode(field) {
+    return String((field && (field.property_code || field.code || field.property || field.prop_code)) || "").trim();
+  }
+
+  function getFieldLabel(field, propertyMetaByCode, explicitCode) {
+    var code = String(explicitCode || getFieldCode(field)).trim();
+    if (code && propertyMetaByCode[code] && propertyMetaByCode[code].name) {
+      return propertyMetaByCode[code].name;
+    }
+    return String((field && (field.label || field.title || field.name)) || "").trim();
   }
 
   function makeFieldIndexMap(fields) {
     var map = {};
     fields.forEach(function (field) {
-      var code = String(field.property_code || "").trim();
+      var code = getFieldCode(field);
       if (code) map[code] = field;
     });
     return map;
@@ -157,7 +169,7 @@
     var map = {};
     var fields = Array.isArray(config.fields) ? config.fields : [];
     fields.forEach(function (field) {
-      var code = String(field.property_code || "").trim();
+      var code = getFieldCode(field);
       if (!code) return;
       var hidden = Array.isArray(field.hidden_preset_xml_ids) ? field.hidden_preset_xml_ids : [];
       if (!hidden.length) return;
@@ -169,8 +181,78 @@
     return map;
   }
 
-  function createInputControl(field, initialValue, onCommit, onFocus, onBlur) {
-    var label = getFieldLabel(field);
+  function gatherAllPropertyCodes(propertyMetaList, offers, fields) {
+    var map = {};
+    (Array.isArray(propertyMetaList) ? propertyMetaList : []).forEach(function (meta) {
+      var code = String((meta && meta.code) || "").trim();
+      if (code) map[code] = true;
+    });
+    (Array.isArray(offers) ? offers : []).forEach(function (offer) {
+      var properties = (offer && offer.properties) || {};
+      Object.keys(properties).forEach(function (code) {
+        if (code.indexOf("CALC_PROP_") === 0) map[code] = true;
+      });
+    });
+    (Array.isArray(fields) ? fields : []).forEach(function (field) {
+      var code = getFieldCode(field);
+      if (code) map[code] = true;
+    });
+    return Object.keys(map);
+  }
+
+  function buildPresetsFromConfigFields(fields, hiddenByProperty) {
+    var result = {};
+    (Array.isArray(fields) ? fields : []).forEach(function (field) {
+      var code = getFieldCode(field);
+      if (!code) return;
+      var source = field.presets || field.values || field.options || [];
+      if (!Array.isArray(source) || !source.length) return;
+      result[code] = result[code] || [];
+      source.forEach(function (row, idx) {
+        var xmlId = "";
+        var value = "";
+        var sort = 500 + idx;
+
+        if (typeof row === "string" || typeof row === "number") {
+          xmlId = String(row);
+          value = String(row);
+        } else if (row && typeof row === "object") {
+          xmlId = String(row.xml_id || row.id || row.code || row.value || "").trim();
+          value = String(row.value || row.label || row.name || xmlId).trim();
+          sort = parseNumber(row.sort, sort);
+        }
+
+        if (!xmlId) return;
+        if (hiddenByProperty[code] && hiddenByProperty[code][xmlId]) return;
+        result[code].push({ xml_id: xmlId, value: value || xmlId, sort: sort });
+      });
+    });
+    return result;
+  }
+
+  function mergePresets(target, incoming) {
+    Object.keys(incoming || {}).forEach(function (code) {
+      var byXmlId = {};
+      (Array.isArray(target[code]) ? target[code] : []).forEach(function (row) {
+        byXmlId[String(row.xml_id)] = row;
+      });
+      (Array.isArray(incoming[code]) ? incoming[code] : []).forEach(function (row) {
+        var key = String(row.xml_id || "").trim();
+        if (!key) return;
+        byXmlId[key] = row;
+      });
+      var merged = Object.keys(byXmlId).map(function (key) {
+        return byXmlId[key];
+      });
+      merged.sort(function (a, b) {
+        return parseNumber(a.sort, 500) - parseNumber(b.sort, 500);
+      });
+      target[code] = merged;
+    });
+  }
+
+  function createInputControl(field, initialValue, onCommit) {
+    var label = getFieldLabel(field, {}, "");
     var min = parseNumber(field.min, Number.NaN);
     var max = parseNumber(field.max, Number.NaN);
     var step = parseNumber(field.step, 1);
@@ -202,13 +284,8 @@
       commit(parseNumber($input.val(), value) + step);
     });
 
-    $input.on("focus", function () {
-      onFocus && onFocus();
-    });
-
     $input.on("blur", function () {
       commit($input.val());
-      onBlur && onBlur();
     });
 
     $input.on("wheel", function (event) {
@@ -288,6 +365,12 @@
     var data = payload && payload.data ? payload.data : {};
     var config = data.config || {};
     var offers = Array.isArray(data.offers) ? data.offers : [];
+    var propertyMeta = Array.isArray(data.property_meta) ? data.property_meta : [];
+    var propertyMetaByCode = {};
+    propertyMeta.forEach(function (meta) {
+      var code = String((meta && meta.code) || "").trim();
+      if (code) propertyMetaByCode[code] = meta;
+    });
     if (!offers.length) {
       renderError($content, "Нет доступных торговых предложений для калькулятора.");
       return;
@@ -297,12 +380,28 @@
     var fieldByCode = makeFieldIndexMap(fields);
     var hiddenByProperty = buildHiddenPresetMap(config);
     var presetsByCode = buildPresetsByProperty(offers, hiddenByProperty);
+    mergePresets(presetsByCode, buildPresetsFromConfigFields(fields, hiddenByProperty));
+    Object.keys(propertyMetaByCode).forEach(function (code) {
+      if (Array.isArray(propertyMetaByCode[code].presets) && propertyMetaByCode[code].presets.length) {
+        mergePresets(presetsByCode, (function () {
+          var map = {};
+          map[code] = propertyMetaByCode[code].presets;
+          return map;
+        })());
+      }
+    });
+    var allCodes = gatherAllPropertyCodes(propertyMeta, offers, fields).sort(function (a, b) {
+      var sortA = parseNumber(propertyMetaByCode[a] && propertyMetaByCode[a].sort, parseNumber(fieldByCode[a] && fieldByCode[a].sort, 500));
+      var sortB = parseNumber(propertyMetaByCode[b] && propertyMetaByCode[b].sort, parseNumber(fieldByCode[b] && fieldByCode[b].sort, 500));
+      if (sortA === sortB) return a.localeCompare(b);
+      return sortA - sortB;
+    });
 
     var selectedByProperty = {};
     var hasCustomValues = false;
 
-    Object.keys(presetsByCode).forEach(function (code) {
-      if (presetsByCode[code].length) {
+    allCodes.forEach(function (code) {
+      if (Array.isArray(presetsByCode[code]) && presetsByCode[code].length) {
         selectedByProperty[code] = presetsByCode[code][0].xml_id;
       }
     });
@@ -312,28 +411,42 @@
     var $price = $('<aside class="frontcalc-price-panel"><div class="frontcalc-price-panel__inner"></div></aside>');
     var $priceInner = $price.find(".frontcalc-price-panel__inner");
 
-    Object.keys(presetsByCode).forEach(function (code) {
+    allCodes.forEach(function (code) {
       var fieldConfig = fieldByCode[code] || {};
-      var label = getFieldLabel(fieldConfig);
+      var label = getFieldLabel(fieldConfig, propertyMetaByCode, code);
       var $section = $('<section class="frontcalc-field"></section>');
-      $section.append('<div class="frontcalc-field__title">' + escapeHtml(label) + "</div>");
+      if (label) {
+        $section.append('<div class="frontcalc-field__title">' + escapeHtml(label) + "</div>");
+      }
 
-      var presets = presetsByCode[code];
+      var presets = Array.isArray(presetsByCode[code]) ? presetsByCode[code] : [];
       var $chips = createPresetButtons(presets, function (preset) {
         selectedByProperty[code] = preset.xml_id;
         hasCustomValues = false;
         updatePrice();
       });
+      if (selectedByProperty[code]) {
+        $chips.find('.frontcalc-chip[data-xml-id="' + selectedByProperty[code] + '"]').addClass("is-active");
+      }
       $section.append($chips);
 
-      var showPresets = fieldConfig.show_presets === true || fieldConfig.show_presets === "Y" || fieldConfig.show_presets === "1";
-      if (!showPresets) {
-        $chips.hide();
-      }
+      var showPresets = !isTruthyFlag(fieldConfig.hide_presets);
+      if (!presets.length || !showPresets) $chips.hide();
 
-      if (fieldConfig.enable_input === true || fieldConfig.enable_input === "Y" || fieldConfig.enable_input === "1") {
+      var groupItems = Array.isArray(fieldConfig.group_inputs) ? fieldConfig.group_inputs : [];
+      var hasInputFlag =
+        isTruthyFlag(fieldConfig.enable_input) ||
+        isTruthyFlag(fieldConfig.input_enabled) ||
+        isTruthyFlag(fieldConfig.allow_input) ||
+        isTruthyFlag(fieldConfig.show_input) ||
+        isTruthyFlag(fieldConfig.custom_input_enabled) ||
+        isTruthyFlag(fieldConfig.enable_custom_input) ||
+        String(fieldConfig.type || "").toLowerCase() === "input" ||
+        Number.isFinite(parseNumber(fieldConfig.min, Number.NaN)) ||
+        Number.isFinite(parseNumber(fieldConfig.max, Number.NaN));
+
+      if (hasInputFlag || groupItems.length > 0) {
         var delimiter = fieldConfig.group_delimiter || fieldConfig.split_delimiter || "x";
-        var groupItems = Array.isArray(fieldConfig.group_inputs) ? fieldConfig.group_inputs : [];
         if (!groupItems.length) groupItems = [fieldConfig];
 
         var $group = $('<div class="frontcalc-input-group"></div>');
@@ -346,12 +459,6 @@
               hasCustomValues = true;
               selectedByProperty[code] = String(numericValue);
               updatePrice();
-            },
-            function () {
-              if (showPresets) $chips.show();
-            },
-            function () {
-              if (showPresets) $chips.hide();
             }
           );
           $group.append($inputField);
