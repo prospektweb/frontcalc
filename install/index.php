@@ -248,7 +248,7 @@ class prospektweb_frontcalc extends CModule
 "
             . "<?php if (function_exists('frontcalc_render_runtime_assets')) { echo frontcalc_render_runtime_assets(); } ?>
 "
-            . "<?php \$frontcalcPayload = (new \Prospektweb\Frontcalc\Service\CalculatorAvailability())->getLightPayload((int)(\$arConfig['ITEM_ID'] ?? 0), (int)(\$arConfig['CATALOG_IBLOCK_ID'] ?? 0)); ?>
+            . "<?php \$frontcalcPayload = function_exists('frontcalc_get_light_payload') ? frontcalc_get_light_payload((int)(\$arConfig['ITEM_ID'] ?? 0), (int)(\$arConfig['CATALOG_IBLOCK_ID'] ?? 0)) : ['is_available' => false]; ?>
 "
             . "<?php if (!empty(\$frontcalcPayload['is_available'])): ?>
 "
