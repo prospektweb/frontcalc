@@ -1,7 +1,5 @@
 <?php
 
-use Prospektweb\Frontcalc\Service\CalculatorAvailability;
-
 if (!function_exists('frontcalc_render_runtime_assets')) {
     function frontcalc_render_runtime_assets(): string
     {
@@ -175,7 +173,25 @@ HTML
 if (!function_exists('frontcalc_get_light_payload')) {
     function frontcalc_get_light_payload(int $productId, int $iblockId, string $ajaxUrl = ''): array
     {
-        $service = new CalculatorAvailability();
+        $serviceClass = '\\Prospektweb\\Frontcalc\\Service\\CalculatorAvailability';
+
+        if (!class_exists($serviceClass)) {
+            if (class_exists('\\Bitrix\\Main\\Loader')) {
+                \Bitrix\Main\Loader::includeModule('prospektweb.frontcalc');
+            } elseif (class_exists('\\CModule')) {
+                \CModule::IncludeModule('prospektweb.frontcalc');
+            }
+        }
+
+        if (!class_exists($serviceClass)) {
+            return [
+                'is_available' => false,
+                'product_id' => $productId,
+                'ajax_url' => $ajaxUrl,
+            ];
+        }
+
+        $service = new $serviceClass();
 
         return $service->getLightPayload($productId, $iblockId, $ajaxUrl);
     }
