@@ -11,7 +11,14 @@ if (!function_exists('frontcalc_render_runtime_assets')) {
         }
         $isRendered = true;
 
-        return <<<'HTML'
+        $modulePathLocal = '/local/modules/prospektweb.frontcalc/assets/js/frontcalc-jqm-popup.js';
+        $modulePathBitrix = '/bitrix/modules/prospektweb.frontcalc/assets/js/frontcalc-jqm-popup.js';
+        $moduleScriptPath = file_exists($_SERVER['DOCUMENT_ROOT'] . $modulePathLocal) ? $modulePathLocal : $modulePathBitrix;
+
+        return str_replace(
+            ['{{MODULE_PATH_LOCAL}}', '{{MODULE_PATH_BITRIX}}', '{{MODULE_SCRIPT_PATH}}'],
+            [$modulePathLocal, $modulePathBitrix, $moduleScriptPath],
+            <<<'HTML'
 <style>
 .frontcalc-calculate-button{
     display:inline-flex;
@@ -40,7 +47,8 @@ if (!function_exists('frontcalc_render_runtime_assets')) {
     color:var(--button_color_text,#fff);
 }
 .frontcalc-calculate-button:disabled{opacity:.65;cursor:wait;}
-.frontcalc-popup-shell{width:1320px;max-width:calc(100vw - 32px);}
+.frontcalc_frame{width:min(1320px,calc(100vw - 32px));}
+.frontcalc-popup-shell{width:100%;max-width:100%;}
 .frontcalc-popup-shell.form.popup{display:block;padding:0;background:#fff;}
 .frontcalc-popup-content{min-height:220px;padding:24px;}
 .frontcalc-preloader{display:flex;align-items:center;gap:12px;padding:28px 0;color:#5f6a83;}
@@ -82,8 +90,9 @@ if (!function_exists('frontcalc_render_runtime_assets')) {
     w.__frontcalcPopupLoaderReady = true;
 
     w.FrontcalcPopupConfig = {
-        modulePathLocal: '/local/modules/prospektweb.frontcalc/assets/js/frontcalc-jqm-popup.js',
-        modulePathBitrix: '/bitrix/modules/prospektweb.frontcalc/assets/js/frontcalc-jqm-popup.js',
+        modulePathLocal: '{{MODULE_PATH_LOCAL}}',
+        modulePathBitrix: '{{MODULE_PATH_BITRIX}}',
+        modulePath: '{{MODULE_SCRIPT_PATH}}',
         jqModalPath: (w.arAsproOptions && w.arAsproOptions.SITE_TEMPLATE_PATH ? w.arAsproOptions.SITE_TEMPLATE_PATH + '/js/jqModal.js' : '/bitrix/modules/aspro.popup/install/js/jqModal.js')
     };
 
@@ -97,14 +106,11 @@ if (!function_exists('frontcalc_render_runtime_assets')) {
         d.head.appendChild(script);
     }
 
-    appendScript(
-        w.FrontcalcPopupConfig.modulePathLocal,
-        null,
-        function(){ appendScript(w.FrontcalcPopupConfig.modulePathBitrix); }
-    );
+    appendScript(w.FrontcalcPopupConfig.modulePath);
 })(window, document);
 </script>
-HTML;
+HTML
+        );
     }
 }
 

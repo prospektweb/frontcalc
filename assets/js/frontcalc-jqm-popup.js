@@ -109,18 +109,22 @@
     return value === true || value === "Y" || value === "1" || value === 1 || value === "true";
   }
 
-  function getFieldLabel(field, propertyMetaByCode) {
-    var code = String((field && field.property_code) || "").trim();
+  function getFieldCode(field) {
+    return String((field && (field.property_code || field.code)) || "").trim();
+  }
+
+  function getFieldLabel(field, propertyMetaByCode, explicitCode) {
+    var code = String(explicitCode || getFieldCode(field)).trim();
     if (code && propertyMetaByCode[code] && propertyMetaByCode[code].name) {
       return propertyMetaByCode[code].name;
     }
-    return "";
+    return String((field && (field.label || field.title || field.name)) || "").trim();
   }
 
   function makeFieldIndexMap(fields) {
     var map = {};
     fields.forEach(function (field) {
-      var code = String(field.property_code || "").trim();
+      var code = getFieldCode(field);
       if (code) map[code] = field;
     });
     return map;
@@ -165,7 +169,7 @@
     var map = {};
     var fields = Array.isArray(config.fields) ? config.fields : [];
     fields.forEach(function (field) {
-      var code = String(field.property_code || "").trim();
+      var code = getFieldCode(field);
       if (!code) return;
       var hidden = Array.isArray(field.hidden_preset_xml_ids) ? field.hidden_preset_xml_ids : [];
       if (!hidden.length) return;
@@ -190,14 +194,14 @@
       });
     });
     (Array.isArray(fields) ? fields : []).forEach(function (field) {
-      var code = String((field && field.property_code) || "").trim();
+      var code = getFieldCode(field);
       if (code) map[code] = true;
     });
     return Object.keys(map);
   }
 
-  function createInputControl(field, initialValue, onCommit, onFocus, onBlur) {
-    var label = getFieldLabel(field);
+  function createInputControl(field, initialValue, onCommit) {
+    var label = getFieldLabel(field, {}, "");
     var min = parseNumber(field.min, Number.NaN);
     var max = parseNumber(field.max, Number.NaN);
     var step = parseNumber(field.step, 1);
@@ -229,13 +233,8 @@
       commit(parseNumber($input.val(), value) + step);
     });
 
-    $input.on("focus", function () {
-      onFocus && onFocus();
-    });
-
     $input.on("blur", function () {
       commit($input.val());
-      onBlur && onBlur();
     });
 
     $input.on("wheel", function (event) {
@@ -353,7 +352,7 @@
 
     allCodes.forEach(function (code) {
       var fieldConfig = fieldByCode[code] || {};
-      var label = getFieldLabel(fieldConfig, propertyMetaByCode);
+      var label = getFieldLabel(fieldConfig, propertyMetaByCode, code);
       var $section = $('<section class="frontcalc-field"></section>');
       if (label) {
         $section.append('<div class="frontcalc-field__title">' + escapeHtml(label) + "</div>");
@@ -373,9 +372,16 @@
       var showPresets = !isTruthyFlag(fieldConfig.hide_presets);
       if (!presets.length || !showPresets) $chips.hide();
 
-      if (isTruthyFlag(fieldConfig.enable_input) || isTruthyFlag(fieldConfig.input_enabled) || isTruthyFlag(fieldConfig.allow_input)) {
+      var groupItems = Array.isArray(fieldConfig.group_inputs) ? fieldConfig.group_inputs : [];
+      var hasInputFlag =
+        isTruthyFlag(fieldConfig.enable_input) ||
+        isTruthyFlag(fieldConfig.input_enabled) ||
+        isTruthyFlag(fieldConfig.allow_input) ||
+        isTruthyFlag(fieldConfig.show_input) ||
+        isTruthyFlag(fieldConfig.custom_input_enabled);
+
+      if (hasInputFlag || groupItems.length > 0) {
         var delimiter = fieldConfig.group_delimiter || fieldConfig.split_delimiter || "x";
-        var groupItems = Array.isArray(fieldConfig.group_inputs) ? fieldConfig.group_inputs : [];
         if (!groupItems.length) groupItems = [fieldConfig];
 
         var $group = $('<div class="frontcalc-input-group"></div>');
@@ -388,12 +394,6 @@
               hasCustomValues = true;
               selectedByProperty[code] = String(numericValue);
               updatePrice();
-            },
-            function () {
-              if (showPresets) $chips.show();
-            },
-            function () {
-              if (showPresets) $chips.hide();
             }
           );
           $group.append($inputField);
