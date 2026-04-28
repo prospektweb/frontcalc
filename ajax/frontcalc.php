@@ -67,6 +67,7 @@ if ($schemaText !== '') {
 
 $calcPropertyCodes = [];
 $propertyMeta = [];
+$propertyEnumNames = [];
 $propertyListRes = CIBlockProperty::GetList(['SORT' => 'ASC'], ['IBLOCK_ID' => $offersIblockId, 'ACTIVE' => 'Y']);
 while ($prop = $propertyListRes->Fetch()) {
     $code = trim((string)($prop['CODE'] ?? ''));
@@ -75,11 +76,27 @@ while ($prop = $propertyListRes->Fetch()) {
     }
 
     $calcPropertyCodes[$code] = $code;
+    $propertyId = (int)($prop['ID'] ?? 0);
     $propertyMeta[$code] = [
         'code' => $code,
         'name' => (string)($prop['NAME'] ?? $code),
         'sort' => (int)($prop['SORT'] ?? 500),
     ];
+
+    if ($propertyId > 0) {
+        $enumNames = [];
+        $enumRes = CIBlockPropertyEnum::GetList(['SORT' => 'ASC'], ['PROPERTY_ID' => $propertyId]);
+        while ($enum = $enumRes->Fetch()) {
+            $enumXmlId = trim((string)($enum['XML_ID'] ?? ''));
+            if ($enumXmlId === '') {
+                continue;
+            }
+            $enumNames[$enumXmlId] = (string)($enum['VALUE'] ?? '');
+        }
+        if (!empty($enumNames)) {
+            $propertyEnumNames[$code] = $enumNames;
+        }
+    }
 }
 
 $offers = [];
@@ -128,8 +145,13 @@ if (!empty($offersMap[$productId]) && is_array($offersMap[$productId])) {
 
             $sort = (int)($offerProp['VALUE_SORT'] ?? $offerProp['SORT'] ?? 500);
 
+            $presetText = trim((string)($propertyEnumNames[$code][$xmlId] ?? ''));
+            if ($presetText === '') {
+                $presetText = $value;
+            }
+
             $offerProps[$code] = [
-                'value' => $value,
+                'value' => $presetText,
                 'xml_id' => $xmlId,
                 'sort' => $sort,
             ];
@@ -138,7 +160,7 @@ if (!empty($offersMap[$productId]) && is_array($offersMap[$productId])) {
                 $presetBuckets[$code] = [];
             }
             $presetBuckets[$code][$xmlId] = [
-                'value' => $value,
+                'value' => $presetText,
                 'xml_id' => $xmlId,
                 'sort' => $sort,
             ];

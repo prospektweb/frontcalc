@@ -21,7 +21,7 @@
   function createFrame() {
     ensureWrapper();
     return $(
-      '<div class="frontcalc_frame jqmWindow jqmWindow--mobile-fill popup"><span class="jqmClose top-close fill-grey-hover" title="Закрыть"><i class="svg inline inline" aria-hidden="true">×</i></span><div class="scrollbar"><div class="flexbox"><div class="form popup frontcalc-popup-shell"><div class="form-header"><div class="text"><div class="title switcher-title font_24 color_222">Калькулятор стоимости</div></div></div><div class="frontcalc-popup-content js-frontcalc-popup-content"></div></div></div></div></div>'
+      '<div class="frontcalc_frame jqmWindow jqmWindow--mobile-fill popup"><span class="jqmClose top-close fill-grey-hover" title="Закрыть"><i class="svg inline inline" aria-hidden="true">×</i></span><div class="scrollbar"><div class="flexbox"><div class="form popup frontcalc-popup-shell"><div class="frontcalc-popup-content js-frontcalc-popup-content"></div></div></div></div></div>'
     ).appendTo("#popup_iframe_wrapper");
   }
 
@@ -105,14 +105,26 @@
     return base + Math.round((value - base) / step) * step;
   }
 
-  function getFieldLabel(field) {
-    return field.label || field.title || field.name || field.property_code || "Параметр";
+  function isTruthyFlag(value) {
+    return value === true || value === "Y" || value === "1" || value === 1 || value === "true";
+  }
+
+  function getFieldCode(field) {
+    return String((field && (field.property_code || field.code)) || "").trim();
+  }
+
+  function getFieldLabel(field, propertyMetaByCode, explicitCode) {
+    var code = String(explicitCode || getFieldCode(field)).trim();
+    if (code && propertyMetaByCode[code] && propertyMetaByCode[code].name) {
+      return propertyMetaByCode[code].name;
+    }
+    return String((field && (field.label || field.title || field.name)) || "").trim();
   }
 
   function makeFieldIndexMap(fields) {
     var map = {};
     fields.forEach(function (field) {
-      var code = String(field.property_code || "").trim();
+      var code = getFieldCode(field);
       if (code) map[code] = field;
     });
     return map;
@@ -157,7 +169,7 @@
     var map = {};
     var fields = Array.isArray(config.fields) ? config.fields : [];
     fields.forEach(function (field) {
-      var code = String(field.property_code || "").trim();
+      var code = getFieldCode(field);
       if (!code) return;
       var hidden = Array.isArray(field.hidden_preset_xml_ids) ? field.hidden_preset_xml_ids : [];
       if (!hidden.length) return;
@@ -169,8 +181,27 @@
     return map;
   }
 
-  function createInputControl(field, initialValue, onCommit, onFocus, onBlur) {
-    var label = getFieldLabel(field);
+  function gatherAllPropertyCodes(propertyMetaList, offers, fields) {
+    var map = {};
+    (Array.isArray(propertyMetaList) ? propertyMetaList : []).forEach(function (meta) {
+      var code = String((meta && meta.code) || "").trim();
+      if (code) map[code] = true;
+    });
+    (Array.isArray(offers) ? offers : []).forEach(function (offer) {
+      var properties = (offer && offer.properties) || {};
+      Object.keys(properties).forEach(function (code) {
+        if (code.indexOf("CALC_PROP_") === 0) map[code] = true;
+      });
+    });
+    (Array.isArray(fields) ? fields : []).forEach(function (field) {
+      var code = getFieldCode(field);
+      if (code) map[code] = true;
+    });
+    return Object.keys(map);
+  }
+
+  function createInputControl(field, initialValue, onCommit) {
+    var label = getFieldLabel(field, {}, "");
     var min = parseNumber(field.min, Number.NaN);
     var max = parseNumber(field.max, Number.NaN);
     var step = parseNumber(field.step, 1);
@@ -202,13 +233,8 @@
       commit(parseNumber($input.val(), value) + step);
     });
 
-    $input.on("focus", function () {
-      onFocus && onFocus();
-    });
-
     $input.on("blur", function () {
       commit($input.val());
-      onBlur && onBlur();
     });
 
     $input.on("wheel", function (event) {
@@ -288,6 +314,12 @@
     var data = payload && payload.data ? payload.data : {};
     var config = data.config || {};
     var offers = Array.isArray(data.offers) ? data.offers : [];
+    var propertyMeta = Array.isArray(data.property_meta) ? data.property_meta : [];
+    var propertyMetaByCode = {};
+    propertyMeta.forEach(function (meta) {
+      var code = String((meta && meta.code) || "").trim();
+      if (code) propertyMetaByCode[code] = meta;
+    });
     if (!offers.length) {
       renderError($content, "Нет доступных торговых предложений для калькулятора.");
       return;
@@ -297,12 +329,18 @@
     var fieldByCode = makeFieldIndexMap(fields);
     var hiddenByProperty = buildHiddenPresetMap(config);
     var presetsByCode = buildPresetsByProperty(offers, hiddenByProperty);
+    Object.keys(propertyMetaByCode).forEach(function (code) {
+      if (Array.isArray(propertyMetaByCode[code].presets) && propertyMetaByCode[code].presets.length) {
+        presetsByCode[code] = propertyMetaByCode[code].presets;
+      }
+    });
+    var allCodes = gatherAllPropertyCodes(propertyMeta, offers, fields);
 
     var selectedByProperty = {};
     var hasCustomValues = false;
 
-    Object.keys(presetsByCode).forEach(function (code) {
-      if (presetsByCode[code].length) {
+    allCodes.forEach(function (code) {
+      if (Array.isArray(presetsByCode[code]) && presetsByCode[code].length) {
         selectedByProperty[code] = presetsByCode[code][0].xml_id;
       }
     });
@@ -312,28 +350,38 @@
     var $price = $('<aside class="frontcalc-price-panel"><div class="frontcalc-price-panel__inner"></div></aside>');
     var $priceInner = $price.find(".frontcalc-price-panel__inner");
 
-    Object.keys(presetsByCode).forEach(function (code) {
+    allCodes.forEach(function (code) {
       var fieldConfig = fieldByCode[code] || {};
-      var label = getFieldLabel(fieldConfig);
+      var label = getFieldLabel(fieldConfig, propertyMetaByCode, code);
       var $section = $('<section class="frontcalc-field"></section>');
-      $section.append('<div class="frontcalc-field__title">' + escapeHtml(label) + "</div>");
+      if (label) {
+        $section.append('<div class="frontcalc-field__title">' + escapeHtml(label) + "</div>");
+      }
 
-      var presets = presetsByCode[code];
+      var presets = Array.isArray(presetsByCode[code]) ? presetsByCode[code] : [];
       var $chips = createPresetButtons(presets, function (preset) {
         selectedByProperty[code] = preset.xml_id;
         hasCustomValues = false;
         updatePrice();
       });
+      if (selectedByProperty[code]) {
+        $chips.find('.frontcalc-chip[data-xml-id="' + selectedByProperty[code] + '"]').addClass("is-active");
+      }
       $section.append($chips);
 
-      var showPresets = fieldConfig.show_presets === true || fieldConfig.show_presets === "Y" || fieldConfig.show_presets === "1";
-      if (!showPresets) {
-        $chips.hide();
-      }
+      var showPresets = !isTruthyFlag(fieldConfig.hide_presets);
+      if (!presets.length || !showPresets) $chips.hide();
 
-      if (fieldConfig.enable_input === true || fieldConfig.enable_input === "Y" || fieldConfig.enable_input === "1") {
+      var groupItems = Array.isArray(fieldConfig.group_inputs) ? fieldConfig.group_inputs : [];
+      var hasInputFlag =
+        isTruthyFlag(fieldConfig.enable_input) ||
+        isTruthyFlag(fieldConfig.input_enabled) ||
+        isTruthyFlag(fieldConfig.allow_input) ||
+        isTruthyFlag(fieldConfig.show_input) ||
+        isTruthyFlag(fieldConfig.custom_input_enabled);
+
+      if (hasInputFlag || groupItems.length > 0) {
         var delimiter = fieldConfig.group_delimiter || fieldConfig.split_delimiter || "x";
-        var groupItems = Array.isArray(fieldConfig.group_inputs) ? fieldConfig.group_inputs : [];
         if (!groupItems.length) groupItems = [fieldConfig];
 
         var $group = $('<div class="frontcalc-input-group"></div>');
@@ -346,12 +394,6 @@
               hasCustomValues = true;
               selectedByProperty[code] = String(numericValue);
               updatePrice();
-            },
-            function () {
-              if (showPresets) $chips.show();
-            },
-            function () {
-              if (showPresets) $chips.hide();
             }
           );
           $group.append($inputField);
