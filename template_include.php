@@ -51,6 +51,31 @@ if (!function_exists('frontcalc_render_runtime_assets')) {
 .frontcalc-summary{font-size:16px;line-height:24px;color:#555;}
 .frontcalc-summary strong{font-weight:600;color:#333;}
 .frontcalc-summary ul{margin:8px 0 0;padding-left:18px;}
+.frontcalc-layout{display:grid;grid-template-columns:minmax(0,2fr) minmax(280px,1fr);gap:20px;align-items:start;}
+.frontcalc-selectors{display:flex;flex-direction:column;gap:20px;}
+.frontcalc-field{display:flex;flex-direction:column;gap:10px;}
+.frontcalc-field__title{font-size:24px;line-height:1.35;color:#2a3348;}
+.frontcalc-input-control{display:flex;align-items:center;max-width:240px;border:1px solid #d9dee7;border-radius:8px;overflow:hidden;}
+.frontcalc-step-btn{width:52px;height:52px;border:0;background:#f7f8fb;font-size:28px;line-height:1;color:#4d5b76;cursor:pointer;}
+.frontcalc-num-input{flex:1;min-width:0;height:52px;border:0;text-align:center;font-size:30px;font-weight:600;color:#1a2236;}
+.frontcalc-presets{display:flex;flex-wrap:wrap;gap:8px;}
+.frontcalc-chip{min-height:48px;padding:8px 24px;border:1px solid #d9dee7;border-radius:8px;background:#fff;color:#1a2236;font-size:28px;line-height:1.2;cursor:pointer;}
+.frontcalc-chip:hover{border-color:#2f3a52;}
+.frontcalc-chip.is-active{border-color:#2f3a52;box-shadow:inset 0 0 0 1px #2f3a52;}
+.frontcalc-input-group{display:flex;flex-wrap:wrap;gap:12px;}
+.frontcalc-input-group .frontcalc-field__title{font-size:20px;color:#5f6a83;}
+.frontcalc-price-panel__inner{position:sticky;top:12px;border:1px solid #d9dee7;border-radius:12px;background:#fafbff;padding:16px;}
+.frontcalc-price-value{font-size:34px;font-weight:700;line-height:1.1;color:#101933;}
+.frontcalc-price-offer{margin-top:6px;font-size:15px;color:#5f6a83;}
+.frontcalc-price-meta{margin-top:12px;font-size:13px;color:#8b93a6;}
+.frontcalc-price-empty{font-size:14px;color:#8b93a6;}
+@media (max-width: 991px){
+    .frontcalc-layout{grid-template-columns:1fr;}
+    .frontcalc-price-panel{order:-1;}
+    .frontcalc-field__title{font-size:18px;}
+    .frontcalc-chip{font-size:20px;min-height:44px;padding:6px 16px;}
+    .frontcalc-num-input{font-size:24px;}
+}
 @keyframes frontcalc-spin{to{transform:rotate(360deg);}}
 </style>
 <script>
