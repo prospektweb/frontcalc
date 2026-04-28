@@ -200,6 +200,21 @@
     return Object.keys(map);
   }
 
+  function buildParticipatingPropertyMap(offers) {
+    var map = {};
+    (Array.isArray(offers) ? offers : []).forEach(function (offer) {
+      var properties = (offer && offer.properties) || {};
+      Object.keys(properties).forEach(function (code) {
+        if (code.indexOf("CALC_PROP_") !== 0) return;
+        var prop = properties[code] || {};
+        var xmlId = String(prop.xml_id || "").trim();
+        if (!xmlId) return;
+        map[code] = true;
+      });
+    });
+    return map;
+  }
+
   function buildPresetsFromConfigFields(fields, hiddenByProperty) {
     var result = {};
     (Array.isArray(fields) ? fields : []).forEach(function (field) {
@@ -390,12 +405,23 @@
         })());
       }
     });
-    var allCodes = gatherAllPropertyCodes(propertyMeta, offers, fields).sort(function (a, b) {
-      var sortA = parseNumber(propertyMetaByCode[a] && propertyMetaByCode[a].sort, parseNumber(fieldByCode[a] && fieldByCode[a].sort, 500));
-      var sortB = parseNumber(propertyMetaByCode[b] && propertyMetaByCode[b].sort, parseNumber(fieldByCode[b] && fieldByCode[b].sort, 500));
-      if (sortA === sortB) return a.localeCompare(b);
-      return sortA - sortB;
-    });
+    var participatingByCode = buildParticipatingPropertyMap(offers);
+    var allCodes = gatherAllPropertyCodes(propertyMeta, offers, fields)
+      .filter(function (code) {
+        return !!participatingByCode[code];
+      })
+      .sort(function (a, b) {
+        var sortA = parseNumber(
+          propertyMetaByCode[a] && (propertyMetaByCode[a].sort || propertyMetaByCode[a].SORT),
+          parseNumber(fieldByCode[a] && (fieldByCode[a].sort || fieldByCode[a].SORT), 500)
+        );
+        var sortB = parseNumber(
+          propertyMetaByCode[b] && (propertyMetaByCode[b].sort || propertyMetaByCode[b].SORT),
+          parseNumber(fieldByCode[b] && (fieldByCode[b].sort || fieldByCode[b].SORT), 500)
+        );
+        if (sortA === sortB) return a.localeCompare(b);
+        return sortA - sortB;
+      });
 
     var selectedByProperty = {};
     var hasCustomValues = false;
