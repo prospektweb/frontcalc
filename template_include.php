@@ -107,7 +107,68 @@ if (!function_exists('frontcalc_render_runtime_assets')) {
         d.head.appendChild(script);
     }
 
-    appendScript(w.FrontcalcPopupConfig.modulePath);
+    function findButtonTarget(node){
+        var current = node;
+        while (current && current !== d) {
+            if (current.classList && current.classList.contains('js-frontcalc-calculate')) {
+                return current;
+            }
+            current = current.parentNode;
+        }
+        return null;
+    }
+
+    var isModuleLoaded = false;
+    var isModuleLoading = false;
+    var loadQueue = [];
+
+    function flushQueue(){
+        var callbacks = loadQueue.slice();
+        loadQueue = [];
+        for (var i = 0; i < callbacks.length; i++) {
+            try { callbacks[i](); } catch (e) {}
+        }
+    }
+
+    function ensureFrontcalcModule(onReady){
+        if (isModuleLoaded) {
+            onReady && onReady();
+            return;
+        }
+        if (onReady) {
+            loadQueue.push(onReady);
+        }
+        if (isModuleLoading) {
+            return;
+        }
+        isModuleLoading = true;
+        appendScript(
+            w.FrontcalcPopupConfig.modulePath,
+            function(){
+                isModuleLoading = false;
+                isModuleLoaded = true;
+                flushQueue();
+            },
+            function(){
+                isModuleLoading = false;
+                flushQueue();
+            }
+        );
+    }
+
+    d.addEventListener('click', function(event){
+        var button = findButtonTarget(event.target);
+        if (!button || isModuleLoaded) {
+            return;
+        }
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        ensureFrontcalcModule(function(){
+            if (button && typeof button.click === 'function') {
+                button.click();
+            }
+        });
+    }, true);
 })(window, document);
 </script>
 HTML
