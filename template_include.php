@@ -11,13 +11,11 @@ if (!function_exists('frontcalc_render_runtime_assets')) {
         }
         $isRendered = true;
 
-        $modulePathLocal = '/local/modules/prospektweb.frontcalc/assets/js/frontcalc-jqm-popup.js';
-        $modulePathBitrix = '/bitrix/modules/prospektweb.frontcalc/assets/js/frontcalc-jqm-popup.js';
-        $moduleScriptPath = file_exists($_SERVER['DOCUMENT_ROOT'] . $modulePathLocal) ? $modulePathLocal : $modulePathBitrix;
+        $moduleScriptPath = '/local/modules/prospektweb.frontcalc/assets/js/frontcalc-jqm-popup.js';
 
         return str_replace(
-            ['{{MODULE_PATH_LOCAL}}', '{{MODULE_PATH_BITRIX}}', '{{MODULE_SCRIPT_PATH}}'],
-            [$modulePathLocal, $modulePathBitrix, $moduleScriptPath],
+            ['{{MODULE_SCRIPT_PATH}}'],
+            [$moduleScriptPath],
             <<<'HTML'
 <style>
 .frontcalc-calculate-button{
@@ -91,8 +89,6 @@ if (!function_exists('frontcalc_render_runtime_assets')) {
     w.__frontcalcPopupLoaderReady = true;
 
     w.FrontcalcPopupConfig = {
-        modulePathLocal: '{{MODULE_PATH_LOCAL}}',
-        modulePathBitrix: '{{MODULE_PATH_BITRIX}}',
         modulePath: '{{MODULE_SCRIPT_PATH}}',
         jqModalPath: (w.arAsproOptions && w.arAsproOptions.SITE_TEMPLATE_PATH ? w.arAsproOptions.SITE_TEMPLATE_PATH + '/js/jqModal.js' : '/bitrix/modules/aspro.popup/install/js/jqModal.js')
     };

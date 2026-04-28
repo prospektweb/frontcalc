@@ -380,6 +380,21 @@ class prospektweb_frontcalc extends CModule
             throw new \RuntimeException('Не удалось создать /local/ajax/frontcalc.php');
         }
 
+        $localJsTarget = $_SERVER['DOCUMENT_ROOT'] . '/local/modules/' . $this->MODULE_ID . '/assets/js/frontcalc-jqm-popup.js';
+        $localJsDir = dirname($localJsTarget);
+        if (!is_dir($localJsDir) && !@mkdir($localJsDir, 0775, true) && !is_dir($localJsDir)) {
+            throw new \RuntimeException('Не удалось создать каталог для /local/modules/.../frontcalc-jqm-popup.js');
+        }
+
+        $moduleJsSource = dirname(__DIR__) . '/assets/js/frontcalc-jqm-popup.js';
+        if (!is_file($moduleJsSource)) {
+            throw new \RuntimeException('Не найден исходный файл assets/js/frontcalc-jqm-popup.js');
+        }
+
+        if (!@copy($moduleJsSource, $localJsTarget)) {
+            throw new \RuntimeException('Не удалось скопировать frontcalc-jqm-popup.js в /local/modules');
+        }
+
         return true;
     }
 
@@ -393,6 +408,11 @@ class prospektweb_frontcalc extends CModule
         $ajaxTarget = $_SERVER['DOCUMENT_ROOT'] . '/local/ajax/frontcalc.php';
         if (is_file($ajaxTarget)) {
             @unlink($ajaxTarget);
+        }
+
+        $localJsTarget = $_SERVER['DOCUMENT_ROOT'] . '/local/modules/' . $this->MODULE_ID . '/assets/js/frontcalc-jqm-popup.js';
+        if (is_file($localJsTarget)) {
+            @unlink($localJsTarget);
         }
 
         return true;
