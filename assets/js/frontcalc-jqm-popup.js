@@ -492,7 +492,6 @@
       if (selectedByProperty[code]) {
         $chips.find('.frontcalc-chip[data-xml-id="' + selectedByProperty[code] + '"]').addClass("is-active");
       }
-      $section.append($chips);
 
       var hasShowPresetsSetting = Object.prototype.hasOwnProperty.call(fieldConfig, "show_presets");
       var showPresetsBySetting = hasShowPresetsSetting ? isTruthyFlag(fieldConfig.show_presets) : true;
@@ -544,6 +543,7 @@
           });
         });
         $section.append($group);
+        $section.append($chips);
 
         if (showPresetsBySetting && presets.length) {
           $chips.hide();
@@ -552,11 +552,18 @@
           });
           $section.on("focusout", ".frontcalc-num-input", function () {
             setTimeout(function () {
-              if ($section.find(document.activeElement).length) return;
+              if ($(document.activeElement).hasClass("frontcalc-num-input")) return;
               $chips.hide();
             }, 0);
           });
+
+          $chips.on("click", ".frontcalc-chip", function () {
+            $chips.hide();
+            this.blur();
+          });
         }
+      } else {
+        $section.append($chips);
       }
 
       $selectors.append($section);
