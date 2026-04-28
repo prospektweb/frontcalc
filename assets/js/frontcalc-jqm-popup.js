@@ -358,8 +358,12 @@
     return $wrap;
   }
 
-  function pickMatchedOffer(offers, selectedByProperty, hasCustomValues) {
-    if (hasCustomValues) return null;
+  function pickMatchedOffer(offers, selectedByProperty, customByProperty) {
+    for (var customCode in customByProperty) {
+      if (!Object.prototype.hasOwnProperty.call(customByProperty, customCode)) continue;
+      if (customByProperty[customCode]) return null;
+    }
+
     for (var i = 0; i < offers.length; i++) {
       var offer = offers[i];
       var props = offer.properties || {};
@@ -377,6 +381,33 @@
       }
 
       if (matched) return offer;
+    }
+    return null;
+  }
+
+  function normalizeValueToken(value) {
+    return String(value || "")
+      .replace(/\s+/g, "")
+      .replace(",", ".")
+      .trim();
+  }
+
+  function findPresetByInputValue(presets, numericValue) {
+    var normalizedInput = normalizeValueToken(numericValue);
+    var numericInput = parseNumber(normalizedInput, Number.NaN);
+    for (var i = 0; i < presets.length; i++) {
+      var preset = presets[i] || {};
+      var presetXmlId = normalizeValueToken(preset.xml_id);
+      var presetValue = normalizeValueToken(preset.value);
+      if (normalizedInput && (presetXmlId === normalizedInput || presetValue === normalizedInput)) {
+        return preset;
+      }
+
+      var numericXml = parseNumber(presetXmlId, Number.NaN);
+      var numericValuePreset = parseNumber(presetValue, Number.NaN);
+      if (Number.isFinite(numericInput) && (numericXml === numericInput || numericValuePreset === numericInput)) {
+        return preset;
+      }
     }
     return null;
   }
@@ -462,11 +493,12 @@
       });
 
     var selectedByProperty = {};
-    var hasCustomValues = false;
+    var customByProperty = {};
 
     allCodes.forEach(function (code) {
       if (Array.isArray(presetsByCode[code]) && presetsByCode[code].length) {
         selectedByProperty[code] = presetsByCode[code][0].xml_id;
+        customByProperty[code] = false;
       }
     });
 
@@ -486,7 +518,7 @@
       var presets = Array.isArray(presetsByCode[code]) ? presetsByCode[code] : [];
       var $chips = createPresetButtons(presets, function (preset) {
         selectedByProperty[code] = preset.xml_id;
-        hasCustomValues = false;
+        customByProperty[code] = false;
         updatePrice();
       });
       if (selectedByProperty[code]) {
@@ -525,8 +557,17 @@
             item,
             initial,
             function (numericValue) {
-              hasCustomValues = true;
-              selectedByProperty[code] = String(numericValue);
+              var matchedPreset = findPresetByInputValue(presets, numericValue);
+              if (matchedPreset) {
+                selectedByProperty[code] = matchedPreset.xml_id;
+                customByProperty[code] = false;
+                $chips.find(".is-active").removeClass("is-active");
+                $chips.find('.frontcalc-chip[data-xml-id="' + matchedPreset.xml_id + '"]').addClass("is-active");
+              } else {
+                selectedByProperty[code] = String(numericValue);
+                customByProperty[code] = true;
+                $chips.find(".is-active").removeClass("is-active");
+              }
               updatePrice();
             }
           );
@@ -576,7 +617,7 @@
     });
 
     function updatePrice() {
-      var matched = pickMatchedOffer(offers, selectedByProperty, hasCustomValues);
+      var matched = pickMatchedOffer(offers, selectedByProperty, customByProperty);
       renderPriceBlock($priceInner, matched);
     }
 
