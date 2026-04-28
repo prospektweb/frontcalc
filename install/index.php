@@ -244,7 +244,7 @@ class prospektweb_frontcalc extends CModule
 "
             . "<?php \$frontcalcTemplateIncludeBitrix = \$_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/prospektweb.frontcalc/template_include.php'; ?>
 "
-            . "<?php if (is_file(\$frontcalcTemplateIncludeLocal)) { require_once \$frontcalcTemplateIncludeLocal; } elseif (is_file(\$frontcalcTemplateIncludeBitrix)) { require_once \$frontcalcTemplateIncludeBitrix; } ?>
+            . "<?php if (is_file(\$frontcalcTemplateIncludeBitrix)) { require_once \$frontcalcTemplateIncludeBitrix; } elseif (is_file(\$frontcalcTemplateIncludeLocal)) { require_once \$frontcalcTemplateIncludeLocal; } ?>
 "
             . "<?php if (function_exists('frontcalc_render_runtime_assets')) { echo frontcalc_render_runtime_assets(); } ?>
 "
@@ -395,6 +395,21 @@ class prospektweb_frontcalc extends CModule
             throw new \RuntimeException('Не удалось скопировать frontcalc-jqm-popup.js в /local/modules');
         }
 
+        $localTemplateIncludeTarget = $_SERVER['DOCUMENT_ROOT'] . '/local/modules/' . $this->MODULE_ID . '/template_include.php';
+        $localTemplateIncludeDir = dirname($localTemplateIncludeTarget);
+        if (!is_dir($localTemplateIncludeDir) && !@mkdir($localTemplateIncludeDir, 0775, true) && !is_dir($localTemplateIncludeDir)) {
+            throw new \RuntimeException('Не удалось создать каталог для /local/modules/.../template_include.php');
+        }
+
+        $moduleTemplateIncludeSource = dirname(__DIR__) . '/template_include.php';
+        if (!is_file($moduleTemplateIncludeSource)) {
+            throw new \RuntimeException('Не найден исходный файл template_include.php');
+        }
+
+        if (!@copy($moduleTemplateIncludeSource, $localTemplateIncludeTarget)) {
+            throw new \RuntimeException('Не удалось скопировать template_include.php в /local/modules');
+        }
+
         return true;
     }
 
@@ -413,6 +428,11 @@ class prospektweb_frontcalc extends CModule
         $localJsTarget = $_SERVER['DOCUMENT_ROOT'] . '/local/modules/' . $this->MODULE_ID . '/assets/js/frontcalc-jqm-popup.js';
         if (is_file($localJsTarget)) {
             @unlink($localJsTarget);
+        }
+
+        $localTemplateIncludeTarget = $_SERVER['DOCUMENT_ROOT'] . '/local/modules/' . $this->MODULE_ID . '/template_include.php';
+        if (is_file($localTemplateIncludeTarget)) {
+            @unlink($localTemplateIncludeTarget);
         }
 
         return true;
