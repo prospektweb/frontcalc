@@ -185,9 +185,9 @@ if (!function_exists('frontcalc_get_light_payload')) {
 
         if (!class_exists($serviceClass)) {
             return [
-                'is_available' => false,
+                'is_available' => $productId > 0,
                 'product_id' => $productId,
-                'ajax_url' => $ajaxUrl,
+                'ajax_url' => $ajaxUrl !== '' ? $ajaxUrl : '/local/ajax/frontcalc.php',
             ];
         }
 

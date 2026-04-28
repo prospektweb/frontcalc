@@ -238,25 +238,13 @@ class prospektweb_frontcalc extends CModule
         return "
 <?php /* FRONTCALC_BUTTON_START */ ?>
 "
-            . "<?php if (\Bitrix\Main\Loader::includeModule('prospektweb.frontcalc')): ?>
-"
             . "<?php \$frontcalcTemplateIncludeLocal = \$_SERVER['DOCUMENT_ROOT'] . '/local/modules/prospektweb.frontcalc/template_include.php'; ?>
 "
             . "<?php \$frontcalcTemplateIncludeBitrix = \$_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/prospektweb.frontcalc/template_include.php'; ?>
 "
             . "<?php if (is_file(\$frontcalcTemplateIncludeBitrix)) { require_once \$frontcalcTemplateIncludeBitrix; } elseif (is_file(\$frontcalcTemplateIncludeLocal)) { require_once \$frontcalcTemplateIncludeLocal; } ?>
 "
-            . "<?php if (function_exists('frontcalc_render_runtime_assets')) { echo frontcalc_render_runtime_assets(); } ?>
-"
-            . "<?php \$frontcalcPayload = function_exists('frontcalc_get_light_payload') ? frontcalc_get_light_payload((int)(\$arConfig['ITEM_ID'] ?? 0), (int)(\$arConfig['CATALOG_IBLOCK_ID'] ?? 0)) : ['is_available' => false]; ?>
-"
-            . "<?php if (!empty(\$frontcalcPayload['is_available'])): ?>
-"
-            . "<button type=\"button\" class=\"btn btn-default btn-transparent-bg btn-wide frontcalc-calculate-button js-frontcalc-calculate\" data-frontcalc-product-id=\"<?= (int)\$frontcalcPayload['product_id'] ?>\" data-frontcalc-ajax-url=\"<?= htmlspecialcharsbx((string)\$frontcalcPayload['ajax_url']) ?>\">Рассчитать стоимость</button>
-"
-            . "<?php endif; ?>
-"
-            . "<?php endif; ?>
+            . "<?php if (function_exists('frontcalc_render_calculate_button')) { echo frontcalc_render_calculate_button((int)(\$arConfig['ITEM_ID'] ?? 0), (int)(\$arConfig['CATALOG_IBLOCK_ID'] ?? 0), 'Рассчитать стоимость', '/local/ajax/frontcalc.php'); } ?>
 "
             . "<?php /* FRONTCALC_BUTTON_END */ ?>
 ";
