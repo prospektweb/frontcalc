@@ -3,6 +3,7 @@
 namespace Prospektweb\Frontcalc\Admin;
 
 use Bitrix\Main\Config\Option;
+use Bitrix\Main\Loader;
 
 class ProductCardButton
 {
@@ -22,12 +23,25 @@ class ProductCardButton
         $elementId = (int)($_REQUEST['ID'] ?? 0);
         $iblockId = (int)($_REQUEST['IBLOCK_ID'] ?? 0);
         $productsIblockId = (int)Option::get('prospektweb.frontcalc', 'PRODUCTS_IBLOCK_ID', '0');
+        $calcPropertyCode = (string)Option::get('prospektweb.frontcalc', 'CALC_PROPERTY_CODE', 'FRONTCALC_CONFIG');
+        $iblockModuleLoaded = Loader::includeModule('iblock');
 
-        if ($elementId > 0 && $iblockId <= 0 && class_exists('\CIBlockElement')) {
+        if ($elementId > 0 && $iblockId <= 0 && $iblockModuleLoaded && class_exists('\CIBlockElement')) {
             $iblockId = (int)\CIBlockElement::GetIBlockByID($elementId);
         }
 
-        if ($elementId <= 0 || $iblockId <= 0 || $productsIblockId <= 0 || $iblockId !== $productsIblockId) {
+        $matchesConfiguredIblock = ($productsIblockId > 0 && $iblockId === $productsIblockId);
+        $hasCalculatorProperty = false;
+
+        if ($iblockId > 0 && $calcPropertyCode !== '' && $iblockModuleLoaded && class_exists('\CIBlockProperty')) {
+            $property = \CIBlockProperty::GetList(
+                ['ID' => 'ASC'],
+                ['IBLOCK_ID' => $iblockId, 'CODE' => $calcPropertyCode]
+            )->Fetch();
+            $hasCalculatorProperty = is_array($property);
+        }
+
+        if ($elementId <= 0 || $iblockId <= 0 || (!$matchesConfiguredIblock && !$hasCalculatorProperty)) {
             return;
         }
 
