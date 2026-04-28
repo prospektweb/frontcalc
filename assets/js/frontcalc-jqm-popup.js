@@ -193,7 +193,11 @@
     fields.forEach(function (field) {
       var code = getFieldCode(field);
       if (!code) return;
-      var hidden = Array.isArray(field.hidden_preset_xml_ids) ? field.hidden_preset_xml_ids : [];
+      var hidden = Array.isArray(field.hide_presets)
+        ? field.hide_presets
+        : Array.isArray(field.hidden_preset_xml_ids)
+        ? field.hidden_preset_xml_ids
+        : [];
       if (!hidden.length) return;
       map[code] = {};
       hidden.forEach(function (xmlId) {
@@ -490,8 +494,9 @@
       }
       $section.append($chips);
 
-      var showPresets = !isTruthyFlag(fieldConfig.hide_presets);
-      if (!presets.length || !showPresets) $chips.hide();
+      var hasShowPresetsSetting = Object.prototype.hasOwnProperty.call(fieldConfig, "show_presets");
+      var showPresetsBySetting = hasShowPresetsSetting ? isTruthyFlag(fieldConfig.show_presets) : true;
+      if (!presets.length || !showPresetsBySetting) $chips.hide();
 
       var groupItems = Array.isArray(fieldConfig.group_inputs)
         ? fieldConfig.group_inputs
@@ -539,6 +544,19 @@
           });
         });
         $section.append($group);
+
+        if (showPresetsBySetting && presets.length) {
+          $chips.hide();
+          $section.on("focusin", ".frontcalc-num-input", function () {
+            $chips.show();
+          });
+          $section.on("focusout", ".frontcalc-num-input", function () {
+            setTimeout(function () {
+              if ($section.find(document.activeElement).length) return;
+              $chips.hide();
+            }, 0);
+          });
+        }
       }
 
       $selectors.append($section);
