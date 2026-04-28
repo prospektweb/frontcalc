@@ -110,7 +110,7 @@
   }
 
   function getFieldCode(field) {
-    return String((field && (field.property_code || field.code)) || "").trim();
+    return String((field && (field.property_code || field.code || field.property || field.prop_code)) || "").trim();
   }
 
   function getFieldLabel(field, propertyMetaByCode, explicitCode) {
@@ -198,6 +198,57 @@
       if (code) map[code] = true;
     });
     return Object.keys(map);
+  }
+
+  function buildPresetsFromConfigFields(fields, hiddenByProperty) {
+    var result = {};
+    (Array.isArray(fields) ? fields : []).forEach(function (field) {
+      var code = getFieldCode(field);
+      if (!code) return;
+      var source = field.presets || field.values || field.options || [];
+      if (!Array.isArray(source) || !source.length) return;
+      result[code] = result[code] || [];
+      source.forEach(function (row, idx) {
+        var xmlId = "";
+        var value = "";
+        var sort = 500 + idx;
+
+        if (typeof row === "string" || typeof row === "number") {
+          xmlId = String(row);
+          value = String(row);
+        } else if (row && typeof row === "object") {
+          xmlId = String(row.xml_id || row.id || row.code || row.value || "").trim();
+          value = String(row.value || row.label || row.name || xmlId).trim();
+          sort = parseNumber(row.sort, sort);
+        }
+
+        if (!xmlId) return;
+        if (hiddenByProperty[code] && hiddenByProperty[code][xmlId]) return;
+        result[code].push({ xml_id: xmlId, value: value || xmlId, sort: sort });
+      });
+    });
+    return result;
+  }
+
+  function mergePresets(target, incoming) {
+    Object.keys(incoming || {}).forEach(function (code) {
+      var byXmlId = {};
+      (Array.isArray(target[code]) ? target[code] : []).forEach(function (row) {
+        byXmlId[String(row.xml_id)] = row;
+      });
+      (Array.isArray(incoming[code]) ? incoming[code] : []).forEach(function (row) {
+        var key = String(row.xml_id || "").trim();
+        if (!key) return;
+        byXmlId[key] = row;
+      });
+      var merged = Object.keys(byXmlId).map(function (key) {
+        return byXmlId[key];
+      });
+      merged.sort(function (a, b) {
+        return parseNumber(a.sort, 500) - parseNumber(b.sort, 500);
+      });
+      target[code] = merged;
+    });
   }
 
   function createInputControl(field, initialValue, onCommit) {
@@ -329,12 +380,22 @@
     var fieldByCode = makeFieldIndexMap(fields);
     var hiddenByProperty = buildHiddenPresetMap(config);
     var presetsByCode = buildPresetsByProperty(offers, hiddenByProperty);
+    mergePresets(presetsByCode, buildPresetsFromConfigFields(fields, hiddenByProperty));
     Object.keys(propertyMetaByCode).forEach(function (code) {
       if (Array.isArray(propertyMetaByCode[code].presets) && propertyMetaByCode[code].presets.length) {
-        presetsByCode[code] = propertyMetaByCode[code].presets;
+        mergePresets(presetsByCode, (function () {
+          var map = {};
+          map[code] = propertyMetaByCode[code].presets;
+          return map;
+        })());
       }
     });
-    var allCodes = gatherAllPropertyCodes(propertyMeta, offers, fields);
+    var allCodes = gatherAllPropertyCodes(propertyMeta, offers, fields).sort(function (a, b) {
+      var sortA = parseNumber(propertyMetaByCode[a] && propertyMetaByCode[a].sort, parseNumber(fieldByCode[a] && fieldByCode[a].sort, 500));
+      var sortB = parseNumber(propertyMetaByCode[b] && propertyMetaByCode[b].sort, parseNumber(fieldByCode[b] && fieldByCode[b].sort, 500));
+      if (sortA === sortB) return a.localeCompare(b);
+      return sortA - sortB;
+    });
 
     var selectedByProperty = {};
     var hasCustomValues = false;
@@ -378,7 +439,11 @@
         isTruthyFlag(fieldConfig.input_enabled) ||
         isTruthyFlag(fieldConfig.allow_input) ||
         isTruthyFlag(fieldConfig.show_input) ||
-        isTruthyFlag(fieldConfig.custom_input_enabled);
+        isTruthyFlag(fieldConfig.custom_input_enabled) ||
+        isTruthyFlag(fieldConfig.enable_custom_input) ||
+        String(fieldConfig.type || "").toLowerCase() === "input" ||
+        Number.isFinite(parseNumber(fieldConfig.min, Number.NaN)) ||
+        Number.isFinite(parseNumber(fieldConfig.max, Number.NaN));
 
       if (hasInputFlag || groupItems.length > 0) {
         var delimiter = fieldConfig.group_delimiter || fieldConfig.split_delimiter || "x";
