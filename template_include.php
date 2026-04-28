@@ -54,230 +54,27 @@ if (!function_exists('frontcalc_render_runtime_assets')) {
 @keyframes frontcalc-spin{to{transform:rotate(360deg);}}
 </style>
 <script>
-(function(){
-    if(window.__frontcalcReady){return;}
-    window.__frontcalcReady = true;
+(function(w, d){
+    if (w.__frontcalcPopupLoaderReady) { return; }
+    w.__frontcalcPopupLoaderReady = true;
 
-    var frontcalcPopupInstance = null;
+    w.FrontcalcPopupConfig = {
+        modulePathLocal: '/local/modules/prospektweb.frontcalc/assets/js/frontcalc-jqm-popup.js',
+        modulePathBitrix: '/bitrix/modules/prospektweb.frontcalc/assets/js/frontcalc-jqm-popup.js',
+        jqModalPath: (w.arAsproOptions && w.arAsproOptions.SITE_TEMPLATE_PATH ? w.arAsproOptions.SITE_TEMPLATE_PATH + '/js/jqModal.js' : '/bitrix/modules/aspro.popup/install/js/jqModal.js')
+    };
 
-    function escapeHtml(str){
-        return String(str || '').replace(/[&<>"']/g, function(ch){
-            return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[ch] || ch;
-        });
+    function appendScript(src){
+        if (!src) { return; }
+        var script = d.createElement('script');
+        script.src = src;
+        script.async = true;
+        d.head.appendChild(script);
     }
 
-    function closePopup(){
-        if (!frontcalcPopupInstance) {
-            return;
-        }
-
-        if (frontcalcPopupInstance.windowEl && frontcalcPopupInstance.windowEl.parentNode) {
-            frontcalcPopupInstance.windowEl.parentNode.removeChild(frontcalcPopupInstance.windowEl);
-        }
-        if (frontcalcPopupInstance.overlayEl && frontcalcPopupInstance.overlayEl.parentNode) {
-            frontcalcPopupInstance.overlayEl.parentNode.removeChild(frontcalcPopupInstance.overlayEl);
-        }
-
-        document.body.classList.remove('jqm-initied');
-        document.body.classList.remove('swipeignore');
-        frontcalcPopupInstance = null;
-    }
-
-    function ensurePopup(){
-        if (frontcalcPopupInstance) { return frontcalcPopupInstance; }
-
-        var wrapper = document.getElementById('popup_iframe_wrapper');
-        if (!wrapper) {
-            wrapper = document.createElement('div');
-            wrapper.id = 'popup_iframe_wrapper';
-            document.body.appendChild(wrapper);
-        }
-        wrapper.style.zIndex = '3000';
-        wrapper.style.display = 'flex';
-
-        var overlayEl = document.createElement('div');
-        overlayEl.className = 'jqmOverlay';
-        overlayEl.style.height = '100%';
-        overlayEl.style.width = '100%';
-        overlayEl.style.position = 'fixed';
-        overlayEl.style.left = '0';
-        overlayEl.style.top = '0';
-        overlayEl.style.zIndex = '2999';
-        overlayEl.style.opacity = '0.5';
-
-        var windowEl = document.createElement('div');
-        windowEl.className = 'question_frame jqmWindow jqmWindow--mobile-fill popup jqm-init show';
-        windowEl.setAttribute('data-popup', '0');
-        windowEl.style.zIndex = '3000';
-        windowEl.style.opacity = '1';
-
-        windowEl.innerHTML = ''
-            + '<span class="jqmClose top-close fill-grey-hover" title="Закрыть"><i class="svg inline inline" aria-hidden="true">×</i></span>'
-            + '<div class="scrollbar">'
-            + '  <div class="flexbox">'
-            + '    <div class="form popup frontcalc-popup-shell">'
-            + '      <div class="form-header"><div class="text"><div class="title switcher-title font_24 color_222">Калькулятор стоимости</div></div></div>'
-            + '      <div class="frontcalc-popup-content js-frontcalc-popup-content"></div>'
-            + '    </div>'
-            + '  </div>'
-            + '</div>';
-
-        wrapper.appendChild(overlayEl);
-        wrapper.appendChild(windowEl);
-
-        overlayEl.addEventListener('click', closePopup);
-        windowEl.querySelector('.jqmClose').addEventListener('click', function(event){
-            event.preventDefault();
-            closePopup();
-        });
-
-        document.body.classList.add('jqm-initied');
-        document.body.classList.add('swipeignore');
-
-        frontcalcPopupInstance = {
-            wrapper: wrapper,
-            overlayEl: overlayEl,
-            windowEl: windowEl,
-            contentNode: windowEl.querySelector('.js-frontcalc-popup-content'),
-            show: function(){},
-            close: closePopup
-        };
-
-        return frontcalcPopupInstance;
-    }
-
-    function findCalculateButton(target){
-        if (!target) {
-            return null;
-        }
-
-        if (target.closest) {
-            return target.closest('.js-frontcalc-calculate');
-        }
-
-        var node = target;
-        while (node && node !== document) {
-            if (node.classList && node.classList.contains('js-frontcalc-calculate')) {
-                return node;
-            }
-            node = node.parentNode;
-        }
-
-        return null;
-    }
-
-    function setLoading(contentNode){
-        contentNode.innerHTML = '<div class="frontcalc-preloader"><span class="frontcalc-preloader__spinner"></span><span>Загружаем данные калькулятора...</span></div>';
-    }
-
-    function renderError(contentNode, message){
-        contentNode.innerHTML = '<div class="frontcalc-empty">' + escapeHtml(message || 'Не удалось загрузить данные калькулятора.') + '</div>';
-    }
-
-    function renderData(contentNode, payload){
-        var data = payload && payload.data ? payload.data : {};
-        var config = data.config || {};
-        var fields = Array.isArray(config.fields) ? config.fields : [];
-        var offers = Array.isArray(data.offers) ? data.offers : [];
-
-        if (!fields.length) {
-            contentNode.innerHTML = '<div class="frontcalc-empty">Конфигурация калькулятора для товара не заполнена.</div>';
-            return;
-        }
-
-        var html = '<div class="frontcalc-summary">';
-        html += '<div><strong>Товар ID:</strong> ' + escapeHtml(data.product_id) + '</div>';
-        html += '<div style="margin-top:6px;"><strong>Полей в конфиге:</strong> ' + escapeHtml(fields.length) + '</div>';
-        html += '<div style="margin-top:6px;"><strong>Торговых предложений:</strong> ' + escapeHtml(offers.length) + '</div>';
-
-        html += '<div style="margin-top:16px;"><strong>Поля конфигурации:</strong></div><ul style="margin-top:8px;">';
-        for (var i = 0; i < fields.length; i++) {
-            html += '<li>' + escapeHtml(fields[i].property_code || ('Поле ' + (i + 1))) + '</li>';
-        }
-        html += '</ul></div>';
-
-        contentNode.innerHTML = html;
-    }
-
-    function requestData(url, onSuccess, onError){
-        if (window.fetch) {
-            fetch(url, { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-                .then(function(response){
-                    if(!response.ok){ throw new Error('HTTP ' + response.status); }
-                    return response.json();
-                })
-                .then(onSuccess)
-                .catch(function(error){ onError(error && error.message ? error.message : 'fetch_failed'); });
-            return;
-        }
-
-        var xhr = new XMLHttpRequest();
-        xhr.open('GET', url, true);
-        xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
-        xhr.onreadystatechange = function(){
-            if (xhr.readyState !== 4) { return; }
-            if (xhr.status < 200 || xhr.status >= 300) {
-                onError('HTTP ' + xhr.status);
-                return;
-            }
-
-            try {
-                onSuccess(JSON.parse(xhr.responseText));
-            } catch (e) {
-                onError('bad_json');
-            }
-        };
-        xhr.send();
-    }
-
-    document.addEventListener('click', function(event){
-        var button = findCalculateButton(event.target);
-        if (!button) { return; }
-
-        event.preventDefault();
-
-        var productId = button.getAttribute('data-frontcalc-product-id') || '0';
-        var ajaxUrl = button.getAttribute('data-frontcalc-ajax-url') || '';
-
-        if (!ajaxUrl) {
-            if (window.alert) { window.alert('Не задан URL для запроса калькулятора.'); }
-            return;
-        }
-
-        var divider = ajaxUrl.indexOf('?') === -1 ? '?' : '&';
-        var requestUrl = ajaxUrl + divider + 'product_id=' + encodeURIComponent(productId);
-
-        button.disabled = true;
-
-        var currentPopup = ensurePopup();
-        if (!currentPopup) {
-            button.disabled = false;
-            if (window.alert) { window.alert('Не удалось открыть popup калькулятора.'); }
-            return;
-        }
-
-        currentPopup.show();
-        var contentNode = currentPopup.contentNode;
-        if (!contentNode) {
-            button.disabled = false;
-            return;
-        }
-
-        setLoading(contentNode);
-
-        requestData(requestUrl, function(payload){
-            button.disabled = false;
-            if (!payload || payload.success !== true) {
-                renderError(contentNode, payload && payload.message ? payload.message : 'Сервер вернул ошибку.');
-                return;
-            }
-            renderData(contentNode, payload);
-        }, function(errorMessage){
-            button.disabled = false;
-            renderError(contentNode, 'Ошибка запроса: ' + errorMessage);
-        });
-    });
-})();
+    appendScript(w.FrontcalcPopupConfig.modulePathLocal);
+    appendScript(w.FrontcalcPopupConfig.modulePathBitrix);
+})(window, document);
 </script>
 HTML;
     }
