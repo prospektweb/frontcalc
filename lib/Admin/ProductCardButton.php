@@ -13,13 +13,19 @@ class ProductCardButton
         }
 
         $script = (string)($_SERVER['SCRIPT_NAME'] ?? '');
-        if (mb_strpos($script, '/bitrix/admin/iblock_element_edit.php') === false) {
+        $isIblockEdit = mb_strpos($script, '/bitrix/admin/iblock_element_edit.php') !== false;
+        $isCatalogEdit = mb_strpos($script, '/bitrix/admin/cat_product_edit.php') !== false;
+        if (!$isIblockEdit && !$isCatalogEdit) {
             return;
         }
 
         $elementId = (int)($_REQUEST['ID'] ?? 0);
         $iblockId = (int)($_REQUEST['IBLOCK_ID'] ?? 0);
         $productsIblockId = (int)Option::get('prospektweb.frontcalc', 'PRODUCTS_IBLOCK_ID', '0');
+
+        if ($elementId > 0 && $iblockId <= 0 && class_exists('\CIBlockElement')) {
+            $iblockId = (int)\CIBlockElement::GetIBlockByID($elementId);
+        }
 
         if ($elementId <= 0 || $iblockId <= 0 || $productsIblockId <= 0 || $iblockId !== $productsIblockId) {
             return;
