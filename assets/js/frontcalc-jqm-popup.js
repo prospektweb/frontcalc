@@ -130,6 +130,28 @@
     return map;
   }
 
+  function makeCodeOrderMapFromMeta(propertyMetaList) {
+    var map = {};
+    (Array.isArray(propertyMetaList) ? propertyMetaList : []).forEach(function (meta, index) {
+      var code = String((meta && meta.code) || "").trim();
+      if (code && map[code] === undefined) {
+        map[code] = index;
+      }
+    });
+    return map;
+  }
+
+  function makeCodeOrderMapFromFields(fields) {
+    var map = {};
+    (Array.isArray(fields) ? fields : []).forEach(function (field, index) {
+      var code = getFieldCode(field);
+      if (code && map[code] === undefined) {
+        map[code] = index;
+      }
+    });
+    return map;
+  }
+
   function buildPresetsByProperty(offers, hiddenByProperty) {
     var byCode = {};
     offers.forEach(function (offer) {
@@ -171,7 +193,11 @@
     fields.forEach(function (field) {
       var code = getFieldCode(field);
       if (!code) return;
-      var hidden = Array.isArray(field.hidden_preset_xml_ids) ? field.hidden_preset_xml_ids : [];
+      var hidden = Array.isArray(field.hide_presets)
+        ? field.hide_presets
+        : Array.isArray(field.hidden_preset_xml_ids)
+        ? field.hidden_preset_xml_ids
+        : [];
       if (!hidden.length) return;
       map[code] = {};
       hidden.forEach(function (xmlId) {
@@ -198,6 +224,21 @@
       if (code) map[code] = true;
     });
     return Object.keys(map);
+  }
+
+  function buildParticipatingPropertyMap(offers) {
+    var map = {};
+    (Array.isArray(offers) ? offers : []).forEach(function (offer) {
+      var properties = (offer && offer.properties) || {};
+      Object.keys(properties).forEach(function (code) {
+        if (code.indexOf("CALC_PROP_") !== 0) return;
+        var prop = properties[code] || {};
+        var xmlId = String(prop.xml_id || "").trim();
+        if (!xmlId) return;
+        map[code] = true;
+      });
+    });
+    return map;
   }
 
   function buildPresetsFromConfigFields(fields, hiddenByProperty) {
@@ -378,6 +419,8 @@
 
     var fields = Array.isArray(config.fields) ? config.fields : [];
     var fieldByCode = makeFieldIndexMap(fields);
+    var metaOrderByCode = makeCodeOrderMapFromMeta(propertyMeta);
+    var fieldOrderByCode = makeCodeOrderMapFromFields(fields);
     var hiddenByProperty = buildHiddenPresetMap(config);
     var presetsByCode = buildPresetsByProperty(offers, hiddenByProperty);
     mergePresets(presetsByCode, buildPresetsFromConfigFields(fields, hiddenByProperty));
@@ -390,12 +433,33 @@
         })());
       }
     });
-    var allCodes = gatherAllPropertyCodes(propertyMeta, offers, fields).sort(function (a, b) {
-      var sortA = parseNumber(propertyMetaByCode[a] && propertyMetaByCode[a].sort, parseNumber(fieldByCode[a] && fieldByCode[a].sort, 500));
-      var sortB = parseNumber(propertyMetaByCode[b] && propertyMetaByCode[b].sort, parseNumber(fieldByCode[b] && fieldByCode[b].sort, 500));
-      if (sortA === sortB) return a.localeCompare(b);
-      return sortA - sortB;
-    });
+    var participatingByCode = buildParticipatingPropertyMap(offers);
+    var allCodes = gatherAllPropertyCodes(propertyMeta, offers, fields)
+      .filter(function (code) {
+        return !!participatingByCode[code];
+      })
+      .sort(function (a, b) {
+        var sortA = parseNumber(
+          propertyMetaByCode[a] && (propertyMetaByCode[a].sort || propertyMetaByCode[a].SORT),
+          parseNumber(fieldByCode[a] && (fieldByCode[a].sort || fieldByCode[a].SORT), 500)
+        );
+        var sortB = parseNumber(
+          propertyMetaByCode[b] && (propertyMetaByCode[b].sort || propertyMetaByCode[b].SORT),
+          parseNumber(fieldByCode[b] && (fieldByCode[b].sort || fieldByCode[b].SORT), 500)
+        );
+        if (sortA === sortB) {
+          var metaOrderA = parseNumber(metaOrderByCode[a], Number.POSITIVE_INFINITY);
+          var metaOrderB = parseNumber(metaOrderByCode[b], Number.POSITIVE_INFINITY);
+          if (metaOrderA !== metaOrderB) return metaOrderA - metaOrderB;
+
+          var fieldOrderA = parseNumber(fieldOrderByCode[a], Number.POSITIVE_INFINITY);
+          var fieldOrderB = parseNumber(fieldOrderByCode[b], Number.POSITIVE_INFINITY);
+          if (fieldOrderA !== fieldOrderB) return fieldOrderA - fieldOrderB;
+
+          return a.localeCompare(b);
+        }
+        return sortA - sortB;
+      });
 
     var selectedByProperty = {};
     var hasCustomValues = false;
@@ -430,15 +494,21 @@
       }
       $section.append($chips);
 
-      var showPresets = !isTruthyFlag(fieldConfig.hide_presets);
-      if (!presets.length || !showPresets) $chips.hide();
+      var hasShowPresetsSetting = Object.prototype.hasOwnProperty.call(fieldConfig, "show_presets");
+      var showPresetsBySetting = hasShowPresetsSetting ? isTruthyFlag(fieldConfig.show_presets) : true;
+      if (!presets.length || !showPresetsBySetting) $chips.hide();
 
-      var groupItems = Array.isArray(fieldConfig.group_inputs) ? fieldConfig.group_inputs : [];
+      var groupItems = Array.isArray(fieldConfig.group_inputs)
+        ? fieldConfig.group_inputs
+        : Array.isArray(fieldConfig.inputs)
+        ? fieldConfig.inputs
+        : [];
       var hasInputFlag =
         isTruthyFlag(fieldConfig.enable_input) ||
         isTruthyFlag(fieldConfig.input_enabled) ||
         isTruthyFlag(fieldConfig.allow_input) ||
         isTruthyFlag(fieldConfig.show_input) ||
+        isTruthyFlag(fieldConfig.show_inputs) ||
         isTruthyFlag(fieldConfig.custom_input_enabled) ||
         isTruthyFlag(fieldConfig.enable_custom_input) ||
         String(fieldConfig.type || "").toLowerCase() === "input" ||
@@ -474,6 +544,19 @@
           });
         });
         $section.append($group);
+
+        if (showPresetsBySetting && presets.length) {
+          $chips.hide();
+          $section.on("focusin", ".frontcalc-num-input", function () {
+            $chips.show();
+          });
+          $section.on("focusout", ".frontcalc-num-input", function () {
+            setTimeout(function () {
+              if ($section.find(document.activeElement).length) return;
+              $chips.hide();
+            }, 0);
+          });
+        }
       }
 
       $selectors.append($section);
@@ -513,6 +596,10 @@
         onHide: function (hash) {
           hash.w.remove();
           hash.o && hash.o.remove();
+          var $wrapper = $("#popup_iframe_wrapper");
+          if ($wrapper.find(".jqmWindow").length === 0 && $wrapper.find(".jqmOverlay").length === 0) {
+            $wrapper.css({ "z-index": "", display: "" });
+          }
           $("body").removeClass("jqm-initied swipeignore");
         },
       });
