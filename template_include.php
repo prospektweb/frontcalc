@@ -1,7 +1,5 @@
 <?php
 
-use Prospektweb\Frontcalc\Service\CalculatorAvailability;
-
 if (!function_exists('frontcalc_render_runtime_assets')) {
     function frontcalc_render_runtime_assets(): string
     {
@@ -11,7 +9,12 @@ if (!function_exists('frontcalc_render_runtime_assets')) {
         }
         $isRendered = true;
 
-        return <<<'HTML'
+        $moduleScriptPath = '/local/modules/prospektweb.frontcalc/assets/js/frontcalc-jqm-popup.js';
+
+        return str_replace(
+            ['{{MODULE_SCRIPT_PATH}}'],
+            [$moduleScriptPath],
+            <<<'HTML'
 <style>
 .frontcalc-calculate-button{
     display:inline-flex;
@@ -40,26 +43,26 @@ if (!function_exists('frontcalc_render_runtime_assets')) {
     color:var(--button_color_text,#fff);
 }
 .frontcalc-calculate-button:disabled{opacity:.65;cursor:wait;}
-.frontcalc-popup-shell{width:480px;max-width:calc(100vw - 32px);}
+#popup_iframe_wrapper .frontcalc_frame{width:min(1320px,calc(100vw - 32px)) !important;max-width:calc(100vw - 32px) !important;}
+#popup_iframe_wrapper .frontcalc_frame .scrollbar{max-height:calc(100vh - 40px);overflow:auto;}
+.frontcalc-popup-shell{width:100%;max-width:100%;box-sizing:border-box;}
 .frontcalc-popup-shell.form.popup{display:block;padding:0;background:#fff;}
-.frontcalc-popup-shell .form-header{padding:32px 32px 0;}
-.frontcalc-popup-shell .form-header .title{margin:0;}
-.frontcalc-popup-content{min-height:220px;padding:16px 32px 32px;}
+.frontcalc-popup-content{min-height:220px;padding:24px;}
 .frontcalc-preloader{display:flex;align-items:center;gap:12px;padding:28px 0;color:#5f6a83;}
 .frontcalc-preloader__spinner{width:28px;height:28px;border-radius:50%;border:3px solid rgba(42,101,208,.2);border-top-color:var(--theme-base-color,#2a65d0);animation:frontcalc-spin .8s linear infinite;}
 .frontcalc-empty{padding:8px 0;color:#5f6a83;}
 .frontcalc-summary{font-size:16px;line-height:24px;color:#555;}
 .frontcalc-summary strong{font-weight:600;color:#333;}
 .frontcalc-summary ul{margin:8px 0 0;padding-left:18px;}
-.frontcalc-layout{display:grid;grid-template-columns:minmax(0,2fr) minmax(280px,1fr);gap:20px;align-items:start;}
+.frontcalc-layout{display:grid;grid-template-columns:minmax(0,2fr) minmax(320px,1fr);gap:20px;align-items:start;}
 .frontcalc-selectors{display:flex;flex-direction:column;gap:20px;}
-.frontcalc-field{display:flex;flex-direction:column;gap:10px;}
-.frontcalc-field__title{font-size:24px;line-height:1.35;color:#2a3348;}
-.frontcalc-input-control{display:flex;align-items:center;max-width:240px;border:1px solid #d9dee7;border-radius:8px;overflow:hidden;}
-.frontcalc-step-btn{width:52px;height:52px;border:0;background:#f7f8fb;font-size:28px;line-height:1;color:#4d5b76;cursor:pointer;}
-.frontcalc-num-input{flex:1;min-width:0;height:52px;border:0;text-align:center;font-size:30px;font-weight:600;color:#1a2236;}
+.frontcalc-field{display:flex;flex-direction:column;gap:8px;}
+.frontcalc-field__title{font-size:16px;line-height:1.35;color:#2a3348;}
+.frontcalc-input-control{display:flex;align-items:center;max-width:200px;border:1px solid #d9dee7;border-radius:8px;overflow:hidden;}
+.frontcalc-step-btn{width:38px;height:38px;border:0;background:#f7f8fb;font-size:20px;line-height:1;color:#4d5b76;cursor:pointer;}
+.frontcalc-num-input{flex:1;min-width:0;height:38px;border:0;text-align:center;font-size:18px;font-weight:600;color:#1a2236;}
 .frontcalc-presets{display:flex;flex-wrap:wrap;gap:8px;}
-.frontcalc-chip{min-height:48px;padding:8px 24px;border:1px solid #d9dee7;border-radius:8px;background:#fff;color:#1a2236;font-size:28px;line-height:1.2;cursor:pointer;}
+.frontcalc-chip{min-height:34px;padding:6px 12px;border:1px solid #d9dee7;border-radius:8px;background:#fff;color:#1a2236;font-size:14px;line-height:1.2;cursor:pointer;}
 .frontcalc-chip:hover{border-color:#2f3a52;}
 .frontcalc-chip.is-active{border-color:#2f3a52;box-shadow:inset 0 0 0 1px #2f3a52;}
 .frontcalc-input-group{display:flex;flex-wrap:wrap;gap:12px;}
@@ -72,9 +75,9 @@ if (!function_exists('frontcalc_render_runtime_assets')) {
 @media (max-width: 991px){
     .frontcalc-layout{grid-template-columns:1fr;}
     .frontcalc-price-panel{order:-1;}
-    .frontcalc-field__title{font-size:18px;}
-    .frontcalc-chip{font-size:20px;min-height:44px;padding:6px 16px;}
-    .frontcalc-num-input{font-size:24px;}
+    .frontcalc-field__title{font-size:15px;}
+    .frontcalc-chip{font-size:13px;min-height:32px;padding:4px 10px;}
+    .frontcalc-num-input{font-size:16px;}
 }
 @keyframes frontcalc-spin{to{transform:rotate(360deg);}}
 </style>
@@ -84,31 +87,111 @@ if (!function_exists('frontcalc_render_runtime_assets')) {
     w.__frontcalcPopupLoaderReady = true;
 
     w.FrontcalcPopupConfig = {
-        modulePathLocal: '/local/modules/prospektweb.frontcalc/assets/js/frontcalc-jqm-popup.js',
-        modulePathBitrix: '/bitrix/modules/prospektweb.frontcalc/assets/js/frontcalc-jqm-popup.js',
+        modulePath: '{{MODULE_SCRIPT_PATH}}',
         jqModalPath: (w.arAsproOptions && w.arAsproOptions.SITE_TEMPLATE_PATH ? w.arAsproOptions.SITE_TEMPLATE_PATH + '/js/jqModal.js' : '/bitrix/modules/aspro.popup/install/js/jqModal.js')
     };
 
-    function appendScript(src){
+    function appendScript(src, onload, onerror){
         if (!src) { return; }
         var script = d.createElement('script');
         script.src = src;
         script.async = true;
+        if (onload) { script.onload = onload; }
+        if (onerror) { script.onerror = onerror; }
         d.head.appendChild(script);
     }
 
-    appendScript(w.FrontcalcPopupConfig.modulePathLocal);
-    appendScript(w.FrontcalcPopupConfig.modulePathBitrix);
+    function findButtonTarget(node){
+        var current = node;
+        while (current && current !== d) {
+            if (current.classList && current.classList.contains('js-frontcalc-calculate')) {
+                return current;
+            }
+            current = current.parentNode;
+        }
+        return null;
+    }
+
+    var isModuleLoaded = false;
+    var isModuleLoading = false;
+    var loadQueue = [];
+
+    function flushQueue(){
+        var callbacks = loadQueue.slice();
+        loadQueue = [];
+        for (var i = 0; i < callbacks.length; i++) {
+            try { callbacks[i](); } catch (e) {}
+        }
+    }
+
+    function ensureFrontcalcModule(onReady){
+        if (isModuleLoaded) {
+            onReady && onReady();
+            return;
+        }
+        if (onReady) {
+            loadQueue.push(onReady);
+        }
+        if (isModuleLoading) {
+            return;
+        }
+        isModuleLoading = true;
+        appendScript(
+            w.FrontcalcPopupConfig.modulePath,
+            function(){
+                isModuleLoading = false;
+                isModuleLoaded = true;
+                flushQueue();
+            },
+            function(){
+                isModuleLoading = false;
+                flushQueue();
+            }
+        );
+    }
+
+    d.addEventListener('click', function(event){
+        var button = findButtonTarget(event.target);
+        if (!button || isModuleLoaded) {
+            return;
+        }
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        ensureFrontcalcModule(function(){
+            if (button && typeof button.click === 'function') {
+                button.click();
+            }
+        });
+    }, true);
 })(window, document);
 </script>
-HTML;
+HTML
+        );
     }
 }
 
 if (!function_exists('frontcalc_get_light_payload')) {
     function frontcalc_get_light_payload(int $productId, int $iblockId, string $ajaxUrl = ''): array
     {
-        $service = new CalculatorAvailability();
+        $serviceClass = '\\Prospektweb\\Frontcalc\\Service\\CalculatorAvailability';
+
+        if (!class_exists($serviceClass)) {
+            if (class_exists('\\Bitrix\\Main\\Loader')) {
+                \Bitrix\Main\Loader::includeModule('prospektweb.frontcalc');
+            } elseif (class_exists('\\CModule')) {
+                \CModule::IncludeModule('prospektweb.frontcalc');
+            }
+        }
+
+        if (!class_exists($serviceClass)) {
+            return [
+                'is_available' => false,
+                'product_id' => $productId,
+                'ajax_url' => $ajaxUrl,
+            ];
+        }
+
+        $service = new $serviceClass();
 
         return $service->getLightPayload($productId, $iblockId, $ajaxUrl);
     }
