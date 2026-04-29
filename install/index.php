@@ -435,6 +435,19 @@ class prospektweb_frontcalc extends CModule
             throw new \RuntimeException('Не удалось скопировать lib/Admin/ProductCardButton.php в /local/modules');
         }
 
+        $moduleCalculatorAvailabilitySource = dirname(__DIR__) . '/lib/Service/CalculatorAvailability.php';
+        $moduleCalculatorAvailabilityTarget = $moduleRootPath . '/lib/Service/CalculatorAvailability.php';
+        $moduleCalculatorAvailabilityDir = dirname($moduleCalculatorAvailabilityTarget);
+        if (!is_dir($moduleCalculatorAvailabilityDir) && !@mkdir($moduleCalculatorAvailabilityDir, 0775, true) && !is_dir($moduleCalculatorAvailabilityDir)) {
+            throw new \RuntimeException('Не удалось создать каталог /local/modules/.../lib/Service');
+        }
+        if (!is_file($moduleCalculatorAvailabilitySource)) {
+            throw new \RuntimeException('Не найден исходный файл lib/Service/CalculatorAvailability.php');
+        }
+        if (!@copy($moduleCalculatorAvailabilitySource, $moduleCalculatorAvailabilityTarget)) {
+            throw new \RuntimeException('Не удалось скопировать lib/Service/CalculatorAvailability.php в /local/modules');
+        }
+
         return true;
     }
 
@@ -476,8 +489,14 @@ class prospektweb_frontcalc extends CModule
             @unlink($moduleProductCardButtonTarget);
         }
 
+        $moduleCalculatorAvailabilityTarget = $moduleRootPath . '/lib/Service/CalculatorAvailability.php';
+        if (is_file($moduleCalculatorAvailabilityTarget)) {
+            @unlink($moduleCalculatorAvailabilityTarget);
+        }
+
         @rmdir($moduleRootPath . '/admin');
         @rmdir($moduleRootPath . '/lib/Admin');
+        @rmdir($moduleRootPath . '/lib/Service');
         @rmdir($moduleRootPath . '/lib');
 
         return true;
