@@ -337,7 +337,18 @@
     });
 
     $control.append($minus, $input, $plus);
-    $field.append($control);
+
+    var showUnit = Object.prototype.hasOwnProperty.call(field || {}, "show_unit")
+      ? isTruthyFlag(field.show_unit)
+      : true;
+    var unitText = String((field && field.unit) || "").trim();
+    var $controlWrap = $('<div class="frontcalc-input-control-wrap"></div>');
+    $controlWrap.append($control);
+    if (showUnit && unitText) {
+      $controlWrap.append('<span class="frontcalc-input-unit">' + escapeHtml(unitText) + "</span>");
+    }
+
+    $field.append($controlWrap);
     return $field;
   }
 
