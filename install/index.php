@@ -395,7 +395,6 @@ class prospektweb_frontcalc extends CModule
             $this->validatePrimaryModuleSource(self::BITRIX_MODULE_ROOT);
             return self::BITRIX_MODULE_ROOT;
         }
-    }
 
         throw new \RuntimeException(
             'Не найден модуль ни в ' . self::LOCAL_MODULE_ROOT . ', ни в ' . self::BITRIX_MODULE_ROOT
@@ -434,6 +433,35 @@ class prospektweb_frontcalc extends CModule
         }
     }
 
+    protected function deleteDirectoryRecursively($path)
+    {
+        $path = rtrim((string)$path, '/');
+        if ($path === '' || !is_dir($path)) {
+            return;
+        }
+    }
+
+        $items = scandir($path);
+        if (!is_array($items)) {
+            return;
+        }
+
+        foreach ($items as $item) {
+            if ($item === '.' || $item === '..') {
+                continue;
+            }
+
+            $itemPath = $path . '/' . $item;
+            if (is_dir($itemPath)) {
+                $this->deleteDirectoryRecursively($itemPath);
+            } else {
+                @unlink($itemPath);
+            }
+        }
+
+        @rmdir($path);
+    }
+
     public function UnInstallFiles()
     {
         $adminTarget = $_SERVER['DOCUMENT_ROOT'] . '/bitrix/admin/prospektweb_frontcalc_editor.php';
@@ -448,7 +476,7 @@ class prospektweb_frontcalc extends CModule
 
         $localModuleDir = $_SERVER['DOCUMENT_ROOT'] . self::LOCAL_MODULE_ROOT;
         if (is_dir($localModuleDir)) {
-            DeleteDirFilesEx(self::LOCAL_MODULE_ROOT);
+            $this->deleteDirectoryRecursively($localModuleDir);
         }
 
         return true;
