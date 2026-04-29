@@ -23,25 +23,16 @@ class ProductCardButton
         $elementId = (int)($_REQUEST['ID'] ?? 0);
         $iblockId = (int)($_REQUEST['IBLOCK_ID'] ?? 0);
         $productsIblockId = (int)Option::get('prospektweb.frontcalc', 'PRODUCTS_IBLOCK_ID', '0');
-        $calcPropertyCode = (string)Option::get('prospektweb.frontcalc', 'CALC_PROPERTY_CODE', 'FRONTCALC_CONFIG');
-        $iblockModuleLoaded = Loader::includeModule('iblock');
+        $iblockType = (string)($_REQUEST['type'] ?? '');
 
-        if ($elementId > 0 && $iblockId <= 0 && $iblockModuleLoaded && class_exists('\CIBlockElement')) {
+        if ($elementId > 0 && $iblockId <= 0 && Loader::includeModule('iblock') && class_exists('\CIBlockElement')) {
             $iblockId = (int)\CIBlockElement::GetIBlockByID($elementId);
         }
 
         $matchesConfiguredIblock = ($productsIblockId > 0 && $iblockId === $productsIblockId);
-        $hasCalculatorProperty = false;
+        $isCalculatorType = ($iblockType === 'calculator');
 
-        if ($iblockId > 0 && $calcPropertyCode !== '' && $iblockModuleLoaded && class_exists('\CIBlockProperty')) {
-            $property = \CIBlockProperty::GetList(
-                ['ID' => 'ASC'],
-                ['IBLOCK_ID' => $iblockId, 'CODE' => $calcPropertyCode]
-            )->Fetch();
-            $hasCalculatorProperty = is_array($property);
-        }
-
-        if ($elementId <= 0 || $iblockId <= 0 || (!$matchesConfiguredIblock && !$hasCalculatorProperty)) {
+        if ($elementId <= 0 || $iblockId <= 0 || (!$matchesConfiguredIblock && !$isCalculatorType)) {
             return;
         }
 
