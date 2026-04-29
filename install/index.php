@@ -48,7 +48,6 @@ if (!defined('B_PROLOG_INCLUDED') || B_PROLOG_INCLUDED !== true) {
 
 class prospektweb_frontcalc extends CModule
 {
-    protected const MODULE_ROOT = '/local/modules/prospektweb.frontcalc';
     public $MODULE_ID = 'prospektweb.frontcalc';
     public $MODULE_VERSION;
     public $MODULE_VERSION_DATE;
@@ -239,9 +238,11 @@ class prospektweb_frontcalc extends CModule
         return "
 <?php /* FRONTCALC_BUTTON_START */ ?>
 "
-            . "<?php \$frontcalcTemplateInclude = \$_SERVER['DOCUMENT_ROOT'] . '" . self::MODULE_ROOT . "/template_include.php'; ?>
+            . "<?php \$frontcalcTemplateIncludeLocal = \$_SERVER['DOCUMENT_ROOT'] . '/local/modules/prospektweb.frontcalc/template_include.php'; ?>
 "
-            . "<?php if (is_file(\$frontcalcTemplateInclude)) { require_once \$frontcalcTemplateInclude; } ?>
+            . "<?php \$frontcalcTemplateIncludeBitrix = \$_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/prospektweb.frontcalc/template_include.php'; ?>
+"
+            . "<?php if (is_file(\$frontcalcTemplateIncludeBitrix)) { require_once \$frontcalcTemplateIncludeBitrix; } elseif (is_file(\$frontcalcTemplateIncludeLocal)) { require_once \$frontcalcTemplateIncludeLocal; } ?>
 "
             . "<?php if (function_exists('frontcalc_render_calculate_button')) { echo frontcalc_render_calculate_button((int)(\$arConfig['ITEM_ID'] ?? 0), (int)(\$arConfig['CATALOG_IBLOCK_ID'] ?? 0), 'Рассчитать стоимость', '/local/ajax/frontcalc.php'); } ?>
 "
@@ -324,8 +325,6 @@ class prospektweb_frontcalc extends CModule
 
     public function InstallFiles()
     {
-        $this->validatePrimaryModuleSource();
-
         $adminTarget = $_SERVER['DOCUMENT_ROOT'] . '/bitrix/admin/prospektweb_frontcalc_editor.php';
         $moduleAdminFile = dirname(__DIR__) . '/admin/prospektweb_frontcalc_editor.php';
         if (!is_file($moduleAdminFile)) {
@@ -333,9 +332,12 @@ class prospektweb_frontcalc extends CModule
         }
 
         $content = "<?php\n"
-            . "\$modulePath = \$_SERVER['DOCUMENT_ROOT'] . '" . self::MODULE_ROOT . "/admin/prospektweb_frontcalc_editor.php';\n"
-            . "if (is_file(\$modulePath)) {\n"
-            . "    require_once \$modulePath;\n"
+            . "\$localPath = \$_SERVER['DOCUMENT_ROOT'] . '/local/modules/" . $this->MODULE_ID . "/admin/prospektweb_frontcalc_editor.php';\n"
+            . "\$bitrixPath = \$_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/" . $this->MODULE_ID . "/admin/prospektweb_frontcalc_editor.php';\n"
+            . "if (is_file(\$localPath)) {\n"
+            . "    require_once \$localPath;\n"
+            . "} elseif (is_file(\$bitrixPath)) {\n"
+            . "    require_once \$bitrixPath;\n"
             . "} else {\n"
             . "    die('admin/prospektweb_frontcalc_editor.php not found');\n"
             . "}\n";
@@ -350,9 +352,12 @@ class prospektweb_frontcalc extends CModule
         }
 
         $ajaxContent = "<?php\n"
-            . "\$modulePath = \$_SERVER['DOCUMENT_ROOT'] . '" . self::MODULE_ROOT . "/ajax/frontcalc.php';\n"
-            . "if (is_file(\$modulePath)) {\n"
-            . "    require_once \$modulePath;\n"
+            . "\$localPath = \$_SERVER['DOCUMENT_ROOT'] . '/local/modules/" . $this->MODULE_ID . "/ajax/frontcalc.php';\n"
+            . "\$bitrixPath = \$_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/" . $this->MODULE_ID . "/ajax/frontcalc.php';\n"
+            . "if (is_file(\$localPath)) {\n"
+            . "    require_once \$localPath;\n"
+            . "} elseif (is_file(\$bitrixPath)) {\n"
+            . "    require_once \$bitrixPath;\n"
             . "} else {\n"
             . "    http_response_code(500);\n"
             . "    header('Content-Type: application/json; charset=UTF-8');\n"
@@ -394,36 +399,6 @@ class prospektweb_frontcalc extends CModule
         }
 
         return true;
-    }
-
-    protected function validatePrimaryModuleSource()
-    {
-        $requiredFiles = [
-            'include.php',
-            'admin/prospektweb_frontcalc_editor.php',
-            'admin/editor.php',
-            'ajax/frontcalc.php',
-            'template_include.php',
-            'assets/js/frontcalc-jqm-popup.js',
-            'lib/Admin/ProductCardButton.php',
-            'lib/Service/CalculatorAvailability.php',
-        ];
-
-        $missing = [];
-        foreach ($requiredFiles as $relativePath) {
-            $fullPath = $_SERVER['DOCUMENT_ROOT'] . self::MODULE_ROOT . '/' . $relativePath;
-            if (!is_file($fullPath)) {
-                $missing[] = self::MODULE_ROOT . '/' . $relativePath;
-            }
-        }
-
-        if (!empty($missing)) {
-            throw new \RuntimeException(
-                "Нарушена целостность источника модуля " . self::MODULE_ROOT
-                . ". Не допускается частичное разнесение файлов между /local/modules и /bitrix/modules."
-                . " Отсутствуют файлы: " . implode(', ', $missing)
-            );
-        }
     }
 
     public function UnInstallFiles()

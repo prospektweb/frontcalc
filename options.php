@@ -8,22 +8,6 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_ad
 $moduleId = 'prospektweb.frontcalc';
 Loader::includeModule($moduleId);
 
-function frontcalc_detect_module_file_root(string $relativePath): string
-{
-    $localPath = $_SERVER['DOCUMENT_ROOT'] . '/local/modules/prospektweb.frontcalc/' . $relativePath;
-    $bitrixPath = $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/prospektweb.frontcalc/' . $relativePath;
-
-    if (is_file($localPath)) {
-        return '/local/modules/prospektweb.frontcalc/' . $relativePath;
-    }
-
-    if (is_file($bitrixPath)) {
-        return '/bitrix/modules/prospektweb.frontcalc/' . $relativePath;
-    }
-
-    return 'NOT_FOUND: ' . $relativePath;
-}
-
 /** @global CMain $APPLICATION */
 /** @global CUser $USER */
 global $APPLICATION, $USER;
@@ -75,11 +59,6 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
 $products = Option::get($moduleId, 'PRODUCTS_IBLOCK_ID', '0');
 $offers = Option::get($moduleId, 'OFFERS_IBLOCK_ID', '0');
 $editorSchema = Option::get($moduleId, 'CALC_EDITOR_SCHEMA', '');
-$runtimeDiagnostics = [
-    'include.php' => frontcalc_detect_module_file_root('include.php'),
-    'admin/editor.php' => frontcalc_detect_module_file_root('admin/editor.php'),
-    'template_include.php' => frontcalc_detect_module_file_root('template_include.php'),
-];
 ?>
 <style>
     .fc-soft-wrap {
@@ -204,13 +183,6 @@ $runtimeDiagnostics = [
             </div>
         </div>
         <p class="fc-muted">Карточный редактор настроек калькулятора (soft admin UI).</p>
-    </div>
-    <div class="fc-soft-wrap">
-        <div class="fc-subtitle">Диагностика путей загрузки</div>
-        <?php foreach ($runtimeDiagnostics as $file => $resolvedPath): ?>
-            <p class="fc-muted"><b><?= htmlspecialcharsbx($file) ?></b>: <?= htmlspecialcharsbx($resolvedPath) ?></p>
-        <?php endforeach; ?>
-        <p class="fc-muted">Поддерживаемый режим: только <b>/local/modules/prospektweb.frontcalc</b>. Частичное разнесение файлов запрещено.</p>
     </div>
 
     <input type="hidden" name="CALC_EDITOR_SCHEMA" id="fc-schema-json" value="<?= htmlspecialcharsbx($editorSchema) ?>">
