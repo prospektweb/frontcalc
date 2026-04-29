@@ -45,7 +45,6 @@ if ($offersIblockId > 0 && Loader::includeModule('iblock')) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && check_bitrix_sessid()) {
     Option::set($moduleId, 'PRODUCTS_IBLOCK_ID', trim((string)($_POST['PRODUCTS_IBLOCK_ID'] ?? '0')));
     Option::set($moduleId, 'OFFERS_IBLOCK_ID', trim((string)($_POST['OFFERS_IBLOCK_ID'] ?? '0')));
-    Option::set($moduleId, 'ADMIN_BUTTON_DEBUG', (string)($_POST['ADMIN_BUTTON_DEBUG'] ?? 'N') === 'Y' ? 'Y' : 'N');
 
     $schema = (string)($_POST['CALC_EDITOR_SCHEMA'] ?? '');
     if ($schema !== '') {
@@ -60,7 +59,6 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
 $products = Option::get($moduleId, 'PRODUCTS_IBLOCK_ID', '0');
 $offers = Option::get($moduleId, 'OFFERS_IBLOCK_ID', '0');
 $editorSchema = Option::get($moduleId, 'CALC_EDITOR_SCHEMA', '');
-$adminButtonDebug = Option::get($moduleId, 'ADMIN_BUTTON_DEBUG', 'N');
 ?>
 <style>
     .fc-soft-wrap {
@@ -182,13 +180,6 @@ $adminButtonDebug = Option::get($moduleId, 'ADMIN_BUTTON_DEBUG', 'N');
             <div>
                 <div class="fc-subtitle">OFFERS_IBLOCK_ID</div>
                 <input class="fc-input" type="text" name="OFFERS_IBLOCK_ID" value="<?= htmlspecialcharsbx($offers) ?>">
-            </div>
-            <div>
-                <div class="fc-subtitle">ADMIN_BUTTON_DEBUG</div>
-                <select class="fc-select" name="ADMIN_BUTTON_DEBUG">
-                    <option value="N"<?= $adminButtonDebug === 'Y' ? '' : ' selected' ?>>N</option>
-                    <option value="Y"<?= $adminButtonDebug === 'Y' ? ' selected' : '' ?>>Y</option>
-                </select>
             </div>
         </div>
         <p class="fc-muted">Карточный редактор настроек калькулятора (soft admin UI).</p>
