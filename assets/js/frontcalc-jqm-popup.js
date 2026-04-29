@@ -613,6 +613,9 @@
 
         var $group = $('<div class="frontcalc-input-group"></div>');
         groupItems.forEach(function (item, idx) {
+          if (idx > 0) {
+            $group.append('<span class="frontcalc-input-group-divider">' + escapeHtml(delimiter) + "</span>");
+          }
           var initial = parseNumber(item.default, 0);
           var $inputField = createInputControl(
             item,

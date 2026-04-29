@@ -69,6 +69,7 @@ if (!function_exists('frontcalc_render_runtime_assets')) {
 .frontcalc-chip.is-active{border-color:#2f3a52;box-shadow:inset 0 0 0 1px #2f3a52;}
 .frontcalc-chip.is-disabled,.frontcalc-chip:disabled{opacity:.45;cursor:not-allowed;border-color:#d9dee7;box-shadow:none;}
 .frontcalc-input-group{display:flex;flex-wrap:wrap;gap:12px;}
+.frontcalc-input-group-divider{display:inline-flex;align-items:center;justify-content:center;min-height:38px;font-size:20px;line-height:1;color:#5f6a83;}
 .frontcalc-input-group .frontcalc-field__title{font-size:20px;color:#5f6a83;}
 .frontcalc-price-panel__inner{position:sticky;top:12px;border:1px solid #d9dee7;border-radius:12px;background:#fafbff;padding:16px;}
 .frontcalc-price-value{font-size:34px;font-weight:700;line-height:1.1;color:#101933;}
