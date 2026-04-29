@@ -385,6 +385,40 @@
     return null;
   }
 
+  function getFilteredOffers(offers, selectedByProperty, customByProperty, skipCode) {
+    var list = Array.isArray(offers) ? offers : [];
+    return list.filter(function (offer) {
+      var props = (offer && offer.properties) || {};
+      for (var code in selectedByProperty) {
+        if (!Object.prototype.hasOwnProperty.call(selectedByProperty, code)) continue;
+        if (skipCode && code === skipCode) continue;
+        if (customByProperty[code]) continue;
+        var selectedXmlId = selectedByProperty[code];
+        if (!selectedXmlId) continue;
+        var offerProp = props[code];
+        if (!offerProp || String(offerProp.xml_id || "") !== String(selectedXmlId)) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }
+
+  function buildAvailableValuesByCode(offers, allCodes, selectedByProperty, customByProperty) {
+    var availableByCode = {};
+    (Array.isArray(allCodes) ? allCodes : []).forEach(function (code) {
+      availableByCode[code] = {};
+      var filtered = getFilteredOffers(offers, selectedByProperty, customByProperty, code);
+      filtered.forEach(function (offer) {
+        var props = (offer && offer.properties) || {};
+        var prop = props[code] || {};
+        var xmlId = String(prop.xml_id || "").trim();
+        if (xmlId) availableByCode[code][xmlId] = true;
+      });
+    });
+    return availableByCode;
+  }
+
   function normalizeValueToken(value) {
     return String(value || "")
       .replace(/\s+/g, "")
@@ -495,6 +529,8 @@
     var selectedByProperty = {};
     var customByProperty = {};
 
+    var controlsByCode = {};
+
     allCodes.forEach(function (code) {
       if (Array.isArray(presetsByCode[code]) && presetsByCode[code].length) {
         selectedByProperty[code] = presetsByCode[code][0].xml_id;
@@ -524,6 +560,7 @@
       if (selectedByProperty[code]) {
         $chips.find('.frontcalc-chip[data-xml-id="' + selectedByProperty[code] + '"]').addClass("is-active");
       }
+      controlsByCode[code] = { chips: $chips, presets: presets };
 
       var hasShowPresetsSetting = Object.prototype.hasOwnProperty.call(fieldConfig, "show_presets");
       var showPresetsBySetting = hasShowPresetsSetting ? isTruthyFlag(fieldConfig.show_presets) : true;
@@ -617,6 +654,40 @@
     });
 
     function updatePrice() {
+      var availableByCode = buildAvailableValuesByCode(offers, allCodes, selectedByProperty, customByProperty);
+
+      allCodes.forEach(function (code) {
+        var ui = controlsByCode[code];
+        if (!ui || !ui.chips) return;
+        var available = availableByCode[code] || {};
+
+        ui.chips.find(".frontcalc-chip").each(function () {
+          var $chip = $(this);
+          var xmlId = String($chip.attr("data-xml-id") || "");
+          var enabled = !!available[xmlId];
+          $chip.prop("disabled", !enabled);
+          $chip.toggleClass("is-disabled", !enabled);
+        });
+
+        if (customByProperty[code]) return;
+        var selectedXmlId = selectedByProperty[code];
+        if (selectedXmlId && !available[selectedXmlId]) {
+          var fallback = null;
+          for (var i = 0; i < ui.presets.length; i++) {
+            var preset = ui.presets[i];
+            if (available[String(preset.xml_id || "")]) {
+              fallback = preset;
+              break;
+            }
+          }
+          selectedByProperty[code] = fallback ? fallback.xml_id : "";
+          ui.chips.find(".is-active").removeClass("is-active");
+          if (fallback) {
+            ui.chips.find('.frontcalc-chip[data-xml-id="' + fallback.xml_id + '"]').addClass("is-active");
+          }
+        }
+      });
+
       var matched = pickMatchedOffer(offers, selectedByProperty, customByProperty);
       renderPriceBlock($priceInner, matched);
     }
