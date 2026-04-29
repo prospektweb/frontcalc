@@ -398,6 +398,43 @@ class prospektweb_frontcalc extends CModule
             throw new \RuntimeException('Не удалось скопировать template_include.php в /local/modules');
         }
 
+        $moduleRootPath = $_SERVER['DOCUMENT_ROOT'] . '/local/modules/' . $this->MODULE_ID;
+
+        $moduleIncludeSource = dirname(__DIR__) . '/include.php';
+        $moduleIncludeTarget = $moduleRootPath . '/include.php';
+        if (!is_file($moduleIncludeSource)) {
+            throw new \RuntimeException('Не найден исходный файл include.php');
+        }
+        if (!@copy($moduleIncludeSource, $moduleIncludeTarget)) {
+            throw new \RuntimeException('Не удалось скопировать include.php в /local/modules');
+        }
+
+        $moduleEditorSource = dirname(__DIR__) . '/admin/editor.php';
+        $moduleEditorTarget = $moduleRootPath . '/admin/editor.php';
+        $moduleEditorDir = dirname($moduleEditorTarget);
+        if (!is_dir($moduleEditorDir) && !@mkdir($moduleEditorDir, 0775, true) && !is_dir($moduleEditorDir)) {
+            throw new \RuntimeException('Не удалось создать каталог /local/modules/.../admin');
+        }
+        if (!is_file($moduleEditorSource)) {
+            throw new \RuntimeException('Не найден исходный файл admin/editor.php');
+        }
+        if (!@copy($moduleEditorSource, $moduleEditorTarget)) {
+            throw new \RuntimeException('Не удалось скопировать admin/editor.php в /local/modules');
+        }
+
+        $moduleProductCardButtonSource = dirname(__DIR__) . '/lib/Admin/ProductCardButton.php';
+        $moduleProductCardButtonTarget = $moduleRootPath . '/lib/Admin/ProductCardButton.php';
+        $moduleProductCardButtonDir = dirname($moduleProductCardButtonTarget);
+        if (!is_dir($moduleProductCardButtonDir) && !@mkdir($moduleProductCardButtonDir, 0775, true) && !is_dir($moduleProductCardButtonDir)) {
+            throw new \RuntimeException('Не удалось создать каталог /local/modules/.../lib/Admin');
+        }
+        if (!is_file($moduleProductCardButtonSource)) {
+            throw new \RuntimeException('Не найден исходный файл lib/Admin/ProductCardButton.php');
+        }
+        if (!@copy($moduleProductCardButtonSource, $moduleProductCardButtonTarget)) {
+            throw new \RuntimeException('Не удалось скопировать lib/Admin/ProductCardButton.php в /local/modules');
+        }
+
         return true;
     }
 
@@ -422,6 +459,26 @@ class prospektweb_frontcalc extends CModule
         if (is_file($localTemplateIncludeTarget)) {
             @unlink($localTemplateIncludeTarget);
         }
+
+        $moduleRootPath = $_SERVER['DOCUMENT_ROOT'] . '/local/modules/' . $this->MODULE_ID;
+        $moduleIncludeTarget = $moduleRootPath . '/include.php';
+        if (is_file($moduleIncludeTarget)) {
+            @unlink($moduleIncludeTarget);
+        }
+
+        $moduleEditorTarget = $moduleRootPath . '/admin/editor.php';
+        if (is_file($moduleEditorTarget)) {
+            @unlink($moduleEditorTarget);
+        }
+
+        $moduleProductCardButtonTarget = $moduleRootPath . '/lib/Admin/ProductCardButton.php';
+        if (is_file($moduleProductCardButtonTarget)) {
+            @unlink($moduleProductCardButtonTarget);
+        }
+
+        @rmdir($moduleRootPath . '/admin');
+        @rmdir($moduleRootPath . '/lib/Admin');
+        @rmdir($moduleRootPath . '/lib');
 
         return true;
     }
