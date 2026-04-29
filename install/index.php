@@ -93,6 +93,7 @@ class prospektweb_frontcalc extends CModule
         try {
             $this->InstallFiles();
             $this->InstallDB();
+            $this->InstallEvents();
             $this->patchAsproBasketFile();
         } catch (\Throwable $e) {
             $this->UnInstallFiles();
@@ -125,6 +126,7 @@ class prospektweb_frontcalc extends CModule
 
         $removeData = (isset($_REQUEST['remove_data']) && $_REQUEST['remove_data'] === 'Y');
 
+        $this->UnInstallEvents();
         $this->UnInstallDB($removeData);
         $this->UnInstallFiles();
         ModuleManager::unRegisterModule($this->MODULE_ID);
@@ -148,7 +150,6 @@ class prospektweb_frontcalc extends CModule
         Option::set($this->MODULE_ID, 'CALC_PROPERTY_CODE', 'FRONTCALC_CONFIG');
 
         $this->ensureCalcConfigProperty($productsIblockId, 'FRONTCALC_CONFIG');
-        $this->registerAdminHandlers();
 
         return true;
     }
@@ -158,8 +159,6 @@ class prospektweb_frontcalc extends CModule
         $productsIblockId = (int)Option::get($this->MODULE_ID, 'PRODUCTS_IBLOCK_ID', '0');
         $propertyCode = (string)Option::get($this->MODULE_ID, 'CALC_PROPERTY_CODE', 'FRONTCALC_CONFIG');
 
-        $this->unregisterAdminHandlers();
-
         if ($removeData) {
             $this->removeCalcConfigProperty($productsIblockId, $propertyCode);
             Option::delete($this->MODULE_ID);
@@ -167,6 +166,20 @@ class prospektweb_frontcalc extends CModule
             // Служебно помечаем, что uninstall прошёл с сохранением данных
             Option::set($this->MODULE_ID, 'UNINSTALLED_AT', date('c'));
         }
+
+        return true;
+    }
+
+    public function InstallEvents()
+    {
+        $this->registerAdminHandlers();
+
+        return true;
+    }
+
+    public function UnInstallEvents()
+    {
+        $this->unregisterAdminHandlers();
 
         return true;
     }
@@ -252,18 +265,20 @@ class prospektweb_frontcalc extends CModule
 
     protected function registerAdminHandlers()
     {
+        $this->unregisterAdminHandlers();
+
         EventManager::getInstance()->registerEventHandlerCompatible(
             'main',
             'OnAdminContextMenuShow',
             $this->MODULE_ID,
-            '\\Prospektweb\\Frontcalc\\Admin\\ProductCardButton',
+            'Prospektweb\\Frontcalc\\Admin\\ProductCardButton',
             'onAdminContextMenuShow'
         );
         EventManager::getInstance()->registerEventHandlerCompatible(
             'main',
             'OnEpilog',
             $this->MODULE_ID,
-            '\\Prospektweb\\Frontcalc\\Admin\\ProductCardButton',
+            'Prospektweb\\Frontcalc\\Admin\\ProductCardButton',
             'onEpilog'
         );
     }
@@ -274,14 +289,14 @@ class prospektweb_frontcalc extends CModule
             'main',
             'OnAdminContextMenuShow',
             $this->MODULE_ID,
-            '\\Prospektweb\\Frontcalc\\Admin\\ProductCardButton',
+            'Prospektweb\\Frontcalc\\Admin\\ProductCardButton',
             'onAdminContextMenuShow'
         );
         EventManager::getInstance()->unRegisterEventHandler(
             'main',
             'OnEpilog',
             $this->MODULE_ID,
-            '\\Prospektweb\\Frontcalc\\Admin\\ProductCardButton',
+            'Prospektweb\\Frontcalc\\Admin\\ProductCardButton',
             'onEpilog'
         );
     }
