@@ -23,16 +23,12 @@ class ProductCardButton
         $elementId = (int)($_REQUEST['ID'] ?? 0);
         $iblockId = (int)($_REQUEST['IBLOCK_ID'] ?? 0);
         $productsIblockId = (int)Option::get('prospektweb.frontcalc', 'PRODUCTS_IBLOCK_ID', '0');
-        $iblockType = (string)($_REQUEST['type'] ?? '');
 
         if ($elementId > 0 && $iblockId <= 0 && Loader::includeModule('iblock') && class_exists('\CIBlockElement')) {
             $iblockId = (int)\CIBlockElement::GetIBlockByID($elementId);
         }
 
-        $matchesConfiguredIblock = ($productsIblockId > 0 && $iblockId === $productsIblockId);
-        $isCalculatorType = ($iblockType === 'calculator');
-
-        if ($elementId <= 0 || $iblockId <= 0 || (!$matchesConfiguredIblock && !$isCalculatorType)) {
+        if ($elementId <= 0 || $iblockId <= 0 || $productsIblockId <= 0 || $iblockId !== $productsIblockId) {
             return;
         }
 
