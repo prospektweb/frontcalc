@@ -395,6 +395,7 @@ class prospektweb_frontcalc extends CModule
             $this->validatePrimaryModuleSource(self::BITRIX_MODULE_ROOT);
             return self::BITRIX_MODULE_ROOT;
         }
+    }
 
         throw new \RuntimeException(
             'Не найден модуль ни в ' . self::LOCAL_MODULE_ROOT . ', ни в ' . self::BITRIX_MODULE_ROOT
