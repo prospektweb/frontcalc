@@ -8,7 +8,6 @@ use Bitrix\Main\Loader;
 class ProductCardButton
 {
     private const MODULE_ID = 'prospektweb.frontcalc';
-    private const DEBUG_OPTION = 'ADMIN_BUTTON_DEBUG';
 
     public static function onAdminContextMenuShow(&$items)
     {
@@ -33,8 +32,6 @@ class ProductCardButton
             'ONCLICK' => self::buildOnclick($url),
             'ICON' => 'btn_new',
         ];
-
-        self::debugLog('context_menu', 'button_added', self::buildDebugContext());
     }
 
     public static function onEpilog()
@@ -45,13 +42,11 @@ class ProductCardButton
             return;
         }
 
-        $debugEnabled = self::isDebugEnabled();
+        $debugEnabled = (string)Option::get(self::MODULE_ID, 'ADMIN_BUTTON_DEBUG_LOG', 'N') === 'Y';
 
         $escapedUrl = \CUtil::JSEscape($url);
         $escapedOnclick = \CUtil::JSEscape(self::buildOnclick($url));
         $debugFlag = $debugEnabled ? 'true' : 'false';
-
-        self::debugLog('epilog', 'fallback_script_injected', self::buildDebugContext());
 
         echo '<script>(function(){'
             . 'var debug=' . $debugFlag . ';'
@@ -111,39 +106,11 @@ class ProductCardButton
 
     private static function debugSkip($channel, $reason)
     {
-        if ($reason === null || $reason === '') {
+        $enabled = (string)Option::get(self::MODULE_ID, 'ADMIN_BUTTON_DEBUG_LOG', 'N') === 'Y';
+        if (!$enabled || $reason === null || $reason === '') {
             return;
         }
 
-        self::debugLog($channel, 'skip: ' . $reason, self::buildDebugContext());
-    }
-
-    private static function debugLog($channel, $message, array $context = [])
-    {
-        if (!self::isDebugEnabled()) {
-            return;
-        }
-
-        $contextParts = [];
-        foreach ($context as $key => $value) {
-            $contextParts[] = $key . '=' . (string)$value;
-        }
-
-        $suffix = empty($contextParts) ? '' : ' | ' . implode(', ', $contextParts);
-        AddMessage2Log('[frontcalc][' . $channel . '] ' . $message . $suffix, self::MODULE_ID);
-    }
-
-    private static function isDebugEnabled()
-    {
-        return (string)Option::get(self::MODULE_ID, self::DEBUG_OPTION, 'N') === 'Y';
-    }
-
-    private static function buildDebugContext()
-    {
-        return [
-            'SCRIPT_NAME' => (string)($_SERVER['SCRIPT_NAME'] ?? ''),
-            'ID' => (int)($_REQUEST['ID'] ?? 0),
-            'IBLOCK_ID' => (int)($_REQUEST['IBLOCK_ID'] ?? 0),
-        ];
+        AddMessage2Log('[frontcalc][' . $channel . '] skip: ' . $reason, self::MODULE_ID);
     }
 }
