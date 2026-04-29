@@ -252,18 +252,20 @@ class prospektweb_frontcalc extends CModule
 
     protected function registerAdminHandlers()
     {
+        $this->unregisterAdminHandlers();
+
         EventManager::getInstance()->registerEventHandlerCompatible(
             'main',
             'OnAdminContextMenuShow',
             $this->MODULE_ID,
-            '\\Prospektweb\\Frontcalc\\Admin\\ProductCardButton',
+            'Prospektweb\\Frontcalc\\Admin\\ProductCardButton',
             'onAdminContextMenuShow'
         );
         EventManager::getInstance()->registerEventHandlerCompatible(
             'main',
             'OnEpilog',
             $this->MODULE_ID,
-            '\\Prospektweb\\Frontcalc\\Admin\\ProductCardButton',
+            'Prospektweb\\Frontcalc\\Admin\\ProductCardButton',
             'onEpilog'
         );
     }
@@ -274,14 +276,14 @@ class prospektweb_frontcalc extends CModule
             'main',
             'OnAdminContextMenuShow',
             $this->MODULE_ID,
-            '\\Prospektweb\\Frontcalc\\Admin\\ProductCardButton',
+            'Prospektweb\\Frontcalc\\Admin\\ProductCardButton',
             'onAdminContextMenuShow'
         );
         EventManager::getInstance()->unRegisterEventHandler(
             'main',
             'OnEpilog',
             $this->MODULE_ID,
-            '\\Prospektweb\\Frontcalc\\Admin\\ProductCardButton',
+            'Prospektweb\\Frontcalc\\Admin\\ProductCardButton',
             'onEpilog'
         );
     }
