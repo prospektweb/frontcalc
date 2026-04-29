@@ -408,7 +408,20 @@
     var availableByCode = {};
     (Array.isArray(allCodes) ? allCodes : []).forEach(function (code) {
       availableByCode[code] = {};
-      var filtered = getFilteredOffers(offers, selectedByProperty, customByProperty, code);
+      var codeIndex = allCodes.indexOf(code);
+      var scopedSelection = {};
+      var scopedCustom = {};
+
+      // Иерархическая доступность:
+      // для текущего свойства учитываем только выборы "выше" по порядку,
+      // чтобы можно было переключиться на другую ветку текущего уровня.
+      for (var i = 0; i < codeIndex; i++) {
+        var prevCode = allCodes[i];
+        scopedSelection[prevCode] = selectedByProperty[prevCode];
+        scopedCustom[prevCode] = customByProperty[prevCode];
+      }
+
+      var filtered = getFilteredOffers(offers, scopedSelection, scopedCustom);
       filtered.forEach(function (offer) {
         var props = (offer && offer.properties) || {};
         var prop = props[code] || {};
