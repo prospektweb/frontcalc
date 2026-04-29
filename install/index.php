@@ -439,6 +439,7 @@ class prospektweb_frontcalc extends CModule
         if ($path === '' || !is_dir($path)) {
             return;
         }
+    }
 
         $items = scandir($path);
         if (!is_array($items)) {
