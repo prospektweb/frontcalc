@@ -210,7 +210,7 @@ $runtimeDiagnostics = [
         <?php foreach ($runtimeDiagnostics as $file => $resolvedPath): ?>
             <p class="fc-muted"><b><?= htmlspecialcharsbx($file) ?></b>: <?= htmlspecialcharsbx($resolvedPath) ?></p>
         <?php endforeach; ?>
-        <p class="fc-muted">Поддерживаемый режим: только <b>/local/modules/prospektweb.frontcalc</b>. Частичное разнесение файлов запрещено.</p>
+        <p class="fc-muted">Поддерживаемый режим: приоритет <b>/local/modules/prospektweb.frontcalc</b>, fallback в <b>/bitrix/modules/prospektweb.frontcalc</b>. Частичное разнесение в приоритетном источнике запрещено.</p>
     </div>
 
     <input type="hidden" name="CALC_EDITOR_SCHEMA" id="fc-schema-json" value="<?= htmlspecialcharsbx($editorSchema) ?>">
