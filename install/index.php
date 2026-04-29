@@ -327,7 +327,7 @@ class prospektweb_frontcalc extends CModule
 
     public function InstallFiles()
     {
-        $primaryModuleRoot = $this->detectModuleSourceRoot();
+        $primaryModuleRoot = $this->resolvePrimaryModuleRoot();
 
         $adminTarget = $_SERVER['DOCUMENT_ROOT'] . '/bitrix/admin/prospektweb_frontcalc_editor.php';
         $moduleAdminFile = dirname(__DIR__) . '/admin/prospektweb_frontcalc_editor.php';
@@ -377,7 +377,7 @@ class prospektweb_frontcalc extends CModule
         return true;
     }
 
-    protected function detectModuleSourceRoot()
+    protected function resolvePrimaryModuleRoot()
     {
         $localExists = is_dir($_SERVER['DOCUMENT_ROOT'] . self::LOCAL_MODULE_ROOT);
         $bitrixExists = is_dir($_SERVER['DOCUMENT_ROOT'] . self::BITRIX_MODULE_ROOT);
@@ -439,7 +439,6 @@ class prospektweb_frontcalc extends CModule
         if ($path === '' || !is_dir($path)) {
             return;
         }
-    }
 
         $items = scandir($path);
         if (!is_array($items)) {
@@ -460,6 +459,58 @@ class prospektweb_frontcalc extends CModule
         }
 
         @rmdir($path);
+    }
+
+    protected function resolvePrimaryModuleRoot()
+    {
+        $localExists = is_dir($_SERVER['DOCUMENT_ROOT'] . self::LOCAL_MODULE_ROOT);
+        $bitrixExists = is_dir($_SERVER['DOCUMENT_ROOT'] . self::BITRIX_MODULE_ROOT);
+
+        if ($localExists) {
+            $this->validatePrimaryModuleSource(self::LOCAL_MODULE_ROOT);
+            return self::LOCAL_MODULE_ROOT;
+        }
+
+        if ($bitrixExists) {
+            $this->validatePrimaryModuleSource(self::BITRIX_MODULE_ROOT);
+            return self::BITRIX_MODULE_ROOT;
+        }
+
+        throw new \RuntimeException(
+            'Не найден модуль ни в ' . self::LOCAL_MODULE_ROOT . ', ни в ' . self::BITRIX_MODULE_ROOT
+        );
+    }
+
+    protected function validatePrimaryModuleSource($moduleRoot)
+    {
+        $moduleRoot = (string)$moduleRoot;
+        $requiredFiles = [
+            'include.php',
+            'admin/prospektweb_frontcalc_editor.php',
+            'admin/editor.php',
+            'ajax/frontcalc.php',
+            'template_include.php',
+            'assets/js/frontcalc-jqm-popup.js',
+            'lib/Admin/ProductCardButton.php',
+            'lib/Service/CalculatorAvailability.php',
+        ];
+
+        $missing = [];
+        foreach ($requiredFiles as $relativePath) {
+            $fullPath = $_SERVER['DOCUMENT_ROOT'] . $moduleRoot . '/' . $relativePath;
+            if (!is_file($fullPath)) {
+                $missing[] = $moduleRoot . '/' . $relativePath;
+            }
+        }
+
+        if (!empty($missing)) {
+            throw new \RuntimeException(
+                "Нарушена целостность источника модуля " . $moduleRoot
+                . ". В первую очередь используется " . $moduleRoot
+                . ". Исправьте неполную установку в приоритетном источнике или удалите его."
+                . " Отсутствуют файлы: " . implode(', ', $missing)
+            );
+        }
     }
 
     public function UnInstallFiles()
