@@ -259,6 +259,13 @@ class prospektweb_frontcalc extends CModule
             '\\Prospektweb\\Frontcalc\\Admin\\ProductCardButton',
             'onAdminContextMenuShow'
         );
+        EventManager::getInstance()->registerEventHandlerCompatible(
+            'main',
+            'OnEpilog',
+            $this->MODULE_ID,
+            '\\Prospektweb\\Frontcalc\\Admin\\ProductCardButton',
+            'onEpilog'
+        );
     }
 
     protected function unregisterAdminHandlers()
@@ -269,6 +276,13 @@ class prospektweb_frontcalc extends CModule
             $this->MODULE_ID,
             '\\Prospektweb\\Frontcalc\\Admin\\ProductCardButton',
             'onAdminContextMenuShow'
+        );
+        EventManager::getInstance()->unRegisterEventHandler(
+            'main',
+            'OnEpilog',
+            $this->MODULE_ID,
+            '\\Prospektweb\\Frontcalc\\Admin\\ProductCardButton',
+            'onEpilog'
         );
     }
 
