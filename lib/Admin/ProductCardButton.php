@@ -48,15 +48,6 @@ class ProductCardButton
         $url = '/bitrix/admin/prospektweb_frontcalc_editor.php?IBLOCK_ID=' . $iblockId . '&ID=' . $elementId . '&lang=' . urlencode((string)($_REQUEST['lang'] ?? 'ru'));
         $jsOpen = "if (window.BX && BX.SidePanel && BX.SidePanel.Instance) { BX.SidePanel.Instance.open('{$url}', {cacheable:false, width:980}); return false; } window.location.href='{$url}'; return false;";
 
-        if (is_array($items)) {
-            foreach ($items as $item) {
-                $itemLink = (string)($item['LINK'] ?? '');
-                if (mb_strpos($itemLink, '/bitrix/admin/prospektweb_frontcalc_editor.php') !== false) {
-                    return;
-                }
-            }
-        }
-
         $items[] = [
             'TEXT' => 'Настроить калькулятор',
             'TITLE' => 'Настроить калькулятор',
