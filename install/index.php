@@ -327,7 +327,7 @@ class prospektweb_frontcalc extends CModule
 
     public function InstallFiles()
     {
-        $primaryModuleRoot = $this->resolvePrimaryModuleRoot();
+        $this->resolvePrimaryModuleRoot();
 
         $adminTarget = $_SERVER['DOCUMENT_ROOT'] . '/bitrix/admin/prospektweb_frontcalc_editor.php';
         $moduleAdminFile = dirname(__DIR__) . '/admin/prospektweb_frontcalc_editor.php';
@@ -372,93 +372,37 @@ class prospektweb_frontcalc extends CModule
             throw new \RuntimeException('Не удалось создать /local/ajax/frontcalc.php');
         }
 
-        Option::set($this->MODULE_ID, 'MODULE_SOURCE_ROOT', $primaryModuleRoot);
+        $localJsTarget = $_SERVER['DOCUMENT_ROOT'] . '/local/modules/' . $this->MODULE_ID . '/assets/js/frontcalc-jqm-popup.js';
+        $localJsDir = dirname($localJsTarget);
+        if (!is_dir($localJsDir) && !@mkdir($localJsDir, 0775, true) && !is_dir($localJsDir)) {
+            throw new \RuntimeException('Не удалось создать каталог для /local/modules/.../frontcalc-jqm-popup.js');
+        }
+
+        $moduleJsSource = dirname(__DIR__) . '/assets/js/frontcalc-jqm-popup.js';
+        if (!is_file($moduleJsSource)) {
+            throw new \RuntimeException('Не найден исходный файл assets/js/frontcalc-jqm-popup.js');
+        }
+
+        if (!@copy($moduleJsSource, $localJsTarget)) {
+            throw new \RuntimeException('Не удалось скопировать frontcalc-jqm-popup.js в /local/modules');
+        }
+
+        $localTemplateIncludeTarget = $_SERVER['DOCUMENT_ROOT'] . '/local/modules/' . $this->MODULE_ID . '/template_include.php';
+        $localTemplateIncludeDir = dirname($localTemplateIncludeTarget);
+        if (!is_dir($localTemplateIncludeDir) && !@mkdir($localTemplateIncludeDir, 0775, true) && !is_dir($localTemplateIncludeDir)) {
+            throw new \RuntimeException('Не удалось создать каталог для /local/modules/.../template_include.php');
+        }
+
+        $moduleTemplateIncludeSource = dirname(__DIR__) . '/template_include.php';
+        if (!is_file($moduleTemplateIncludeSource)) {
+            throw new \RuntimeException('Не найден исходный файл template_include.php');
+        }
+
+        if (!@copy($moduleTemplateIncludeSource, $localTemplateIncludeTarget)) {
+            throw new \RuntimeException('Не удалось скопировать template_include.php в /local/modules');
+        }
 
         return true;
-    }
-
-    protected function resolvePrimaryModuleRoot()
-    {
-        $localExists = is_dir($_SERVER['DOCUMENT_ROOT'] . self::LOCAL_MODULE_ROOT);
-        $bitrixExists = is_dir($_SERVER['DOCUMENT_ROOT'] . self::BITRIX_MODULE_ROOT);
-
-        if ($localExists) {
-            try {
-                $this->validatePrimaryModuleSource(self::LOCAL_MODULE_ROOT);
-                return self::LOCAL_MODULE_ROOT;
-            } catch (\Throwable $e) {
-                // Игнорируем неполный local-источник, если bitrix-источник валиден.
-            }
-        }
-
-        if ($bitrixExists) {
-            $this->validatePrimaryModuleSource(self::BITRIX_MODULE_ROOT);
-            return self::BITRIX_MODULE_ROOT;
-        }
-
-        throw new \RuntimeException(
-            'Не найден модуль ни в ' . self::LOCAL_MODULE_ROOT . ', ни в ' . self::BITRIX_MODULE_ROOT
-        );
-    }
-
-    protected function validatePrimaryModuleSource($moduleRoot)
-    {
-        $moduleRoot = (string)$moduleRoot;
-        $requiredFiles = [
-            'include.php',
-            'admin/prospektweb_frontcalc_editor.php',
-            'admin/editor.php',
-            'ajax/frontcalc.php',
-            'template_include.php',
-            'assets/js/frontcalc-jqm-popup.js',
-            'lib/Admin/ProductCardButton.php',
-            'lib/Service/CalculatorAvailability.php',
-        ];
-
-        $missing = [];
-        foreach ($requiredFiles as $relativePath) {
-            $fullPath = $_SERVER['DOCUMENT_ROOT'] . $moduleRoot . '/' . $relativePath;
-            if (!is_file($fullPath)) {
-                $missing[] = $moduleRoot . '/' . $relativePath;
-            }
-        }
-
-        if (!empty($missing)) {
-            throw new \RuntimeException(
-                "Нарушена целостность источника модуля " . $moduleRoot
-                . ". В первую очередь используется " . $moduleRoot
-                . ". Исправьте неполную установку в приоритетном источнике или удалите его."
-                . " Отсутствуют файлы: " . implode(', ', $missing)
-            );
-        }
-    }
-
-    protected function deleteDirectoryRecursively($path)
-    {
-        $path = rtrim((string)$path, '/');
-        if ($path === '' || !is_dir($path)) {
-            return;
-        }
-
-        $items = scandir($path);
-        if (!is_array($items)) {
-            return;
-        }
-
-        foreach ($items as $item) {
-            if ($item === '.' || $item === '..') {
-                continue;
-            }
-
-            $itemPath = $path . '/' . $item;
-            if (is_dir($itemPath)) {
-                $this->deleteDirectoryRecursively($itemPath);
-            } else {
-                @unlink($itemPath);
-            }
-        }
-
-        @rmdir($path);
     }
 
     protected function resolvePrimaryModuleRoot()
@@ -525,9 +469,14 @@ class prospektweb_frontcalc extends CModule
             @unlink($ajaxTarget);
         }
 
-        $localModuleDir = $_SERVER['DOCUMENT_ROOT'] . self::LOCAL_MODULE_ROOT;
-        if (is_dir($localModuleDir)) {
-            $this->deleteDirectoryRecursively($localModuleDir);
+        $localJsTarget = $_SERVER['DOCUMENT_ROOT'] . '/local/modules/' . $this->MODULE_ID . '/assets/js/frontcalc-jqm-popup.js';
+        if (is_file($localJsTarget)) {
+            @unlink($localJsTarget);
+        }
+
+        $localTemplateIncludeTarget = $_SERVER['DOCUMENT_ROOT'] . '/local/modules/' . $this->MODULE_ID . '/template_include.php';
+        if (is_file($localTemplateIncludeTarget)) {
+            @unlink($localTemplateIncludeTarget);
         }
 
         return true;
