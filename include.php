@@ -14,10 +14,3 @@ EventManager::getInstance()->addEventHandlerCompatible(
     '\\Prospektweb\\Frontcalc\\Admin\\ProductCardButton',
     'onAdminContextMenuShow'
 );
-
-EventManager::getInstance()->addEventHandlerCompatible(
-    'main',
-    'OnEpilog',
-    '\\Prospektweb\\Frontcalc\\Admin\\ProductCardButton',
-    'onEpilog'
-);
