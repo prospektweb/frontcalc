@@ -8,9 +8,9 @@
 3. Проверить настройки: `/bitrix/admin/settings.php?mid=prospektweb.frontcalc`
 
 ## Поддерживаемая политика расположения файлов
-- Поддерживаются оба корня модуля: `/local/modules/prospektweb.frontcalc` и `/bitrix/modules/prospektweb.frontcalc`.
-- Приоритет загрузки: сначала `/local/modules/...`, затем `/bitrix/modules/...`.
-- Частичное разнесение файлов в **приоритетном** источнике запрещено: инсталлятор валидирует целостность критичных файлов в корне, который будет использован первым.
+- Поддерживается **только один корень модуля**: `/local/modules/prospektweb.frontcalc`.
+- Режим с частичным разнесением файлов между `/local/modules/prospektweb.frontcalc` и `/bitrix/modules/prospektweb.frontcalc` **запрещён**.
+- Инсталлятор валидирует целостность критичных файлов в `/local/modules/prospektweb.frontcalc` до создания admin/ajax-прокси.
 
 ## Что делает baseline
 - Регистрирует модуль
