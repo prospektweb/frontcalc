@@ -337,7 +337,18 @@
     });
 
     $control.append($minus, $input, $plus);
-    $field.append($control);
+
+    var showUnit = Object.prototype.hasOwnProperty.call(field || {}, "show_unit")
+      ? isTruthyFlag(field.show_unit)
+      : true;
+    var unitText = String((field && field.unit) || "").trim();
+    var $controlWrap = $('<div class="frontcalc-input-control-wrap"></div>');
+    $controlWrap.append($control);
+    if (showUnit && unitText) {
+      $controlWrap.append('<span class="frontcalc-input-unit">' + escapeHtml(unitText) + "</span>");
+    }
+
+    $field.append($controlWrap);
     return $field;
   }
 
@@ -598,10 +609,14 @@
 
       if (hasInputFlag || groupItems.length > 0) {
         var delimiter = fieldConfig.group_delimiter || fieldConfig.split_delimiter || "x";
+        var uiGroupDivider = "×";
         if (!groupItems.length) groupItems = [fieldConfig];
 
         var $group = $('<div class="frontcalc-input-group"></div>');
         groupItems.forEach(function (item, idx) {
+          if (idx > 0) {
+            $group.append('<span class="frontcalc-input-group-divider">' + uiGroupDivider + "</span>");
+          }
           var initial = parseNumber(item.default, 0);
           var $inputField = createInputControl(
             item,
