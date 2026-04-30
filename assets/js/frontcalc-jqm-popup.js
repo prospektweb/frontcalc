@@ -620,15 +620,31 @@
           var $inputField = createInputControl(
             item,
             initial,
-            function (numericValue) {
-              var matchedPreset = findPresetByInputValue(presets, numericValue);
+            function () {
+              var groupValues = [];
+              $section.find(".frontcalc-input-group .frontcalc-num-input").each(function () {
+                groupValues.push(String($(this).val() || "").trim());
+              });
+
+              var compositeValue = groupValues.join(delimiter);
+              var normalizedCompositeValue = groupValues
+                .map(function (value) {
+                  return normalizeValueToken(value);
+                })
+                .join(delimiter);
+
+              var matchedPreset =
+                findPresetByInputValue(presets, compositeValue) ||
+                (normalizedCompositeValue !== compositeValue
+                  ? findPresetByInputValue(presets, normalizedCompositeValue)
+                  : null);
               if (matchedPreset) {
                 selectedByProperty[code] = matchedPreset.xml_id;
                 customByProperty[code] = false;
                 $chips.find(".is-active").removeClass("is-active");
                 $chips.find('.frontcalc-chip[data-xml-id="' + matchedPreset.xml_id + '"]').addClass("is-active");
               } else {
-                selectedByProperty[code] = String(numericValue);
+                selectedByProperty[code] = compositeValue;
                 customByProperty[code] = true;
                 $chips.find(".is-active").removeClass("is-active");
               }
