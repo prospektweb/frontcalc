@@ -679,13 +679,19 @@
         var delimiter = fieldConfig.group_delimiter || fieldConfig.split_delimiter || "x";
         var uiGroupDivider = "×";
         if (!groupItems.length) groupItems = [fieldConfig];
+        var selectedXmlForCode = String(selectedByProperty[code] || "");
+        var selectedParts = selectedXmlForCode ? selectedXmlForCode.split(delimiter) : [];
 
         var $group = $('<div class="frontcalc-input-group"></div>');
         groupItems.forEach(function (item, idx) {
           if (idx > 0) {
             $group.append('<span class="frontcalc-input-group-divider">' + uiGroupDivider + "</span>");
           }
-          var initial = parseNumber(item.default, 0);
+          var selectedPart = idx < selectedParts.length ? selectedParts[idx] : "";
+          var initial = parseNumber(
+            selectedPart !== "" ? selectedPart : item.default,
+            parseNumber(item.default, 0)
+          );
           var $inputField = createInputControl(
             item,
             initial,
