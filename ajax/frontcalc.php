@@ -40,24 +40,45 @@ function frontcalc_get_catalog_groups_by_rights(array $userGroups): array
     $view = [];
     $buy = [];
 
-    $groupRes = CCatalogGroup::GetList(['SORT' => 'ASC'], []);
-    while ($group = $groupRes->Fetch()) {
-        $catalogGroupId = (int)($group['ID'] ?? 0);
-        if ($catalogGroupId <= 0) {
-            continue;
-        }
-
-        $accessRes = CCatalogGroup2Group::GetList(['GROUP_ID' => 'ASC'], ['CATALOG_GROUP_ID' => $catalogGroupId]);
-        while ($access = $accessRes->Fetch()) {
-            $groupId = (int)($access['GROUP_ID'] ?? 0);
-            if ($groupId <= 0 || !in_array($groupId, $userGroups, true)) {
+    if (class_exists('CCatalogGroup2Group')) {
+        $groupRes = CCatalogGroup::GetList(['SORT' => 'ASC'], []);
+        while ($group = $groupRes->Fetch()) {
+            $catalogGroupId = (int)($group['ID'] ?? 0);
+            if ($catalogGroupId <= 0) {
                 continue;
             }
-            if (($access['BUY'] ?? 'N') === 'Y') {
-                $buy[$catalogGroupId] = $catalogGroupId;
+
+            $accessRes = CCatalogGroup2Group::GetList(['GROUP_ID' => 'ASC'], ['CATALOG_GROUP_ID' => $catalogGroupId]);
+            while ($access = $accessRes->Fetch()) {
+                $groupId = (int)($access['GROUP_ID'] ?? 0);
+                if ($groupId <= 0 || !in_array($groupId, $userGroups, true)) {
+                    continue;
+                }
+                if (($access['BUY'] ?? 'N') === 'Y') {
+                    $buy[$catalogGroupId] = $catalogGroupId;
+                }
+                if (($access['LIST'] ?? 'N') === 'Y' || ($access['VIEW'] ?? 'N') === 'Y') {
+                    $view[$catalogGroupId] = $catalogGroupId;
+                }
             }
-            if (($access['LIST'] ?? 'N') === 'Y' || ($access['VIEW'] ?? 'N') === 'Y') {
-                $view[$catalogGroupId] = $catalogGroupId;
+        }
+    } else {
+        global $DB;
+        if (is_object($DB) && !empty($userGroups)) {
+            $groupIdsSql = implode(',', array_map('intval', $userGroups));
+            $sql = "SELECT CATALOG_GROUP_ID, BUY, `LIST` FROM b_catalog_group2group WHERE GROUP_ID IN (" . $groupIdsSql . ")";
+            $res = $DB->Query($sql);
+            while ($row = $res->Fetch()) {
+                $catalogGroupId = (int)($row['CATALOG_GROUP_ID'] ?? 0);
+                if ($catalogGroupId <= 0) {
+                    continue;
+                }
+                if (($row['BUY'] ?? 'N') === 'Y') {
+                    $buy[$catalogGroupId] = $catalogGroupId;
+                }
+                if (($row['LIST'] ?? 'N') === 'Y') {
+                    $view[$catalogGroupId] = $catalogGroupId;
+                }
             }
         }
     }
@@ -66,6 +87,25 @@ function frontcalc_get_catalog_groups_by_rights(array $userGroups): array
         'view' => array_values($view),
         'buy' => array_values($buy),
     ];
+}
+
+function frontcalc_pick_price_for_quantity(array $rows, int $quantity = 1): ?array
+{
+    if (empty($rows)) {
+        return null;
+    }
+
+    foreach ($rows as $row) {
+        $from = $row['quantity_from'];
+        $to = $row['quantity_to'];
+        $fromOk = ($from === null) || ((int)$from <= $quantity);
+        $toOk = ($to === null) || ((int)$to >= $quantity);
+        if ($fromOk && $toOk) {
+            return $row;
+        }
+    }
+
+    return $rows[0];
 }
 
 /**
@@ -257,19 +297,51 @@ if (!empty($offersMap[$productId]) && is_array($offersMap[$productId])) {
                 'catalog_group_name' => (string)($catalogGroupNames[$catalogGroupId] ?? ('PRICE_' . $catalogGroupId)),
                 'price' => $priceValue,
                 'currency' => $currency,
-                'formatted' => CCurrencyLang::CurrencyFormat($priceValue, $currency, true),
+                'formatted' => html_entity_decode((string)CCurrencyLang::CurrencyFormat($priceValue, $currency, true), ENT_QUOTES | ENT_HTML5, 'UTF-8'),
                 'quantity_from' => isset($price['QUANTITY_FROM']) ? (int)$price['QUANTITY_FROM'] : null,
                 'quantity_to' => isset($price['QUANTITY_TO']) ? (int)$price['QUANTITY_TO'] : null,
             ];
         }
 
-        $pricesView = array_values(array_filter($pricesRaw, static function ($row) use ($priceAccess) {
+        $pricesViewAll = array_values(array_filter($pricesRaw, static function ($row) use ($priceAccess) {
             return in_array((int)($row['catalog_group_id'] ?? 0), $priceAccess['view'], true);
         }));
 
-        $pricesBuy = array_values(array_filter($pricesRaw, static function ($row) use ($priceAccess) {
+        $pricesBuyAll = array_values(array_filter($pricesRaw, static function ($row) use ($priceAccess) {
             return in_array((int)($row['catalog_group_id'] ?? 0), $priceAccess['buy'], true);
         }));
+
+        $pricesViewByGroup = [];
+        foreach ($pricesViewAll as $row) {
+            $groupId = (int)($row['catalog_group_id'] ?? 0);
+            if ($groupId <= 0) {
+                continue;
+            }
+            $pricesViewByGroup[$groupId][] = $row;
+        }
+        $pricesView = [];
+        foreach ($pricesViewByGroup as $groupRows) {
+            $picked = frontcalc_pick_price_for_quantity($groupRows, 1);
+            if ($picked !== null) {
+                $pricesView[] = $picked;
+            }
+        }
+
+        $pricesBuyByGroup = [];
+        foreach ($pricesBuyAll as $row) {
+            $groupId = (int)($row['catalog_group_id'] ?? 0);
+            if ($groupId <= 0) {
+                continue;
+            }
+            $pricesBuyByGroup[$groupId][] = $row;
+        }
+        $pricesBuy = [];
+        foreach ($pricesBuyByGroup as $groupRows) {
+            $picked = frontcalc_pick_price_for_quantity($groupRows, 1);
+            if ($picked !== null) {
+                $pricesBuy[] = $picked;
+            }
+        }
 
         $primaryBuyPrice = null;
         if (!empty($pricesBuy)) {
