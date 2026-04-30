@@ -66,18 +66,16 @@ function frontcalc_get_catalog_groups_by_rights(array $userGroups): array
         global $DB;
         if (is_object($DB) && !empty($userGroups)) {
             $groupIdsSql = implode(',', array_map('intval', $userGroups));
-            $sql = "SELECT CATALOG_GROUP_ID, BUY, `LIST` FROM b_catalog_group2group WHERE GROUP_ID IN (" . $groupIdsSql . ")";
+            $sql = "SELECT CATALOG_GROUP_ID, BUY FROM b_catalog_group2group WHERE GROUP_ID IN (" . $groupIdsSql . ")";
             $res = $DB->Query($sql);
             while ($row = $res->Fetch()) {
                 $catalogGroupId = (int)($row['CATALOG_GROUP_ID'] ?? 0);
                 if ($catalogGroupId <= 0) {
                     continue;
                 }
+                $view[$catalogGroupId] = $catalogGroupId;
                 if (($row['BUY'] ?? 'N') === 'Y') {
                     $buy[$catalogGroupId] = $catalogGroupId;
-                }
-                if (($row['LIST'] ?? 'N') === 'Y') {
-                    $view[$catalogGroupId] = $catalogGroupId;
                 }
             }
         }
@@ -106,6 +104,14 @@ function frontcalc_pick_price_for_quantity(array $rows, int $quantity = 1): ?arr
     }
 
     return $rows[0];
+}
+
+function frontcalc_round_catalog_price(float $value, int $catalogGroupId, string $currency): float
+{
+    if (class_exists('\Bitrix\Catalog\Product\Price')) {
+        return (float)\Bitrix\Catalog\Product\Price::roundPrice($catalogGroupId, $value, $currency);
+    }
+    return $value;
 }
 
 /**
@@ -291,13 +297,14 @@ if (!empty($offersMap[$productId]) && is_array($offersMap[$productId])) {
             $catalogGroupId = (int)($price['CATALOG_GROUP_ID'] ?? 0);
             $priceValue = (float)($price['PRICE'] ?? 0);
             $currency = (string)($price['CURRENCY'] ?? '');
+            $roundedValue = frontcalc_round_catalog_price($priceValue, $catalogGroupId, $currency);
             $pricesRaw[] = [
                 'id' => (int)($price['ID'] ?? 0),
                 'catalog_group_id' => $catalogGroupId,
                 'catalog_group_name' => (string)($catalogGroupNames[$catalogGroupId] ?? ('PRICE_' . $catalogGroupId)),
-                'price' => $priceValue,
+                'price' => $roundedValue,
                 'currency' => $currency,
-                'formatted' => html_entity_decode((string)CCurrencyLang::CurrencyFormat($priceValue, $currency, true), ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+                'formatted' => html_entity_decode((string)CCurrencyLang::CurrencyFormat($roundedValue, $currency, true), ENT_QUOTES | ENT_HTML5, 'UTF-8'),
                 'quantity_from' => isset($price['QUANTITY_FROM']) ? (int)$price['QUANTITY_FROM'] : null,
                 'quantity_to' => isset($price['QUANTITY_TO']) ? (int)$price['QUANTITY_TO'] : null,
             ];
@@ -344,7 +351,24 @@ if (!empty($offersMap[$productId]) && is_array($offersMap[$productId])) {
         }
 
         $primaryBuyPrice = null;
-        if (!empty($pricesBuy)) {
+        $optimalPrice = CCatalogProduct::GetOptimalPrice($offerId, 1, $userGroups, 'N', [], SITE_ID);
+        if (is_array($optimalPrice) && !empty($optimalPrice['RESULT_PRICE'])) {
+            $resultPrice = $optimalPrice['RESULT_PRICE'];
+            $optValue = (float)($resultPrice['DISCOUNT_PRICE'] ?? $resultPrice['BASE_PRICE'] ?? 0);
+            $optCurrency = (string)($resultPrice['CURRENCY'] ?? '');
+            $optGroupId = (int)($resultPrice['PRICE_TYPE_ID'] ?? 0);
+            $optRounded = frontcalc_round_catalog_price($optValue, $optGroupId, $optCurrency);
+            $primaryBuyPrice = [
+                'id' => (int)($resultPrice['PRICE_ID'] ?? 0),
+                'catalog_group_id' => $optGroupId,
+                'catalog_group_name' => (string)($catalogGroupNames[$optGroupId] ?? ('PRICE_' . $optGroupId)),
+                'price' => $optRounded,
+                'currency' => $optCurrency,
+                'formatted' => html_entity_decode((string)CCurrencyLang::CurrencyFormat($optRounded, $optCurrency, true), ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+                'quantity_from' => null,
+                'quantity_to' => null,
+            ];
+        } elseif (!empty($pricesBuy)) {
             $primaryBuyPrice = $pricesBuy[0];
         } elseif (!empty($pricesView)) {
             $primaryBuyPrice = $pricesView[0];
