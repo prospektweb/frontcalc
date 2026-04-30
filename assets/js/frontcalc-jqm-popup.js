@@ -487,17 +487,28 @@
       return;
     }
 
-    var prices = (matchedOffer.catalog && matchedOffer.catalog.prices) || [];
-    var firstPrice = prices.length ? prices[0] : null;
+    var pricesView = (matchedOffer.catalog && matchedOffer.catalog.prices_view) || [];
+    var primaryBuyPrice = (matchedOffer.catalog && matchedOffer.catalog.primary_buy_price) || null;
     var weightKg = parseNumber(matchedOffer.catalog && matchedOffer.catalog.weight_kg, 0).toFixed(3);
     var volumeM3 = parseNumber(matchedOffer.catalog && matchedOffer.catalog.volume_m3, 0).toFixed(3);
 
     var html = '<div class="frontcalc-price-main">';
-    html += firstPrice
-      ? '<div class="frontcalc-price-value">' + escapeHtml(firstPrice.price) + " " + escapeHtml(firstPrice.currency) + "</div>"
+    html += primaryBuyPrice
+      ? '<div class="frontcalc-price-value">' + escapeHtml(primaryBuyPrice.formatted || (primaryBuyPrice.price + " " + primaryBuyPrice.currency)) + "</div>"
       : '<div class="frontcalc-price-value">Цена не найдена</div>';
     html += '<div class="frontcalc-price-offer">ТП: ' + escapeHtml(matchedOffer.name || matchedOffer.id) + "</div>";
     html += "</div>";
+    if (pricesView.length) {
+      html += '<div class="frontcalc-price-offer">';
+      html += "Доступные цены для просмотра:";
+      html += '<ul style="margin:6px 0 0 16px;">';
+      pricesView.forEach(function (priceRow) {
+        var label = escapeHtml(priceRow.catalog_group_name || ("Тип цены #" + priceRow.catalog_group_id));
+        var value = escapeHtml(priceRow.formatted || (priceRow.price + " " + priceRow.currency));
+        html += "<li>" + label + ": " + value + "</li>";
+      });
+      html += "</ul></div>";
+    }
     html += '<div class="frontcalc-price-meta">Вес: ' + weightKg + ' кг · Объём: ' + volumeM3 + " м³</div>";
     $block.html(html);
   }
@@ -528,7 +539,10 @@
       if (Array.isArray(propertyMetaByCode[code].presets) && propertyMetaByCode[code].presets.length) {
         mergePresets(presetsByCode, (function () {
           var map = {};
-          map[code] = propertyMetaByCode[code].presets;
+          map[code] = propertyMetaByCode[code].presets.filter(function (row) {
+            var xmlId = String((row && row.xml_id) || "").trim();
+            return !(hiddenByProperty[code] && hiddenByProperty[code][xmlId]);
+          });
           return map;
         })());
       }
@@ -566,11 +580,54 @@
 
     var controlsByCode = {};
 
+    function pickDefaultOfferBySort(offersList, codes) {
+      if (!Array.isArray(offersList) || !offersList.length) return null;
+      var best = null;
+      offersList.forEach(function (offer) {
+        var rank = codes.map(function (code) {
+          var prop = offer && offer.properties ? offer.properties[code] : null;
+          return parseNumber(prop && prop.sort, 500);
+        });
+        if (!best) {
+          best = { offer: offer, rank: rank };
+          return;
+        }
+        for (var i = 0; i < rank.length; i++) {
+          if (rank[i] < best.rank[i]) {
+            best = { offer: offer, rank: rank };
+            return;
+          }
+          if (rank[i] > best.rank[i]) return;
+        }
+      });
+      return best ? best.offer : null;
+    }
+
+    var requestedOfferId = parseNumber(data.requested_offer_id, 0);
+    var defaultOffer = null;
+    if (requestedOfferId > 0) {
+      defaultOffer = offers.find(function (offer) {
+        return parseNumber(offer && offer.id, 0) === requestedOfferId;
+      }) || null;
+    }
+    if (!defaultOffer) {
+      defaultOffer = pickDefaultOfferBySort(offers, allCodes);
+    }
     allCodes.forEach(function (code) {
-      if (Array.isArray(presetsByCode[code]) && presetsByCode[code].length) {
-        selectedByProperty[code] = presetsByCode[code][0].xml_id;
-        customByProperty[code] = false;
+      var presets = Array.isArray(presetsByCode[code]) ? presetsByCode[code] : [];
+      var defaultXmlId = "";
+      if (defaultOffer && defaultOffer.properties && defaultOffer.properties[code]) {
+        defaultXmlId = String(defaultOffer.properties[code].xml_id || "").trim();
       }
+      var existsInPresets = presets.some(function (preset) {
+        return String((preset && preset.xml_id) || "") === defaultXmlId;
+      });
+      if (existsInPresets) {
+        selectedByProperty[code] = defaultXmlId;
+      } else if (presets.length) {
+        selectedByProperty[code] = presets[0].xml_id;
+      }
+      customByProperty[code] = false;
     });
 
     var $layout = $('<div class="frontcalc-layout"></div>');
@@ -622,13 +679,19 @@
         var delimiter = fieldConfig.group_delimiter || fieldConfig.split_delimiter || "x";
         var uiGroupDivider = "×";
         if (!groupItems.length) groupItems = [fieldConfig];
+        var selectedXmlForCode = String(selectedByProperty[code] || "");
+        var selectedParts = selectedXmlForCode ? selectedXmlForCode.split(delimiter) : [];
 
         var $group = $('<div class="frontcalc-input-group"></div>');
         groupItems.forEach(function (item, idx) {
           if (idx > 0) {
             $group.append('<span class="frontcalc-input-group-divider">' + uiGroupDivider + "</span>");
           }
-          var initial = parseNumber(item.default, 0);
+          var selectedPart = idx < selectedParts.length ? selectedParts[idx] : "";
+          var initial = parseNumber(
+            selectedPart !== "" ? selectedPart : item.default,
+            parseNumber(item.default, 0)
+          );
           var $inputField = createInputControl(
             item,
             initial,
@@ -770,7 +833,15 @@
     }
 
     var divider = ajaxUrl.indexOf("?") === -1 ? "?" : "&";
+    var currentOid = "";
+    try {
+      var currentUrl = new URL(window.location.href);
+      currentOid = currentUrl.searchParams.get("oid") || "";
+    } catch (e) {}
     var requestUrl = ajaxUrl + divider + "product_id=" + encodeURIComponent(productId);
+    if (currentOid) {
+      requestUrl += "&offer_id=" + encodeURIComponent(currentOid);
+    }
     $button.prop("disabled", true);
 
     loadJqmScript(function () {
