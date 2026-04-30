@@ -66,18 +66,16 @@ function frontcalc_get_catalog_groups_by_rights(array $userGroups): array
         global $DB;
         if (is_object($DB) && !empty($userGroups)) {
             $groupIdsSql = implode(',', array_map('intval', $userGroups));
-            $sql = "SELECT CATALOG_GROUP_ID, BUY, `LIST` FROM b_catalog_group2group WHERE GROUP_ID IN (" . $groupIdsSql . ")";
+            $sql = "SELECT CATALOG_GROUP_ID, BUY FROM b_catalog_group2group WHERE GROUP_ID IN (" . $groupIdsSql . ")";
             $res = $DB->Query($sql);
             while ($row = $res->Fetch()) {
                 $catalogGroupId = (int)($row['CATALOG_GROUP_ID'] ?? 0);
                 if ($catalogGroupId <= 0) {
                     continue;
                 }
+                $view[$catalogGroupId] = $catalogGroupId;
                 if (($row['BUY'] ?? 'N') === 'Y') {
                     $buy[$catalogGroupId] = $catalogGroupId;
-                }
-                if (($row['LIST'] ?? 'N') === 'Y') {
-                    $view[$catalogGroupId] = $catalogGroupId;
                 }
             }
         }
