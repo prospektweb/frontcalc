@@ -142,6 +142,7 @@ if (!Loader::includeModule($moduleId) || !Loader::includeModule('iblock') || !Lo
 }
 
 $productId = (int)($_REQUEST['product_id'] ?? 0);
+$requestedOfferId = (int)($_REQUEST['offer_id'] ?? $_REQUEST['oid'] ?? 0);
 if ($productId <= 0) {
     http_response_code(400);
     echo json_encode([
@@ -432,6 +433,7 @@ echo json_encode([
     'success' => true,
     'data' => [
         'product_id' => $productId,
+        'requested_offer_id' => $requestedOfferId,
         'user_groups' => $userGroups,
         'price_access' => $priceAccess,
         'config' => $config,

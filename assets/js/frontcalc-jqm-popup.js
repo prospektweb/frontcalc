@@ -603,7 +603,16 @@
       return best ? best.offer : null;
     }
 
-    var defaultOffer = pickDefaultOfferBySort(offers, allCodes);
+    var requestedOfferId = parseNumber(data.requested_offer_id, 0);
+    var defaultOffer = null;
+    if (requestedOfferId > 0) {
+      defaultOffer = offers.find(function (offer) {
+        return parseNumber(offer && offer.id, 0) === requestedOfferId;
+      }) || null;
+    }
+    if (!defaultOffer) {
+      defaultOffer = pickDefaultOfferBySort(offers, allCodes);
+    }
     allCodes.forEach(function (code) {
       var presets = Array.isArray(presetsByCode[code]) ? presetsByCode[code] : [];
       var defaultXmlId = "";
@@ -818,7 +827,15 @@
     }
 
     var divider = ajaxUrl.indexOf("?") === -1 ? "?" : "&";
+    var currentOid = "";
+    try {
+      var currentUrl = new URL(window.location.href);
+      currentOid = currentUrl.searchParams.get("oid") || "";
+    } catch (e) {}
     var requestUrl = ajaxUrl + divider + "product_id=" + encodeURIComponent(productId);
+    if (currentOid) {
+      requestUrl += "&offer_id=" + encodeURIComponent(currentOid);
+    }
     $button.prop("disabled", true);
 
     loadJqmScript(function () {
