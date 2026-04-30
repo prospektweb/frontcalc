@@ -487,17 +487,28 @@
       return;
     }
 
-    var prices = (matchedOffer.catalog && matchedOffer.catalog.prices) || [];
-    var firstPrice = prices.length ? prices[0] : null;
+    var pricesView = (matchedOffer.catalog && matchedOffer.catalog.prices_view) || [];
+    var primaryBuyPrice = (matchedOffer.catalog && matchedOffer.catalog.primary_buy_price) || null;
     var weightKg = parseNumber(matchedOffer.catalog && matchedOffer.catalog.weight_kg, 0).toFixed(3);
     var volumeM3 = parseNumber(matchedOffer.catalog && matchedOffer.catalog.volume_m3, 0).toFixed(3);
 
     var html = '<div class="frontcalc-price-main">';
-    html += firstPrice
-      ? '<div class="frontcalc-price-value">' + escapeHtml(firstPrice.price) + " " + escapeHtml(firstPrice.currency) + "</div>"
+    html += primaryBuyPrice
+      ? '<div class="frontcalc-price-value">' + escapeHtml(primaryBuyPrice.formatted || (primaryBuyPrice.price + " " + primaryBuyPrice.currency)) + "</div>"
       : '<div class="frontcalc-price-value">Цена не найдена</div>';
     html += '<div class="frontcalc-price-offer">ТП: ' + escapeHtml(matchedOffer.name || matchedOffer.id) + "</div>";
     html += "</div>";
+    if (pricesView.length) {
+      html += '<div class="frontcalc-price-offer">';
+      html += "Доступные цены для просмотра:";
+      html += '<ul style="margin:6px 0 0 16px;">';
+      pricesView.forEach(function (priceRow) {
+        var label = escapeHtml(priceRow.catalog_group_name || ("Тип цены #" + priceRow.catalog_group_id));
+        var value = escapeHtml(priceRow.formatted || (priceRow.price + " " + priceRow.currency));
+        html += "<li>" + label + ": " + value + "</li>";
+      });
+      html += "</ul></div>";
+    }
     html += '<div class="frontcalc-price-meta">Вес: ' + weightKg + ' кг · Объём: ' + volumeM3 + " м³</div>";
     $block.html(html);
   }
