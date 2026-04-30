@@ -470,6 +470,17 @@
     return null;
   }
 
+
+  function isCompleteGroupInput(values) {
+    if (!Array.isArray(values) || !values.length) return false;
+    for (var i = 0; i < values.length; i++) {
+      var normalized = normalizeValueToken(values[i]);
+      if (!normalized) return false;
+      if (!Number.isFinite(parseNumber(normalized, Number.NaN))) return false;
+    }
+    return true;
+  }
+
   function renderPriceBlock($block, matchedOffer) {
     if (!matchedOffer) {
       $block.html('<div class="frontcalc-price-empty">Для произвольных значений цена пока не рассчитывается.</div>');
@@ -625,6 +636,13 @@
               $section.find(".frontcalc-input-group .frontcalc-num-input").each(function () {
                 groupValues.push(String($(this).val() || "").trim());
               });
+
+              var groupComplete = isCompleteGroupInput(groupValues);
+              if (!groupComplete) {
+                customByProperty[code] = false;
+                updatePrice();
+                return;
+              }
 
               var compositeValue = groupValues.join(delimiter);
               var normalizedCompositeValue = groupValues
