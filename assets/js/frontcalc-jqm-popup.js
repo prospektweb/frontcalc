@@ -620,12 +620,13 @@
 
       if (hasInputFlag || groupItems.length > 0) {
         var delimiter = fieldConfig.group_delimiter || fieldConfig.split_delimiter || "x";
+        var uiGroupDivider = "×";
         if (!groupItems.length) groupItems = [fieldConfig];
 
         var $group = $('<div class="frontcalc-input-group"></div>');
         groupItems.forEach(function (item, idx) {
           if (idx > 0) {
-            $group.append('<span class="frontcalc-input-group-divider">' + escapeHtml(delimiter) + "</span>");
+            $group.append('<span class="frontcalc-input-group-divider">' + uiGroupDivider + "</span>");
           }
           var initial = parseNumber(item.default, 0);
           var $inputField = createInputControl(
