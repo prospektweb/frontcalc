@@ -787,7 +787,6 @@
     loadJqmScript(function () {
       var $frame = createFrame();
       $frame.jqm({
-        trigger: $button,
         overlay: 50,
         overlayClass: "jqmOverlay",
         closeClass: "jqmClose",
