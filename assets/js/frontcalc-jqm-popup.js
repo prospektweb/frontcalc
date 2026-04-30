@@ -539,7 +539,10 @@
       if (Array.isArray(propertyMetaByCode[code].presets) && propertyMetaByCode[code].presets.length) {
         mergePresets(presetsByCode, (function () {
           var map = {};
-          map[code] = propertyMetaByCode[code].presets;
+          map[code] = propertyMetaByCode[code].presets.filter(function (row) {
+            var xmlId = String((row && row.xml_id) || "").trim();
+            return !(hiddenByProperty[code] && hiddenByProperty[code][xmlId]);
+          });
           return map;
         })());
       }
@@ -577,11 +580,45 @@
 
     var controlsByCode = {};
 
+    function pickDefaultOfferBySort(offersList, codes) {
+      if (!Array.isArray(offersList) || !offersList.length) return null;
+      var best = null;
+      offersList.forEach(function (offer) {
+        var rank = codes.map(function (code) {
+          var prop = offer && offer.properties ? offer.properties[code] : null;
+          return parseNumber(prop && prop.sort, 500);
+        });
+        if (!best) {
+          best = { offer: offer, rank: rank };
+          return;
+        }
+        for (var i = 0; i < rank.length; i++) {
+          if (rank[i] < best.rank[i]) {
+            best = { offer: offer, rank: rank };
+            return;
+          }
+          if (rank[i] > best.rank[i]) return;
+        }
+      });
+      return best ? best.offer : null;
+    }
+
+    var defaultOffer = pickDefaultOfferBySort(offers, allCodes);
     allCodes.forEach(function (code) {
-      if (Array.isArray(presetsByCode[code]) && presetsByCode[code].length) {
-        selectedByProperty[code] = presetsByCode[code][0].xml_id;
-        customByProperty[code] = false;
+      var presets = Array.isArray(presetsByCode[code]) ? presetsByCode[code] : [];
+      var defaultXmlId = "";
+      if (defaultOffer && defaultOffer.properties && defaultOffer.properties[code]) {
+        defaultXmlId = String(defaultOffer.properties[code].xml_id || "").trim();
       }
+      var existsInPresets = presets.some(function (preset) {
+        return String((preset && preset.xml_id) || "") === defaultXmlId;
+      });
+      if (existsInPresets) {
+        selectedByProperty[code] = defaultXmlId;
+      } else if (presets.length) {
+        selectedByProperty[code] = presets[0].xml_id;
+      }
+      customByProperty[code] = false;
     });
 
     var $layout = $('<div class="frontcalc-layout"></div>');
