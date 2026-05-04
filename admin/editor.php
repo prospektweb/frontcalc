@@ -212,10 +212,18 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
                         <label class="fc-pill"><input type="checkbox" class="js-concat-unit"<?= !empty($field['concat_unit']) ? ' checked' : '' ?>> Склеивать значение с ед. изм.</label>
                     </div>
 
-                    <div class="fc-subtitle">Скрыть варианты (XML_ID)</div>
+                    <div class="fc-subtitle">Скрыть варианты (XML_ID) из калькулятора</div>
                     <select class="fc-select js-hidden-presets" multiple size="5" style="height:auto; min-height:120px;">
                         <?php foreach ($prop['ENUMS'] as $enum): ?>
                             <option value="<?= htmlspecialcharsbx($enum['XML_ID']) ?>"<?= in_array($enum['XML_ID'], $hiddenXml, true) ? ' selected' : '' ?>><?= htmlspecialcharsbx($enum['VALUE']) ?> [<?= htmlspecialcharsbx($enum['XML_ID']) ?>]</option>
+                        <?php endforeach; ?>
+                    </select>
+
+                    <?php $hiddenOfferXml = array_values(array_filter(array_map('strval', (array)($field['hidden_offer_xml_ids'] ?? [])), fn($v) => $v !== '')); ?>
+                    <div class="fc-subtitle">Скрыть варианты (XML_ID) при выборе ТП</div>
+                    <select class="fc-select js-hidden-offers" multiple size="5" style="height:auto; min-height:120px;">
+                        <?php foreach ($prop['ENUMS'] as $enum): ?>
+                            <option value="<?= htmlspecialcharsbx($enum['XML_ID']) ?>"<?= in_array($enum['XML_ID'], $hiddenOfferXml, true) ? ' selected' : '' ?>><?= htmlspecialcharsbx($enum['VALUE']) ?> [<?= htmlspecialcharsbx($enum['XML_ID']) ?>]</option>
                         <?php endforeach; ?>
                     </select>
 
@@ -319,8 +327,10 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
             + '      <label class="fc-pill"><input type="checkbox" class="js-show-unit" checked> Показывать ед. изм.</label>\n'
             + '      <label class="fc-pill"><input type="checkbox" class="js-concat-unit"> Склеивать значение с ед. изм.</label>\n'
             + '    </div>\n'
-            + '    <div class="fc-subtitle">Скрыть варианты (XML_ID)</div>\n'
+            + '    <div class="fc-subtitle">Скрыть варианты (XML_ID) из калькулятора</div>\n'
             + '    <select class="fc-select js-hidden-presets" multiple size="5" style="height:auto; min-height:120px;">' + renderEnumOptions(prop) + '</select>\n'
+            + '    <div class="fc-subtitle">Скрыть варианты (XML_ID) при выборе ТП</div>\n'
+            + '    <select class="fc-select js-hidden-offers" multiple size="5" style="height:auto; min-height:120px;">' + renderEnumOptions(prop) + '</select>\n'
             + '    <div class="fc-subtitle">Групповые настройки (авто при >1 инпута)</div>\n'
             + '    <div class="js-group-settings" style="display:none;">\n'
             + '      <div class="fc-row">\n'
@@ -417,6 +427,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
                     unit: row.querySelector('.js-inp-unit').value || ''
                 }));
                 const hiddenPresetXmlIds = Array.from(card.querySelector('.js-hidden-presets').selectedOptions).map(opt => opt.value);
+                const hiddenOfferXmlIds = Array.from(card.querySelector('.js-hidden-offers').selectedOptions).map(opt => opt.value);
 
                 fields.push({
                     property_code: card.dataset.propCode || '',
@@ -427,7 +438,8 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
                     is_group: inputs.length > 1,
                     group_code: card.querySelector('.js-group-code').value || '',
                     group_delimiter: card.querySelector('.js-group-delimiter').value || 'x',
-                    hidden_preset_xml_ids: hiddenPresetXmlIds
+                    hidden_preset_xml_ids: hiddenPresetXmlIds,
+                    hidden_offer_xml_ids: hiddenOfferXmlIds
                 });
             });
 
