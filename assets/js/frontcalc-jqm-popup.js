@@ -207,22 +207,6 @@
     return map;
   }
 
-  function buildHiddenOfferMap(config) {
-    var map = {};
-    var fields = Array.isArray(config.fields) ? config.fields : [];
-    fields.forEach(function (field) {
-      var code = getFieldCode(field);
-      if (!code) return;
-      var hidden = Array.isArray(field.hidden_offer_xml_ids) ? field.hidden_offer_xml_ids : [];
-      if (!hidden.length) return;
-      map[code] = {};
-      hidden.forEach(function (xmlId) {
-        map[code][String(xmlId)] = true;
-      });
-    });
-    return map;
-  }
-
   function gatherAllPropertyCodes(propertyMetaList, offers, fields) {
     var map = {};
     (Array.isArray(propertyMetaList) ? propertyMetaList : []).forEach(function (meta) {
@@ -431,7 +415,7 @@
     });
   }
 
-  function buildAvailableValuesByCode(offers, allCodes, selectedByProperty, customByProperty, hiddenOfferByProperty) {
+  function buildAvailableValuesByCode(offers, allCodes, selectedByProperty, customByProperty) {
     var availableByCode = {};
     (Array.isArray(allCodes) ? allCodes : []).forEach(function (code) {
       availableByCode[code] = {};
@@ -453,7 +437,6 @@
         var props = (offer && offer.properties) || {};
         var prop = props[code] || {};
         var xmlId = String(prop.xml_id || "").trim();
-        if (hiddenOfferByProperty[code] && hiddenOfferByProperty[code][xmlId]) return;
         if (xmlId) availableByCode[code][xmlId] = true;
       });
     });
@@ -550,7 +533,6 @@
     var metaOrderByCode = makeCodeOrderMapFromMeta(propertyMeta);
     var fieldOrderByCode = makeCodeOrderMapFromFields(fields);
     var hiddenByProperty = buildHiddenPresetMap(config);
-    var hiddenOfferByProperty = buildHiddenOfferMap(config);
     var presetsByCode = buildPresetsByProperty(offers, hiddenByProperty);
     mergePresets(presetsByCode, buildPresetsFromConfigFields(fields, hiddenByProperty));
     Object.keys(propertyMetaByCode).forEach(function (code) {
@@ -633,10 +615,6 @@
     }
     allCodes.forEach(function (code) {
       var presets = Array.isArray(presetsByCode[code]) ? presetsByCode[code] : [];
-      presets = presets.filter(function (preset) {
-        var xmlId = String((preset && preset.xml_id) || "").trim();
-        return !(hiddenOfferByProperty[code] && hiddenOfferByProperty[code][xmlId]);
-      });
       var defaultXmlId = "";
       if (defaultOffer && defaultOffer.properties && defaultOffer.properties[code]) {
         defaultXmlId = String(defaultOffer.properties[code].xml_id || "").trim();
@@ -666,10 +644,6 @@
       }
 
       var presets = Array.isArray(presetsByCode[code]) ? presetsByCode[code] : [];
-      presets = presets.filter(function (preset) {
-        var xmlId = String((preset && preset.xml_id) || "").trim();
-        return !(hiddenOfferByProperty[code] && hiddenOfferByProperty[code][xmlId]);
-      });
       var $chips = createPresetButtons(presets, function (preset) {
         selectedByProperty[code] = preset.xml_id;
         customByProperty[code] = false;
@@ -805,7 +779,7 @@
     });
 
     function updatePrice() {
-      var availableByCode = buildAvailableValuesByCode(offers, allCodes, selectedByProperty, customByProperty, hiddenOfferByProperty);
+      var availableByCode = buildAvailableValuesByCode(offers, allCodes, selectedByProperty, customByProperty);
 
       allCodes.forEach(function (code) {
         var ui = controlsByCode[code];
