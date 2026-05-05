@@ -25,6 +25,7 @@ $propertyCode = (string)Option::get($moduleId, 'CALC_PROPERTY_CODE', 'FRONTCALC_
 
 $productsIblockId = (int)Option::get($moduleId, 'PRODUCTS_IBLOCK_ID', '0');
 $offersIblockId = (int)Option::get($moduleId, 'OFFERS_IBLOCK_ID', '0');
+$hiddenOfferValueIds = (string)Option::get($moduleId, 'HIDDEN_OFFER_VALUE_IDS', '');
 
 $schema = '';
 $propertyRes = CIBlockProperty::GetList([], ['IBLOCK_ID' => $iblockId, 'CODE' => $propertyCode]);
@@ -80,6 +81,8 @@ if ($offersIblockId > 0) {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && check_bitrix_sessid() && $elementId > 0 && $iblockId > 0 && $propertyCode !== '') {
     $schema = trim((string)($_POST['CALC_EDITOR_SCHEMA'] ?? ''));
+    $hiddenOfferValueIds = trim((string)($_POST['HIDDEN_OFFER_VALUE_IDS'] ?? ''));
+    Option::set($moduleId, 'HIDDEN_OFFER_VALUE_IDS', $hiddenOfferValueIds);
 
     CIBlockElement::SetPropertyValuesEx($elementId, $iblockId, [
         $propertyCode => [
@@ -144,6 +147,11 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
 <div class="fc-soft-wrap">
     <h2 style="margin-top:0;">Настроить калькулятор</h2>
     <p>Элемент ID: <b><?= (int)$elementId ?></b>, инфоблок: <b><?= (int)$iblockId ?></b>, товары: <b><?= (int)$productsIblockId ?></b>, ТП: <b><?= (int)$offersIblockId ?></b>, свойство: <b><?= htmlspecialcharsbx($propertyCode) ?></b></p>
+
+
+
+    <div class="fc-subtitle">Скрыть технические значения в списках и на детальной странице</div>
+    <input class="fc-input" type="text" name="HIDDEN_OFFER_VALUE_IDS" form="frontcalc-editor-form" value="<?= htmlspecialcharsbx($hiddenOfferValueIds) ?>" placeholder="ID enum-значений ТП через запятую/пробел/;" style="max-width:420px;"> 
 
     <div class="fc-toolbar">
         <select id="fc-add-property" class="fc-select" style="min-width: 280px; max-width: 420px;">
