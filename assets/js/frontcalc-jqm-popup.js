@@ -511,6 +511,23 @@
     return Number.isFinite(minDiff) ? minDiff : 1;
   }
 
+  function resolveConfiguredStep(fieldConfig) {
+    if (!fieldConfig || typeof fieldConfig !== "object") return Number.NaN;
+    var direct = parseNumber(fieldConfig.step, Number.NaN);
+    if (Number.isFinite(direct) && direct > 0) return direct;
+    var keys = ["group_inputs", "inputs", "values"];
+    for (var k = 0; k < keys.length; k++) {
+      var arr = fieldConfig[keys[k]];
+      if (!Array.isArray(arr)) continue;
+      for (var i = 0; i < arr.length; i++) {
+        var row = arr[i] || {};
+        var rowStep = parseNumber(row.step, Number.NaN);
+        if (Number.isFinite(rowStep) && rowStep > 0) return rowStep;
+      }
+    }
+    return Number.NaN;
+  }
+
   function renderPriceTable($block, offers, presetsByCode, selectedByProperty, volumeCode, customVolumeValue) {
     var volumePresets = (presetsByCode[volumeCode] || []).slice();
     if (!volumePresets.length) {
@@ -706,7 +723,7 @@
     var controlsByCode = {};
     var volumeCode = "CALC_PROP_VOLUME";
     var customVolumeValue = Number.NaN;
-    var explicitVolumeStep = parseNumber(fieldByCode[volumeCode] && fieldByCode[volumeCode].step, Number.NaN);
+    var explicitVolumeStep = resolveConfiguredStep(fieldByCode[volumeCode]);
     var volumeStep = Math.max(1, Number.isFinite(explicitVolumeStep) ? explicitVolumeStep : deriveStepFromPresets(presetsByCode[volumeCode]));
 
     function pickDefaultOfferBySort(offersList, codes) {
