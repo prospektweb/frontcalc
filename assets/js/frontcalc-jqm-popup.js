@@ -491,6 +491,26 @@
     return pricesView[2] || pricesView[1] || strictPrice;
   }
 
+  function deriveStepFromPresets(presets) {
+    var nums = (Array.isArray(presets) ? presets : [])
+      .map(function (p) {
+        return parseNumber(p && p.xml_id, Number.NaN);
+      })
+      .filter(function (n) {
+        return Number.isFinite(n);
+      })
+      .sort(function (a, b) {
+        return a - b;
+      });
+    if (nums.length < 2) return 1;
+    var minDiff = Number.POSITIVE_INFINITY;
+    for (var i = 1; i < nums.length; i++) {
+      var diff = nums[i] - nums[i - 1];
+      if (diff > 0 && diff < minDiff) minDiff = diff;
+    }
+    return Number.isFinite(minDiff) ? minDiff : 1;
+  }
+
   function renderPriceTable($block, offers, presetsByCode, selectedByProperty, volumeCode, customVolumeValue) {
     var volumePresets = (presetsByCode[volumeCode] || []).slice();
     if (!volumePresets.length) {
@@ -686,7 +706,8 @@
     var controlsByCode = {};
     var volumeCode = "CALC_PROP_VOLUME";
     var customVolumeValue = Number.NaN;
-    var volumeStep = Math.max(1, parseNumber(fieldByCode[volumeCode] && fieldByCode[volumeCode].step, 1));
+    var explicitVolumeStep = parseNumber(fieldByCode[volumeCode] && fieldByCode[volumeCode].step, Number.NaN);
+    var volumeStep = Math.max(1, Number.isFinite(explicitVolumeStep) ? explicitVolumeStep : deriveStepFromPresets(presetsByCode[volumeCode]));
 
     function pickDefaultOfferBySort(offersList, codes) {
       if (!Array.isArray(offersList) || !offersList.length) return null;
@@ -721,7 +742,11 @@
     if (!defaultOffer) {
       defaultOffer = pickDefaultOfferBySort(offers, allCodes);
     }
-    allCodes.forEach(function (code) {
+    var selectorCodes = allCodes.filter(function (code) {
+      return code !== volumeCode;
+    });
+
+    selectorCodes.forEach(function (code) {
       if (code === volumeCode) {
         return;
       }
@@ -746,7 +771,7 @@
     var $price = $('<aside class="frontcalc-price-panel"><div class="frontcalc-price-panel__inner"></div></aside>');
     var $priceInner = $price.find(".frontcalc-price-panel__inner");
 
-    allCodes.forEach(function (code) {
+    selectorCodes.forEach(function (code) {
       var fieldConfig = fieldByCode[code] || {};
       var label = getFieldLabel(fieldConfig, propertyMetaByCode, code);
       var $section = $('<section class="frontcalc-field"></section>');
