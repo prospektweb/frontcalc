@@ -10,6 +10,34 @@
     });
   }
 
+  function isDebugEnabled() {
+    return !!(window && window.FrontcalcPopupDebug);
+  }
+
+  function debugLogPriceContext(context) {
+    if (!isDebugEnabled() || !window.console) return;
+    try {
+      console.groupCollapsed("[frontcalc] price debug");
+      console.log("context:", context);
+      if (context && Array.isArray(context.pricesView)) {
+        console.table(
+          context.pricesView.map(function (row, idx) {
+            return {
+              idx: idx,
+              group_id: row && row.catalog_group_id,
+              group_name: row && row.catalog_group_name,
+              from: row && (row.from || row.from_value || row.quantity_from || row.range_from),
+              to: row && (row.to || row.to_value || row.quantity_to || row.range_to),
+              price: row && row.price,
+              formatted: row && row.formatted,
+            };
+          })
+        );
+      }
+      console.groupEnd();
+    } catch (e) {}
+  }
+
   function ensureWrapper() {
     var $wrapper = $("#popup_iframe_wrapper");
     if (!$wrapper.length) {
@@ -1137,3 +1165,14 @@
     openPopup(this);
   });
 })(window, document, window.jQuery);
+      if (xml === selectedXml) {
+        debugLogPriceContext({
+          volumeCode: volumeCode,
+          selectedXml: selectedXml,
+          strictPrice: strictPrice,
+          flexPrice: flex,
+          pricesView: offer && offer.catalog ? offer.catalog.prices_view : [],
+          offerId: offer && offer.id,
+          offerName: offer && offer.name,
+        });
+      }
