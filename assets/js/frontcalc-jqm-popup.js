@@ -488,7 +488,37 @@
 
   function pickFlexiblePrice(pricesView, strictPrice) {
     if (!Array.isArray(pricesView) || !pricesView.length) return strictPrice;
-    return pricesView[2] || pricesView[1] || strictPrice;
+    var strictGroupId = parseNumber(strictPrice && strictPrice.catalog_group_id, Number.NaN);
+    var pool = pricesView.filter(function (row) {
+      if (!Number.isFinite(strictGroupId)) return true;
+      return parseNumber(row && row.catalog_group_id, Number.NaN) === strictGroupId;
+    });
+    if (!pool.length) pool = pricesView.slice();
+
+    function rangeOrder(row) {
+      var from = parseNumber(row && (row.from || row.from_value || row.quantity_from || row.range_from), Number.NaN);
+      if (Number.isFinite(from)) return from;
+      var name = String((row && (row.catalog_group_name || row.title || row.name)) || "").toLowerCase();
+      var m = name.match(/(?:от\s*)(\d+)/);
+      if (m) return parseNumber(m[1], Number.NaN);
+      return Number.NaN;
+    }
+
+    var sorted = pool
+      .map(function (row) {
+        return { row: row, order: rangeOrder(row) };
+      })
+      .sort(function (a, b) {
+        var ao = Number.isFinite(a.order) ? a.order : Number.POSITIVE_INFINITY;
+        var bo = Number.isFinite(b.order) ? b.order : Number.POSITIVE_INFINITY;
+        if (ao !== bo) return ao - bo;
+        return parseNumber(a.row && a.row.price, 0) - parseNumber(b.row && b.row.price, 0);
+      })
+      .map(function (entry) {
+        return entry.row;
+      });
+
+    return sorted[2] || sorted[1] || sorted[0] || strictPrice;
   }
 
   function deriveStepFromPresets(presets) {
