@@ -487,29 +487,12 @@
       return;
     }
 
-    var pricesView = (matchedOffer.catalog && matchedOffer.catalog.prices_view) || [];
     var primaryBuyPrice = (matchedOffer.catalog && matchedOffer.catalog.primary_buy_price) || null;
     var weightKg = parseNumber(matchedOffer.catalog && matchedOffer.catalog.weight_kg, 0).toFixed(3);
     var volumeM3 = parseNumber(matchedOffer.catalog && matchedOffer.catalog.volume_m3, 0).toFixed(3);
-
-    var html = '<div class="frontcalc-price-main">';
-    html += primaryBuyPrice
-      ? '<div class="frontcalc-price-value">' + escapeHtml(primaryBuyPrice.formatted || (primaryBuyPrice.price + " " + primaryBuyPrice.currency)) + "</div>"
-      : '<div class="frontcalc-price-value">Цена не найдена</div>';
-    html += '<div class="frontcalc-price-offer">ТП: ' + escapeHtml(matchedOffer.name || matchedOffer.id) + "</div>";
-    html += "</div>";
-    if (pricesView.length) {
-      html += '<div class="frontcalc-price-offer">';
-      html += "Доступные цены для просмотра:";
-      html += '<ul style="margin:6px 0 0 16px;">';
-      pricesView.forEach(function (priceRow) {
-        var label = escapeHtml(priceRow.catalog_group_name || ("Тип цены #" + priceRow.catalog_group_id));
-        var value = escapeHtml(priceRow.formatted || (priceRow.price + " " + priceRow.currency));
-        html += "<li>" + label + ": " + value + "</li>";
-      });
-      html += "</ul></div>";
-    }
-    html += '<div class="frontcalc-price-meta">Вес: ' + weightKg + ' кг · Объём: ' + volumeM3 + " м³</div>";
+    var html = "<div class=\"frontcalc-price-main\">";
+    html += primaryBuyPrice ? "<div class=\"frontcalc-price-value\">" + escapeHtml(primaryBuyPrice.formatted || (primaryBuyPrice.price + " " + primaryBuyPrice.currency)) + "</div>" : "<div class=\"frontcalc-price-value\">Цена не найдена</div>";
+    html += "<div class=\"frontcalc-price-meta\">Вес: " + weightKg + " кг · Объём: " + volumeM3 + " м³</div></div>";
     $block.html(html);
   }
 
@@ -579,6 +562,7 @@
     var customByProperty = {};
 
     var controlsByCode = {};
+    var volumeCode = "CALC_PROP_VOLUME";
 
     function pickDefaultOfferBySort(offersList, codes) {
       if (!Array.isArray(offersList) || !offersList.length) return null;
@@ -814,8 +798,44 @@
       });
 
       var matched = pickMatchedOffer(offers, selectedByProperty, customByProperty);
-      renderPriceBlock($priceInner, matched);
+      if (presetsByCode[volumeCode] && presetsByCode[volumeCode].length) {
+        renderPriceTable($priceInner, offers, presetsByCode, selectedByProperty, volumeCode);
+      } else {
+        renderPriceBlock($priceInner, matched);
+      }
     }
+
+
+    $price.on("click", ".frontcalc-table-row .frontcalc-cell", function () {
+      var $cell = $(this);
+      var $row = $cell.closest('.frontcalc-table-row');
+      var xmlId = String($row.attr('data-xml-id') || '');
+      if (!xmlId) return;
+      selectedByProperty[volumeCode] = xmlId;
+      customByProperty[volumeCode] = false;
+      updatePrice();
+    });
+
+    $price.on("click", ".frontcalc-volume-btn", function () {
+      var step = parseNumber($(this).attr('data-step'), 0);
+      var list = presetsByCode[volumeCode] || [];
+      var current = String(selectedByProperty[volumeCode] || '');
+      var idx = list.findIndex(function (p) { return String(p.xml_id) === current; });
+      if (idx < 0) idx = 0;
+      idx = clamp(idx + step, 0, Math.max(0, list.length - 1));
+      if (list[idx]) selectedByProperty[volumeCode] = String(list[idx].xml_id || '');
+      updatePrice();
+    });
+
+    $price.on("change", ".frontcalc-table-input", function () {
+      var raw = normalizeValueToken($(this).val());
+      var list = presetsByCode[volumeCode] || [];
+      var preset = findPresetByInputValue(list, raw);
+      if (preset) {
+        selectedByProperty[volumeCode] = String(preset.xml_id || '');
+      }
+      updatePrice();
+    });
 
     $layout.append($selectors, $price);
     $content.html($layout);
