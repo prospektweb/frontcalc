@@ -259,6 +259,13 @@ class prospektweb_frontcalc extends CModule
             '\\Prospektweb\\Frontcalc\\Admin\\ProductCardButton',
             'onAdminContextMenuShow'
         );
+        EventManager::getInstance()->registerEventHandlerCompatible(
+            'main',
+            'OnEpilog',
+            $this->MODULE_ID,
+            '\\Prospektweb\\Frontcalc\\Service\\FrontendAssets',
+            'onEpilog'
+        );
     }
 
     protected function unregisterAdminHandlers()
@@ -269,6 +276,13 @@ class prospektweb_frontcalc extends CModule
             $this->MODULE_ID,
             '\\Prospektweb\\Frontcalc\\Admin\\ProductCardButton',
             'onAdminContextMenuShow'
+        );
+        EventManager::getInstance()->unRegisterEventHandler(
+            'main',
+            'OnEpilog',
+            $this->MODULE_ID,
+            '\\Prospektweb\\Frontcalc\\Service\\FrontendAssets',
+            'onEpilog'
         );
     }
 
@@ -448,6 +462,46 @@ class prospektweb_frontcalc extends CModule
             throw new \RuntimeException('Не удалось скопировать lib/Service/CalculatorAvailability.php в /local/modules');
         }
 
+        $moduleConfigSource = dirname(__DIR__) . '/lib/Service/ModuleConfig.php';
+        $moduleConfigTarget = $moduleRootPath . '/lib/Service/ModuleConfig.php';
+        if (!is_file($moduleConfigSource)) {
+            throw new \RuntimeException('Не найден исходный файл lib/Service/ModuleConfig.php');
+        }
+        if (!@copy($moduleConfigSource, $moduleConfigTarget)) {
+            throw new \RuntimeException('Не удалось скопировать lib/Service/ModuleConfig.php в /local/modules');
+        }
+
+        $moduleFrontendAssetsSource = dirname(__DIR__) . '/lib/Service/FrontendAssets.php';
+        $moduleFrontendAssetsTarget = $moduleRootPath . '/lib/Service/FrontendAssets.php';
+        if (!is_file($moduleFrontendAssetsSource)) {
+            throw new \RuntimeException('Не найден исходный файл lib/Service/FrontendAssets.php');
+        }
+        if (!@copy($moduleFrontendAssetsSource, $moduleFrontendAssetsTarget)) {
+            throw new \RuntimeException('Не удалось скопировать lib/Service/FrontendAssets.php в /local/modules');
+        }
+
+        $moduleHideJsSource = dirname(__DIR__) . '/assets/js/hide-technical-values.js';
+        $moduleHideJsTarget = $moduleRootPath . '/assets/js/hide-technical-values.js';
+        if (!is_file($moduleHideJsSource)) {
+            throw new \RuntimeException('Не найден исходный файл assets/js/hide-technical-values.js');
+        }
+        if (!@copy($moduleHideJsSource, $moduleHideJsTarget)) {
+            throw new \RuntimeException('Не удалось скопировать hide-technical-values.js в /local/modules');
+        }
+
+        $moduleHideCssSource = dirname(__DIR__) . '/assets/css/hide-technical-values.css';
+        $moduleHideCssTarget = $moduleRootPath . '/assets/css/hide-technical-values.css';
+        $moduleHideCssDir = dirname($moduleHideCssTarget);
+        if (!is_dir($moduleHideCssDir) && !@mkdir($moduleHideCssDir, 0775, true) && !is_dir($moduleHideCssDir)) {
+            throw new \RuntimeException('Не удалось создать каталог /local/modules/.../assets/css');
+        }
+        if (!is_file($moduleHideCssSource)) {
+            throw new \RuntimeException('Не найден исходный файл assets/css/hide-technical-values.css');
+        }
+        if (!@copy($moduleHideCssSource, $moduleHideCssTarget)) {
+            throw new \RuntimeException('Не удалось скопировать hide-technical-values.css в /local/modules');
+        }
+
         return true;
     }
 
@@ -493,10 +547,29 @@ class prospektweb_frontcalc extends CModule
         if (is_file($moduleCalculatorAvailabilityTarget)) {
             @unlink($moduleCalculatorAvailabilityTarget);
         }
+        $moduleConfigTarget = $moduleRootPath . '/lib/Service/ModuleConfig.php';
+        if (is_file($moduleConfigTarget)) {
+            @unlink($moduleConfigTarget);
+        }
+        $moduleFrontendAssetsTarget = $moduleRootPath . '/lib/Service/FrontendAssets.php';
+        if (is_file($moduleFrontendAssetsTarget)) {
+            @unlink($moduleFrontendAssetsTarget);
+        }
+        $moduleHideJsTarget = $moduleRootPath . '/assets/js/hide-technical-values.js';
+        if (is_file($moduleHideJsTarget)) {
+            @unlink($moduleHideJsTarget);
+        }
+        $moduleHideCssTarget = $moduleRootPath . '/assets/css/hide-technical-values.css';
+        if (is_file($moduleHideCssTarget)) {
+            @unlink($moduleHideCssTarget);
+        }
 
         @rmdir($moduleRootPath . '/admin');
         @rmdir($moduleRootPath . '/lib/Admin');
         @rmdir($moduleRootPath . '/lib/Service');
+        @rmdir($moduleRootPath . '/assets/css');
+        @rmdir($moduleRootPath . '/assets/js');
+        @rmdir($moduleRootPath . '/assets');
         @rmdir($moduleRootPath . '/lib');
 
         return true;
