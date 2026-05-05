@@ -491,7 +491,7 @@
     return pricesView[2] || pricesView[1] || strictPrice;
   }
 
-  function renderPriceTable($block, offers, presetsByCode, selectedByProperty, volumeCode) {
+  function renderPriceTable($block, offers, presetsByCode, selectedByProperty, volumeCode, customVolumeValue) {
     var volumePresets = (presetsByCode[volumeCode] || []).slice();
     if (!volumePresets.length) {
       $block.html('<div class="frontcalc-price-empty">Нет значений тиража для таблицы.</div>');
@@ -500,7 +500,32 @@
 
     var tooltip =
       "Примерный вес и объём тиража. Внимание! Исполнитель выполняет фасовку в соответствии с собственными соображениями оптимального хранения/логистики продукции.";
-    var selectedXml = String(selectedByProperty[volumeCode] || volumePresets[0].xml_id || "");
+    var numericPresets = volumePresets
+      .map(function (preset) {
+        return {
+          xml_id: String(preset.xml_id || ""),
+          value: String(preset.value || preset.xml_id || ""),
+          num: parseNumber(preset.xml_id, Number.NaN),
+          isCustom: false,
+        };
+      })
+      .filter(function (row) {
+        return Number.isFinite(row.num);
+      })
+      .sort(function (a, b) {
+        return a.num - b.num;
+      });
+    var minPreset = numericPresets.length ? numericPresets[0].num : Number.NaN;
+    var maxPreset = numericPresets.length ? numericPresets[numericPresets.length - 1].num : Number.NaN;
+    var merged = numericPresets.slice();
+    if (Number.isFinite(customVolumeValue)) {
+      var clamped = clamp(customVolumeValue, minPreset, maxPreset);
+      if (!merged.some(function (row) { return row.num === clamped; })) {
+        merged.push({ xml_id: String(clamped), value: String(clamped), num: clamped, isCustom: true });
+      }
+    }
+    merged.sort(function (a, b) { return a.num - b.num; });
+    var selectedXml = String(selectedByProperty[volumeCode] || (merged[0] && merged[0].xml_id) || "");
 
     var html = '<div class="frontcalc-volume-input">';
     html +=
@@ -514,7 +539,7 @@
       '<div class="frontcalc-table-head"><div>Тираж</div><div>Строгий <span class="frontcalc-tip" title="Отгрузка в соответствии с согласованным сроком"><svg width="17" height="16"><use xlink:href="/bitrix/templates/aspro-premier/images/svg/catalog/item_order_icons.svg?1774850114#attention-16-16"></use></svg></span></div><div>Гибкий <span class="frontcalc-tip" title="Срок отгрузки может быть изменен (не больше 10 рабочих дней)"><svg width="17" height="16"><use xlink:href="/bitrix/templates/aspro-premier/images/svg/catalog/item_order_icons.svg?1774850114#attention-16-16"></use></svg></span></div></div>';
     html += '<div class="frontcalc-table-body">';
 
-    volumePresets.forEach(function (preset, index) {
+    merged.forEach(function (preset, index) {
       var xml = String(preset.xml_id || "");
       var draftSel = Object.assign({}, selectedByProperty);
       draftSel[volumeCode] = xml;
@@ -536,7 +561,7 @@
         escapeHtml(xml) +
         '">';
       html +=
-        '<button type="button" class="frontcalc-cell frontcalc-cell--volume"><span class="frontcalc-cell-main">' +
+        '<button type="button" class="frontcalc-cell frontcalc-cell--volume"><span class="frontcalc-cell-main" title="' + escapeHtml(String(preset.value || xml)) + '">' +
         escapeHtml(String(preset.value || xml)) +
         '</span><span class="frontcalc-cell-sub" title="' +
         escapeHtml(tooltip) +
@@ -660,6 +685,8 @@
 
     var controlsByCode = {};
     var volumeCode = "CALC_PROP_VOLUME";
+    var customVolumeValue = Number.NaN;
+    var volumeStep = Math.max(1, parseNumber(fieldByCode[volumeCode] && fieldByCode[volumeCode].step, 1));
 
     function pickDefaultOfferBySort(offersList, codes) {
       if (!Array.isArray(offersList) || !offersList.length) return null;
@@ -695,6 +722,9 @@
       defaultOffer = pickDefaultOfferBySort(offers, allCodes);
     }
     allCodes.forEach(function (code) {
+      if (code === volumeCode) {
+        return;
+      }
       var presets = Array.isArray(presetsByCode[code]) ? presetsByCode[code] : [];
       var defaultXmlId = "";
       if (defaultOffer && defaultOffer.properties && defaultOffer.properties[code]) {
@@ -896,7 +926,7 @@
 
       var matched = pickMatchedOffer(offers, selectedByProperty, customByProperty);
       if (presetsByCode[volumeCode] && presetsByCode[volumeCode].length) {
-        renderPriceTable($priceInner, offers, presetsByCode, selectedByProperty, volumeCode);
+        renderPriceTable($priceInner, offers, presetsByCode, selectedByProperty, volumeCode, customVolumeValue);
       } else {
         renderPriceBlock($priceInner, matched);
       }
@@ -911,6 +941,7 @@
       $price.find(".frontcalc-cell.is-picked").removeClass("is-picked");
       $cell.addClass("is-picked");
       selectedByProperty[volumeCode] = xmlId;
+      customVolumeValue = Number.NaN;
       customByProperty[volumeCode] = false;
       updatePrice();
     });
@@ -930,13 +961,15 @@
     });
 
     $price.on("click", ".frontcalc-volume-btn", function () {
-      var step = parseNumber($(this).attr('data-step'), 0);
-      var list = presetsByCode[volumeCode] || [];
-      var current = String(selectedByProperty[volumeCode] || '');
-      var idx = list.findIndex(function (p) { return String(p.xml_id) === current; });
-      if (idx < 0) idx = 0;
-      idx = clamp(idx + step, 0, Math.max(0, list.length - 1));
-      if (list[idx]) selectedByProperty[volumeCode] = String(list[idx].xml_id || '');
+      var direction = parseNumber($(this).attr('data-step'), 0);
+      var list = (presetsByCode[volumeCode] || []).map(function (p) { return parseNumber(p.xml_id, Number.NaN); }).filter(Number.isFinite).sort(function(a,b){return a-b;});
+      if (!list.length) return;
+      var minV = list[0];
+      var maxV = list[list.length - 1];
+      var current = parseNumber(selectedByProperty[volumeCode], minV);
+      var next = clamp(current + direction * volumeStep, minV, maxV);
+      customVolumeValue = next;
+      selectedByProperty[volumeCode] = String(next);
       updatePrice();
     });
 
@@ -946,6 +979,14 @@
       var preset = findPresetByInputValue(list, raw);
       if (preset) {
         selectedByProperty[volumeCode] = String(preset.xml_id || '');
+        customVolumeValue = Number.NaN;
+      } else {
+        var presetNums = list.map(function (p) { return parseNumber(p.xml_id, Number.NaN); }).filter(Number.isFinite).sort(function(a,b){return a-b;});
+        if (!presetNums.length) return;
+        var val = parseNumber(raw, presetNums[0]);
+        val = normalizeToStep(clamp(val, presetNums[0], presetNums[presetNums.length - 1]), presetNums[0], volumeStep);
+        customVolumeValue = val;
+        selectedByProperty[volumeCode] = String(val);
       }
       updatePrice();
     });
