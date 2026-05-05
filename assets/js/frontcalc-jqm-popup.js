@@ -501,16 +501,6 @@
     var tooltip =
       "Примерный вес и объём тиража. Внимание! Исполнитель выполняет фасовку в соответствии с собственными соображениями оптимального хранения/логистики продукции.";
     var selectedXml = String(selectedByProperty[volumeCode] || volumePresets[0].xml_id || "");
-    var selectedIndex = Math.max(
-      0,
-      volumePresets.findIndex(function (p) {
-        return String(p.xml_id) === selectedXml;
-      })
-    );
-    var start = Math.max(0, selectedIndex - 2);
-    var maxStart = Math.max(0, volumePresets.length - 5);
-    if (start > maxStart) start = maxStart;
-    var visible = volumePresets.slice(start, start + 5);
 
     var html = '<div class="frontcalc-volume-input">';
     html +=
@@ -524,7 +514,7 @@
       '<div class="frontcalc-table-head"><div>Тираж</div><div>Строгий <span class="frontcalc-tip" title="Отгрузка в соответствии с согласованным сроком"><svg width="17" height="16"><use xlink:href="/bitrix/templates/aspro-premier/images/svg/catalog/item_order_icons.svg?1774850114#attention-16-16"></use></svg></span></div><div>Гибкий <span class="frontcalc-tip" title="Срок отгрузки может быть изменен (не больше 10 рабочих дней)"><svg width="17" height="16"><use xlink:href="/bitrix/templates/aspro-premier/images/svg/catalog/item_order_icons.svg?1774850114#attention-16-16"></use></svg></span></div></div>';
     html += '<div class="frontcalc-table-body">';
 
-    visible.forEach(function (preset) {
+    volumePresets.forEach(function (preset, index) {
       var xml = String(preset.xml_id || "");
       var draftSel = Object.assign({}, selectedByProperty);
       draftSel[volumeCode] = xml;
@@ -538,7 +528,13 @@
       var volumeM3 = parseNumber(offer && offer.catalog && offer.catalog.volume_m3, 0).toFixed(3);
 
       html +=
-        '<div class="frontcalc-table-row' + (xml === selectedXml ? " is-selected" : "") + '" data-xml-id="' + escapeHtml(xml) + '">';
+        '<div class="frontcalc-table-row' +
+        (xml === selectedXml ? " is-selected" : "") +
+        '" data-row-index="' +
+        index +
+        '" data-xml-id="' +
+        escapeHtml(xml) +
+        '">';
       html +=
         '<button type="button" class="frontcalc-cell frontcalc-cell--volume"><span class="frontcalc-cell-main">' +
         escapeHtml(String(preset.value || xml)) +
@@ -565,6 +561,21 @@
     });
     html += "</div>";
     $block.html(html);
+
+    var $body = $block.find(".frontcalc-table-body");
+    var $selectedRow = $body.find('.frontcalc-table-row[data-xml-id="' + selectedXml + '"]');
+    if ($selectedRow.length) {
+      var rowH = $selectedRow.outerHeight(true) || 1;
+      var selectedIndex = parseNumber($selectedRow.attr("data-row-index"), 0);
+      var targetIndex = selectedIndex - 2;
+      if (targetIndex >= 0) {
+        var targetScroll = targetIndex * rowH;
+        var maxScroll = Math.max(0, $body.prop("scrollHeight") - $body.innerHeight());
+        if (targetScroll <= maxScroll) {
+          $body.scrollTop(targetScroll);
+        }
+      }
+    }
   }
 
   function renderPriceBlock($block, matchedOffer) {
@@ -897,9 +908,25 @@
       var $row = $cell.closest('.frontcalc-table-row');
       var xmlId = String($row.attr('data-xml-id') || '');
       if (!xmlId) return;
+      $price.find(".frontcalc-cell.is-picked").removeClass("is-picked");
+      $cell.addClass("is-picked");
       selectedByProperty[volumeCode] = xmlId;
       customByProperty[volumeCode] = false;
       updatePrice();
+    });
+
+    $price.on("mouseenter", ".frontcalc-table-row .frontcalc-cell", function () {
+      var $cell = $(this);
+      var colIndex = $cell.index();
+      var $row = $cell.closest(".frontcalc-table-row");
+      $price.find(".is-hover-row,.is-hover-col").removeClass("is-hover-row is-hover-col");
+      $row.children(".frontcalc-cell").addClass("is-hover-row");
+      $price.find(".frontcalc-table-row").each(function () {
+        $(this).children(".frontcalc-cell").eq(colIndex).addClass("is-hover-col");
+      });
+    });
+    $price.on("mouseleave", ".frontcalc-table-row .frontcalc-cell", function () {
+      $price.find(".is-hover-row,.is-hover-col").removeClass("is-hover-row is-hover-col");
     });
 
     $price.on("click", ".frontcalc-volume-btn", function () {
