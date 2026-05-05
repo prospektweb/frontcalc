@@ -63,6 +63,7 @@ if ($offersIblockId > 0) {
                 continue;
             }
             $enumValues[] = [
+                'ID' => (int)$enum['ID'],
                 'XML_ID' => (string)$enum['XML_ID'],
                 'VALUE' => (string)$enum['VALUE'],
             ];
@@ -80,6 +81,7 @@ if ($offersIblockId > 0) {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && check_bitrix_sessid() && $elementId > 0 && $iblockId > 0 && $propertyCode !== '') {
     $schema = trim((string)($_POST['CALC_EDITOR_SCHEMA'] ?? ''));
+    Option::set($moduleId, 'HIDDEN_OFFER_VALUE_IDS', trim((string)($_POST['HIDDEN_OFFER_VALUE_IDS'] ?? '')));
 
     CIBlockElement::SetPropertyValuesEx($elementId, $iblockId, [
         $propertyCode => [
@@ -145,6 +147,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
     <h2 style="margin-top:0;">Настроить калькулятор</h2>
     <p>Элемент ID: <b><?= (int)$elementId ?></b>, инфоблок: <b><?= (int)$iblockId ?></b>, товары: <b><?= (int)$productsIblockId ?></b>, ТП: <b><?= (int)$offersIblockId ?></b>, свойство: <b><?= htmlspecialcharsbx($propertyCode) ?></b></p>
 
+
     <div class="fc-toolbar">
         <select id="fc-add-property" class="fc-select" style="min-width: 280px; max-width: 420px;">
             <option value="">Выберите свойство для добавления…</option>
@@ -174,6 +177,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
                 'unit' => '',
             ]];
             $hiddenXml = (isset($field['hidden_preset_xml_ids']) && is_array($field['hidden_preset_xml_ids'])) ? $field['hidden_preset_xml_ids'] : [];
+            $technicalValueIds = (isset($field['technical_value_ids']) && is_array($field['technical_value_ids'])) ? $field['technical_value_ids'] : [];
             ?>
             <div class="fc-card<?= $index === 0 ? ' open' : '' ?>" data-prop-code="<?= htmlspecialcharsbx($code) ?>">
                 <button type="button" class="fc-card-head js-fc-toggle">
@@ -216,6 +220,13 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
                     <select class="fc-select js-hidden-presets" multiple size="5" style="height:auto; min-height:120px;">
                         <?php foreach ($prop['ENUMS'] as $enum): ?>
                             <option value="<?= htmlspecialcharsbx($enum['XML_ID']) ?>"<?= in_array($enum['XML_ID'], $hiddenXml, true) ? ' selected' : '' ?>><?= htmlspecialcharsbx($enum['VALUE']) ?> [<?= htmlspecialcharsbx($enum['XML_ID']) ?>]</option>
+                        <?php endforeach; ?>
+                    </select>
+
+                    <div class="fc-subtitle">Технические варианты (скрыть на фронте)</div>
+                    <select class="fc-select js-technical-values" multiple size="5" style="height:auto; min-height:120px;">
+                        <?php foreach ($prop['ENUMS'] as $enum): ?>
+                            <option value="<?= (int)$enum['ID'] ?>"<?= in_array((int)$enum['ID'], array_map('intval', $technicalValueIds), true) ? ' selected' : '' ?>><?= htmlspecialcharsbx($enum['VALUE']) ?> [ID: <?= (int)$enum['ID'] ?>]</option>
                         <?php endforeach; ?>
                     </select>
 
@@ -286,6 +297,11 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
     function renderEnumOptions(prop){
         const enums = Array.isArray(prop.ENUMS) ? prop.ENUMS : [];
         return enums.map(e => '<option value="' + escapeHtml(e.XML_ID) + '">' + escapeHtml(e.VALUE) + ' [' + escapeHtml(e.XML_ID) + ']</option>').join('');
+    }
+
+    function renderTechnicalEnumOptions(prop){
+        const enums = Array.isArray(prop.ENUMS) ? prop.ENUMS : [];
+        return enums.map(e => '<option value="' + escapeHtml(e.ID) + '">' + escapeHtml(e.VALUE) + ' [ID: ' + escapeHtml(e.ID) + ']</option>').join('');
     }
 
     function createCard(propCode){
@@ -417,6 +433,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
                     unit: row.querySelector('.js-inp-unit').value || ''
                 }));
                 const hiddenPresetXmlIds = Array.from(card.querySelector('.js-hidden-presets').selectedOptions).map(opt => opt.value);
+                const technicalValueIds = Array.from(card.querySelector('.js-technical-values').selectedOptions).map(opt => parseInt(opt.value, 10)).filter(Boolean);
 
                 fields.push({
                     property_code: card.dataset.propCode || '',
@@ -427,10 +444,20 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
                     is_group: inputs.length > 1,
                     group_code: card.querySelector('.js-group-code').value || '',
                     group_delimiter: card.querySelector('.js-group-delimiter').value || 'x',
-                    hidden_preset_xml_ids: hiddenPresetXmlIds
+                    hidden_preset_xml_ids: hiddenPresetXmlIds,
+                    technical_value_ids: technicalValueIds
                 });
             });
 
+            const allTechnicalIds = Array.from(new Set(fields.reduce((acc, field) => acc.concat(field.technical_value_ids || []), []))).join(',');
+            let hiddenInput = form.querySelector('input[name="HIDDEN_OFFER_VALUE_IDS"]');
+            if (!hiddenInput) {
+                hiddenInput = document.createElement('input');
+                hiddenInput.type = 'hidden';
+                hiddenInput.name = 'HIDDEN_OFFER_VALUE_IDS';
+                form.appendChild(hiddenInput);
+            }
+            hiddenInput.value = allTechnicalIds;
             schemaInput.value = JSON.stringify({version: 1, fields: fields});
         });
     }
