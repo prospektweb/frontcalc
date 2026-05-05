@@ -25,6 +25,7 @@ $propertyCode = (string)Option::get($moduleId, 'CALC_PROPERTY_CODE', 'FRONTCALC_
 
 $productsIblockId = (int)Option::get($moduleId, 'PRODUCTS_IBLOCK_ID', '0');
 $offersIblockId = (int)Option::get($moduleId, 'OFFERS_IBLOCK_ID', '0');
+$hiddenOfferValueIds = (string)Option::get($moduleId, 'HIDDEN_OFFER_VALUE_IDS', '');
 
 $schema = '';
 $propertyRes = CIBlockProperty::GetList([], ['IBLOCK_ID' => $iblockId, 'CODE' => $propertyCode]);
