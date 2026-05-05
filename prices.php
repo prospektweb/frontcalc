@@ -1000,8 +1000,6 @@ class Prices
         }
 
         $prop = $props['CALC_PROP_VOLUME'];
-
-        // Bitrix-style приоритет отображаемого значения
         $value = $prop['DISPLAY_VALUE'] ?? $prop['~VALUE'] ?? $prop['VALUE'] ?? null;
 
         if (is_array($value)) {
@@ -1013,41 +1011,42 @@ class Prices
         return $value !== '' ? $value : null;
     }
 
-    protected function getPlanMetaByIndex(int $index, int $from = 0, int $to = 0): array
+    protected function formatRepeatCondition(int $from, int $to = 0): string
     {
-        // index: 0-based позиция диапазона
-        if ($index === 0) {
-            return [
-                'title' => 'Разовый тираж',
-                'hint' => 'Повтор заказа не планируется',
-            ];
+        if ($from <= 1) {
+            return '1 тираж';
         }
 
-        if ($index === 1) {
-            return [
-                'title' => 'Повторный тираж',
-                'hint' => 'Планируется разовый повтор',
-            ];
+        return 'от '.$from.' тиражей';
+    }
+
+    protected function formatPriceExt($value, ?string $currency): string
+    {
+        if ($value === null || $value === '' || !$currency) {
+            return '—';
         }
 
-        if ($index === 2) {
-            return [
-                'title' => 'Регулярный тираж',
-                'hint' => 'Планируется несколько повторов',
-            ];
-        }
+        return \CCurrencyLang::CurrencyFormat((float)$value, $currency, true);
+    }
 
-        if ($to > 0) {
-            return [
-                'title' => 'От '.$from.' до '.$to,
-                'hint' => '',
-            ];
-        }
+    protected function getMatrixUnitPrice(array $cell)
+    {
+        return $cell['DISCOUNT_PRICE'] ?? $cell['PRICE'] ?? null;
+    }
 
-        return [
-            'title' => 'От '.$from,
-            'hint' => '',
-        ];
+    protected function getItemUnitPrice(array $price)
+    {
+        return $price['PRICE'] ?? $price['DISCOUNT_VALUE'] ?? $price['BASE_PRICE'] ?? $price['VALUE'] ?? null;
+    }
+
+    protected function getSimpleUnitPrice(array $price)
+    {
+        return $price['DISCOUNT_VALUE'] ?? $price['VALUE'] ?? null;
+    }
+
+    protected function getCustomUnitPrice(array $price)
+    {
+        return $price['DISCOUNT_VALUE'] ?? $price['VALUE'] ?? null;
     }
 
     public function captureTable(): string
@@ -1058,94 +1057,182 @@ class Prices
             return $html;
         }
 
-        $prices = $this->getMatrixPrices();
-        if (!$prices || empty($prices['ROWS']) || empty($prices['COLS']) || empty($prices['MATRIX'])) {
-            return $html;
-        }
-
-        $colKeys = array_keys($prices['COLS'] ?? []);
-        $volumeValue = $this->getCalcPropVolumeValue();
-
         ob_start();
         ?>
-        <div class="prices-popup-ext">
-            <?php if ($volumeValue !== null): ?>
-                <div class="prices-popup-ext__volume">
-                    Тираж <span class="prices-popup-ext__volume-val"><?=htmlspecialcharsbx($volumeValue);?></span> экз.
+        <div
+            class="prices-popup-ext"
+            data-current-price-type="<?=htmlspecialcharsbx((string)($this->currentPrice['PRICE_TYPE_ID'] ?? ''));?>"
+        >
+            <?php
+            $matrixData = $this->getMatrixPrices();
+            $cols = $matrixData['COLS'] ?? [];
+            $rows = $matrixData['ROWS'] ?? [];
+            $matrix = $matrixData['MATRIX'] ?? [];
+            ?>
+
+            <?php if ($cols && $rows && $matrix): ?>
+
+                <div class="prices-popup-ext__tabs">
+                    <?php foreach ($cols as $colKey => $col): ?>
+                        <?php
+                        $priceTypeName = $col['NAME_LANG'] ?? $col['NAME'] ?? ('Тип цены #'.$colKey);
+
+                        $hintText = '';
+                        if (mb_stripos($priceTypeName, 'Корпоратив') !== false) {
+                            $hintText = 'Цены для авторизованных пользователей';
+                        } elseif (mb_stripos($priceTypeName, 'Контракт') !== false) {
+                            $hintText = 'Цены для верифицированных пользователей';
+                        }
+                        ?>
+
+                        <button
+                            type="button"
+                            class="prices-popup-ext__tab"
+                            data-price-type="<?=htmlspecialcharsbx((string)$colKey);?>"
+                            data-price-hint="<?=htmlspecialcharsbx($hintText);?>"
+                        >
+                            <?=htmlspecialcharsbx($priceTypeName);?>
+                        </button>
+                    <?php endforeach; ?>
                 </div>
-            <?php endif; ?>
 
-            <?php foreach ($colKeys as $colKey): ?>
-                <?php
-                $colTitle = $prices['COLS'][$colKey]['NAME_LANG']
-                    ?? $prices['COLS'][$colKey]['NAME']
-                    ?? ('Тип цены #'.$colKey);
-                ?>
-                <div class="prices-popup-ext__block">
-                    <div class="prices-popup-ext__table-wrap">
-                        <table class="prices-popup-ext__table">
-                            <thead>
-                                <tr>
-                                    <th class="prices-popup-ext__th prices-popup-ext__th--single" colspan="2">
-                                        <?=htmlspecialcharsbx($colTitle);?>
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php
-                                $idx = 0;
-                                foreach ($prices['ROWS'] as $rowKey => $rowMeta):
-                                    $from = (int)($rowMeta['QUANTITY_FROM'] ?? 0);
-                                    $to = (int)($rowMeta['QUANTITY_TO'] ?? 0);
+                <div class="prices-popup-ext__table-wrap">
+                    <table class="prices-popup-ext__table prices-popup-ext__table--compact">
+                        <colgroup>
+                            <col style="width:38%">
+                            <col style="width:31%">
+                            <col style="width:31%">
+                        </colgroup>
 
-                                    $title = '';
-                                    $hint = '';
+                        <thead>
+                            <tr>
+                                <th class="prices-popup-ext__th prices-popup-ext__th--condition">Условие</th>
+                                <th class="prices-popup-ext__th prices-popup-ext__th--price">Цена за тираж</th>
+                                <th class="prices-popup-ext__th prices-popup-ext__th--sum">Сумма</th>
+                            </tr>
+                        </thead>
 
-                                    if ($idx === 0) {
-                                        $title = 'Разовый';
-                                        $hint = 'Если не планируете повтор';
-                                    } elseif ($idx === 1) {
-                                        $title = 'С повтором';
-                                        $hint = 'Если планируете 1 повтор';
-                                    } elseif ($idx === 2) {
-                                        $title = 'Регулярный';
-                                        $hint = 'Если планируете несколько повторов';
-                                    } else {
-                                        $title = $to > 0 ? ('От '.$from.' до '.$to) : ('От '.$from);
-                                        $hint = '';
-                                    }
-                                    $idx++;
+                        <tbody>
+                            <?php foreach ($cols as $colKey => $col): ?>
+                                <?php foreach ($rows as $rowKey => $rowMeta): ?>
+                                    <?php
+                                    $from = (int)($rowMeta['QUANTITY_FROM'] ?? 1);
+                                    $repeatCount = max(1, $from);
 
-                                    $cell = $prices['MATRIX'][$colKey][$rowKey] ?? null;
-                                ?>
-                                    <tr>
-                                        <td class="prices-popup-ext__cell prices-popup-ext__cell--plan">
-                                            <div title="<?=htmlspecialcharsbx($hint);?>" class="prices-popup-ext__plan-title"><?=htmlspecialcharsbx($title);?></div>
+                                    $cell = $matrix[$colKey][$rowKey] ?? null;
+                                    $unitValue = is_array($cell) ? $this->getMatrixUnitPrice($cell) : null;
+                                    $currency = is_array($cell) ? ($cell['CURRENCY'] ?? null) : null;
+                                    $sumValue = $unitValue !== null ? ((float)$unitValue * $repeatCount) : null;
+                                    ?>
+
+                                    <tr
+                                        class="prices-popup-ext__row"
+                                        data-price-type="<?=htmlspecialcharsbx((string)$colKey);?>"
+                                    >
+                                        <td class="prices-popup-ext__cell prices-popup-ext__cell--condition">
+                                            <?=htmlspecialcharsbx($this->formatRepeatCondition($from));?>
                                         </td>
-                                        <td class="prices-popup-ext__cell">
-                                            <?php
-                                            if (is_array($cell)) {
-                                                $value = $cell['DISCOUNT_PRICE'] ?? $cell['PRICE'] ?? null;
-                                                $currency = $cell['CURRENCY'] ?? null;
 
-                                                if ($value !== null && $currency) {
-                                                    echo \CCurrencyLang::CurrencyFormat((float)$value, $currency, true);
-                                                } else {
-                                                    echo '—';
-                                                }
-                                            } else {
-                                                echo '—';
-                                            }
-                                            ?>
+                                        <td class="prices-popup-ext__cell prices-popup-ext__cell--price">
+                                            <?=$this->formatPriceExt($unitValue, $currency);?>
+                                        </td>
+
+                                        <td class="prices-popup-ext__cell prices-popup-ext__cell--sum">
+                                            <?=$this->formatPriceExt($sumValue, $currency);?>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
                 </div>
-            <?php endforeach; ?>
+
+                <div class="prices-popup-ext__notice" style="display:none;">
+                    <span class="prices-popup-ext__notice-icon">
+                        <svg width="17" height="16">
+                            <use xlink:href="/bitrix/templates/aspro-premier/images/svg/catalog/item_order_icons.svg?1774850114#attention-16-16"></use>
+                        </svg>
+                    </span>
+                    <span class="prices-popup-ext__notice-text"></span>
+                </div>
+
+            <?php endif; ?>
         </div>
+
+        <script>
+        (function ($) {
+            if (!window.PricesPopupExt) {
+                window.PricesPopupExt = {};
+
+                window.PricesPopupExt.activate = function ($root, type) {
+                    type = String(type || '');
+
+                    var $tab = $root.find('.prices-popup-ext__tab[data-price-type="' + type + '"]');
+                    var hint = String($tab.attr('data-price-hint') || '');
+
+                    $root.find('.prices-popup-ext__tab').removeClass('is-active');
+                    $tab.addClass('is-active');
+
+                    $root.find('.prices-popup-ext__row').removeClass('is-active');
+                    $root.find('.prices-popup-ext__row[data-price-type="' + type + '"]').addClass('is-active');
+
+                    var $notice = $root.find('.prices-popup-ext__notice');
+                    var $noticeText = $root.find('.prices-popup-ext__notice-text');
+
+                    if (hint) {
+                        $noticeText.text(hint);
+                        $notice.show();
+                    } else {
+                        $noticeText.text('');
+                        $notice.hide();
+                    }
+                };
+
+                window.PricesPopupExt.detect = function ($root) {
+                    var currentType = String($root.attr('data-current-price-type') || '');
+
+                    if (
+                        currentType &&
+                        $root.find('.prices-popup-ext__tab[data-price-type="' + currentType + '"]').length
+                    ) {
+                        return currentType;
+                    }
+
+                    return $root.find('.prices-popup-ext__tab').first().attr('data-price-type');
+                };
+
+                window.PricesPopupExt.init = function () {
+                    $('.prices-popup-ext').each(function () {
+                        var $root = $(this);
+
+                        if (!$root.find('.prices-popup-ext__tab').length) {
+                            return;
+                        }
+
+                        window.PricesPopupExt.activate(
+                            $root,
+                            window.PricesPopupExt.detect($root)
+                        );
+                    });
+                };
+
+                $(document).on('click', '.prices-popup-ext__tab', function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    var $root = $(this).closest('.prices-popup-ext');
+                    window.PricesPopupExt.activate($root, $(this).attr('data-price-type'));
+                });
+
+                $(document).on('click', '.price__popup-toggle, .xpopover-toggle', function () {
+                    setTimeout(window.PricesPopupExt.init, 100);
+                });
+            }
+
+            window.PricesPopupExt.init();
+        })(jQuery);
+        </script>
+
         <?php
 
         return trim(ob_get_clean());
