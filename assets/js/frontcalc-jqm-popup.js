@@ -481,35 +481,115 @@
     return true;
   }
 
+  function formatMoneyRow(priceObj) {
+    if (!priceObj) return "—";
+    return String(priceObj.formatted || ((priceObj.price || 0) + " " + (priceObj.currency || "₽")));
+  }
+
+  function pickFlexiblePrice(pricesView, strictPrice) {
+    if (!Array.isArray(pricesView) || !pricesView.length) return strictPrice;
+    return pricesView[2] || pricesView[1] || strictPrice;
+  }
+
+  function renderPriceTable($block, offers, presetsByCode, selectedByProperty, volumeCode) {
+    var volumePresets = (presetsByCode[volumeCode] || []).slice();
+    if (!volumePresets.length) {
+      $block.html('<div class="frontcalc-price-empty">Нет значений тиража для таблицы.</div>');
+      return;
+    }
+
+    var tooltip =
+      "Примерный вес и объём тиража. Внимание! Исполнитель выполняет фасовку в соответствии с собственными соображениями оптимального хранения/логистики продукции.";
+    var selectedXml = String(selectedByProperty[volumeCode] || volumePresets[0].xml_id || "");
+
+    var html = '<div class="frontcalc-volume-input">';
+    html +=
+      '<input type="text" class="frontcalc-table-input" value="' +
+      escapeHtml(selectedXml) +
+      '" inputmode="numeric">';
+    html +=
+      '<div class="frontcalc-volume-btns"><button type="button" class="frontcalc-volume-btn" data-step="-1">−</button><button type="button" class="frontcalc-volume-btn" data-step="1">+</button></div>';
+    html += "</div>";
+    html +=
+      '<div class="frontcalc-table-head"><div>Тираж</div><div>Строгий <span class="frontcalc-tip" title="Отгрузка в соответствии с согласованным сроком"><svg width="17" height="16"><use xlink:href="/bitrix/templates/aspro-premier/images/svg/catalog/item_order_icons.svg?1774850114#attention-16-16"></use></svg></span></div><div>Гибкий <span class="frontcalc-tip" title="Срок отгрузки может быть изменен (не больше 10 рабочих дней)"><svg width="17" height="16"><use xlink:href="/bitrix/templates/aspro-premier/images/svg/catalog/item_order_icons.svg?1774850114#attention-16-16"></use></svg></span></div></div>';
+    html += '<div class="frontcalc-table-body">';
+
+    volumePresets.forEach(function (preset, index) {
+      var xml = String(preset.xml_id || "");
+      var draftSel = Object.assign({}, selectedByProperty);
+      draftSel[volumeCode] = xml;
+      var offer = pickMatchedOffer(offers, draftSel, {});
+      var strictPrice = offer && offer.catalog ? offer.catalog.primary_buy_price || null : null;
+      var strictNum = parseNumber(strictPrice && strictPrice.price, 0);
+      var qty = Math.max(1, parseNumber(xml, 1));
+      var flex = pickFlexiblePrice(offer && offer.catalog ? offer.catalog.prices_view : [], strictPrice);
+      var flexNum = parseNumber(flex && flex.price, strictNum);
+      var weightKg = parseNumber(offer && offer.catalog && offer.catalog.weight_kg, 0).toFixed(3);
+      var volumeM3 = parseNumber(offer && offer.catalog && offer.catalog.volume_m3, 0).toFixed(3);
+
+      html +=
+        '<div class="frontcalc-table-row' +
+        (xml === selectedXml ? " is-selected" : "") +
+        '" data-row-index="' +
+        index +
+        '" data-xml-id="' +
+        escapeHtml(xml) +
+        '">';
+      html +=
+        '<button type="button" class="frontcalc-cell frontcalc-cell--volume"><span class="frontcalc-cell-main">' +
+        escapeHtml(String(preset.value || xml)) +
+        '</span><span class="frontcalc-cell-sub" title="' +
+        escapeHtml(tooltip) +
+        '">' +
+        weightKg +
+        " кг · " +
+        volumeM3 +
+        " м³</span></button>";
+      html +=
+        '<button type="button" class="frontcalc-cell" data-col="strict"><span class="frontcalc-cell-main">' +
+        escapeHtml(formatMoneyRow(strictPrice)) +
+        '</span><span class="frontcalc-cell-sub">' +
+        escapeHtml((strictNum / qty).toFixed(2) + " ₽/экз") +
+        "</span></button>";
+      html +=
+        '<button type="button" class="frontcalc-cell" data-col="flex"><span class="frontcalc-cell-main">' +
+        escapeHtml(formatMoneyRow(flex)) +
+        '</span><span class="frontcalc-cell-sub">' +
+        escapeHtml((flexNum / qty).toFixed(2) + " ₽/экз") +
+        "</span></button>";
+      html += "</div>";
+    });
+    html += "</div>";
+    $block.html(html);
+
+    var $body = $block.find(".frontcalc-table-body");
+    var $selectedRow = $body.find('.frontcalc-table-row[data-xml-id="' + selectedXml + '"]');
+    if ($selectedRow.length) {
+      var rowH = $selectedRow.outerHeight(true) || 1;
+      var selectedIndex = parseNumber($selectedRow.attr("data-row-index"), 0);
+      var targetIndex = selectedIndex - 2;
+      if (targetIndex >= 0) {
+        var targetScroll = targetIndex * rowH;
+        var maxScroll = Math.max(0, $body.prop("scrollHeight") - $body.innerHeight());
+        if (targetScroll <= maxScroll) {
+          $body.scrollTop(targetScroll);
+        }
+      }
+    }
+  }
+
   function renderPriceBlock($block, matchedOffer) {
     if (!matchedOffer) {
       $block.html('<div class="frontcalc-price-empty">Для произвольных значений цена пока не рассчитывается.</div>');
       return;
     }
 
-    var pricesView = (matchedOffer.catalog && matchedOffer.catalog.prices_view) || [];
     var primaryBuyPrice = (matchedOffer.catalog && matchedOffer.catalog.primary_buy_price) || null;
     var weightKg = parseNumber(matchedOffer.catalog && matchedOffer.catalog.weight_kg, 0).toFixed(3);
     var volumeM3 = parseNumber(matchedOffer.catalog && matchedOffer.catalog.volume_m3, 0).toFixed(3);
-
-    var html = '<div class="frontcalc-price-main">';
-    html += primaryBuyPrice
-      ? '<div class="frontcalc-price-value">' + escapeHtml(primaryBuyPrice.formatted || (primaryBuyPrice.price + " " + primaryBuyPrice.currency)) + "</div>"
-      : '<div class="frontcalc-price-value">Цена не найдена</div>';
-    html += '<div class="frontcalc-price-offer">ТП: ' + escapeHtml(matchedOffer.name || matchedOffer.id) + "</div>";
-    html += "</div>";
-    if (pricesView.length) {
-      html += '<div class="frontcalc-price-offer">';
-      html += "Доступные цены для просмотра:";
-      html += '<ul style="margin:6px 0 0 16px;">';
-      pricesView.forEach(function (priceRow) {
-        var label = escapeHtml(priceRow.catalog_group_name || ("Тип цены #" + priceRow.catalog_group_id));
-        var value = escapeHtml(priceRow.formatted || (priceRow.price + " " + priceRow.currency));
-        html += "<li>" + label + ": " + value + "</li>";
-      });
-      html += "</ul></div>";
-    }
-    html += '<div class="frontcalc-price-meta">Вес: ' + weightKg + ' кг · Объём: ' + volumeM3 + " м³</div>";
+    var html = "<div class=\"frontcalc-price-main\">";
+    html += primaryBuyPrice ? "<div class=\"frontcalc-price-value\">" + escapeHtml(primaryBuyPrice.formatted || (primaryBuyPrice.price + " " + primaryBuyPrice.currency)) + "</div>" : "<div class=\"frontcalc-price-value\">Цена не найдена</div>";
+    html += "<div class=\"frontcalc-price-meta\">Вес: " + weightKg + " кг · Объём: " + volumeM3 + " м³</div></div>";
     $block.html(html);
   }
 
@@ -579,6 +659,7 @@
     var customByProperty = {};
 
     var controlsByCode = {};
+    var volumeCode = "CALC_PROP_VOLUME";
 
     function pickDefaultOfferBySort(offersList, codes) {
       if (!Array.isArray(offersList) || !offersList.length) return null;
@@ -814,8 +895,60 @@
       });
 
       var matched = pickMatchedOffer(offers, selectedByProperty, customByProperty);
-      renderPriceBlock($priceInner, matched);
+      if (presetsByCode[volumeCode] && presetsByCode[volumeCode].length) {
+        renderPriceTable($priceInner, offers, presetsByCode, selectedByProperty, volumeCode);
+      } else {
+        renderPriceBlock($priceInner, matched);
+      }
     }
+
+
+    $price.on("click", ".frontcalc-table-row .frontcalc-cell", function () {
+      var $cell = $(this);
+      var $row = $cell.closest('.frontcalc-table-row');
+      var xmlId = String($row.attr('data-xml-id') || '');
+      if (!xmlId) return;
+      $price.find(".frontcalc-cell.is-picked").removeClass("is-picked");
+      $cell.addClass("is-picked");
+      selectedByProperty[volumeCode] = xmlId;
+      customByProperty[volumeCode] = false;
+      updatePrice();
+    });
+
+    $price.on("mouseenter", ".frontcalc-table-row .frontcalc-cell", function () {
+      var $cell = $(this);
+      var colIndex = $cell.index();
+      var $row = $cell.closest(".frontcalc-table-row");
+      $price.find(".is-hover-row,.is-hover-col").removeClass("is-hover-row is-hover-col");
+      $row.children(".frontcalc-cell").addClass("is-hover-row");
+      $price.find(".frontcalc-table-row").each(function () {
+        $(this).children(".frontcalc-cell").eq(colIndex).addClass("is-hover-col");
+      });
+    });
+    $price.on("mouseleave", ".frontcalc-table-row .frontcalc-cell", function () {
+      $price.find(".is-hover-row,.is-hover-col").removeClass("is-hover-row is-hover-col");
+    });
+
+    $price.on("click", ".frontcalc-volume-btn", function () {
+      var step = parseNumber($(this).attr('data-step'), 0);
+      var list = presetsByCode[volumeCode] || [];
+      var current = String(selectedByProperty[volumeCode] || '');
+      var idx = list.findIndex(function (p) { return String(p.xml_id) === current; });
+      if (idx < 0) idx = 0;
+      idx = clamp(idx + step, 0, Math.max(0, list.length - 1));
+      if (list[idx]) selectedByProperty[volumeCode] = String(list[idx].xml_id || '');
+      updatePrice();
+    });
+
+    $price.on("change", ".frontcalc-table-input", function () {
+      var raw = normalizeValueToken($(this).val());
+      var list = presetsByCode[volumeCode] || [];
+      var preset = findPresetByInputValue(list, raw);
+      if (preset) {
+        selectedByProperty[volumeCode] = String(preset.xml_id || '');
+      }
+      updatePrice();
+    });
 
     $layout.append($selectors, $price);
     $content.html($layout);
