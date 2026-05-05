@@ -481,6 +481,92 @@
     return true;
   }
 
+  function formatMoneyRow(priceObj) {
+    if (!priceObj) return "—";
+    return String(priceObj.formatted || ((priceObj.price || 0) + " " + (priceObj.currency || "₽")));
+  }
+
+  function pickFlexiblePrice(pricesView, strictPrice) {
+    if (!Array.isArray(pricesView) || !pricesView.length) return strictPrice;
+    return pricesView[2] || pricesView[1] || strictPrice;
+  }
+
+  function renderPriceTable($block, offers, presetsByCode, selectedByProperty, volumeCode) {
+    var volumePresets = (presetsByCode[volumeCode] || []).slice();
+    if (!volumePresets.length) {
+      $block.html('<div class="frontcalc-price-empty">Нет значений тиража для таблицы.</div>');
+      return;
+    }
+
+    var tooltip =
+      "Примерный вес и объём тиража. Внимание! Исполнитель выполняет фасовку в соответствии с собственными соображениями оптимального хранения/логистики продукции.";
+    var selectedXml = String(selectedByProperty[volumeCode] || volumePresets[0].xml_id || "");
+    var selectedIndex = Math.max(
+      0,
+      volumePresets.findIndex(function (p) {
+        return String(p.xml_id) === selectedXml;
+      })
+    );
+    var start = Math.max(0, selectedIndex - 2);
+    var maxStart = Math.max(0, volumePresets.length - 5);
+    if (start > maxStart) start = maxStart;
+    var visible = volumePresets.slice(start, start + 5);
+
+    var html = '<div class="frontcalc-volume-input">';
+    html +=
+      '<input type="text" class="frontcalc-table-input" value="' +
+      escapeHtml(selectedXml) +
+      '" inputmode="numeric">';
+    html +=
+      '<div class="frontcalc-volume-btns"><button type="button" class="frontcalc-volume-btn" data-step="-1">−</button><button type="button" class="frontcalc-volume-btn" data-step="1">+</button></div>';
+    html += "</div>";
+    html +=
+      '<div class="frontcalc-table-head"><div>Тираж</div><div>Строгий <span class="frontcalc-tip" title="Отгрузка в соответствии с согласованным сроком"><svg width="17" height="16"><use xlink:href="/bitrix/templates/aspro-premier/images/svg/catalog/item_order_icons.svg?1774850114#attention-16-16"></use></svg></span></div><div>Гибкий <span class="frontcalc-tip" title="Срок отгрузки может быть изменен (не больше 10 рабочих дней)"><svg width="17" height="16"><use xlink:href="/bitrix/templates/aspro-premier/images/svg/catalog/item_order_icons.svg?1774850114#attention-16-16"></use></svg></span></div></div>';
+    html += '<div class="frontcalc-table-body">';
+
+    visible.forEach(function (preset) {
+      var xml = String(preset.xml_id || "");
+      var draftSel = Object.assign({}, selectedByProperty);
+      draftSel[volumeCode] = xml;
+      var offer = pickMatchedOffer(offers, draftSel, {});
+      var strictPrice = offer && offer.catalog ? offer.catalog.primary_buy_price || null : null;
+      var strictNum = parseNumber(strictPrice && strictPrice.price, 0);
+      var qty = Math.max(1, parseNumber(xml, 1));
+      var flex = pickFlexiblePrice(offer && offer.catalog ? offer.catalog.prices_view : [], strictPrice);
+      var flexNum = parseNumber(flex && flex.price, strictNum);
+      var weightKg = parseNumber(offer && offer.catalog && offer.catalog.weight_kg, 0).toFixed(3);
+      var volumeM3 = parseNumber(offer && offer.catalog && offer.catalog.volume_m3, 0).toFixed(3);
+
+      html +=
+        '<div class="frontcalc-table-row' + (xml === selectedXml ? " is-selected" : "") + '" data-xml-id="' + escapeHtml(xml) + '">';
+      html +=
+        '<button type="button" class="frontcalc-cell frontcalc-cell--volume"><span class="frontcalc-cell-main">' +
+        escapeHtml(String(preset.value || xml)) +
+        '</span><span class="frontcalc-cell-sub" title="' +
+        escapeHtml(tooltip) +
+        '">' +
+        weightKg +
+        " кг · " +
+        volumeM3 +
+        " м³</span></button>";
+      html +=
+        '<button type="button" class="frontcalc-cell" data-col="strict"><span class="frontcalc-cell-main">' +
+        escapeHtml(formatMoneyRow(strictPrice)) +
+        '</span><span class="frontcalc-cell-sub">' +
+        escapeHtml((strictNum / qty).toFixed(2) + " ₽/экз") +
+        "</span></button>";
+      html +=
+        '<button type="button" class="frontcalc-cell" data-col="flex"><span class="frontcalc-cell-main">' +
+        escapeHtml(formatMoneyRow(flex)) +
+        '</span><span class="frontcalc-cell-sub">' +
+        escapeHtml((flexNum / qty).toFixed(2) + " ₽/экз") +
+        "</span></button>";
+      html += "</div>";
+    });
+    html += "</div>";
+    $block.html(html);
+  }
+
   function renderPriceBlock($block, matchedOffer) {
     if (!matchedOffer) {
       $block.html('<div class="frontcalc-price-empty">Для произвольных значений цена пока не рассчитывается.</div>');
