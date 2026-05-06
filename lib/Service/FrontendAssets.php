@@ -17,6 +17,7 @@ class FrontendAssets
 
         $asset = Asset::getInstance();
         $asset->addCss('/local/modules/prospektweb.frontcalc/assets/css/hide-technical-values.css');
+        $asset->addCss('/local/modules/prospektweb.frontcalc/assets/css/prices-popup-ext.css');
         $asset->addJs('/local/modules/prospektweb.frontcalc/assets/js/hide-technical-values.js');
         $asset->addString('<script>window.myModuleHiddenValueIds=' . 
             \CUtil::PhpToJSObject(array_values($hiddenIds), false, true, true) . ';</script>', true);
