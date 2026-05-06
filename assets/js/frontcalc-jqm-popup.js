@@ -23,8 +23,10 @@
       ".frontcalc-layout{display:grid;grid-template-columns:minmax(0,2fr) minmax(320px,1fr);gap:20px;align-items:start;}",
       ".frontcalc-selectors{display:flex;flex-direction:column;gap:20px;}",
       ".frontcalc-price-panel__inner{position:sticky;top:12px;border:1px solid #d9dee7;border-radius:12px;background:#fafbff;padding:16px;}",
-      ".frontcalc-price-groups{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;}",
-      ".frontcalc-price-group-tag{display:inline-flex;align-items:center;min-height:28px;border:1px solid #d9dee7;border-radius:999px;background:#fff;padding:3px 10px;font-size:12px;font-weight:600;color:#2f3a52;}",
+      ".frontcalc-price-groups{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;}",
+      ".frontcalc-price-group{min-height:34px;padding:6px 12px;border:1px solid #d9dee7;border-radius:999px;background:#fff;color:#33405a;font-size:14px;line-height:1.2;cursor:pointer;}",
+      ".frontcalc-price-group:hover{border-color:#2f3a52;}",
+      ".frontcalc-price-group.is-active{border-color:#2f3a52;background:#101933;color:#fff;font-weight:600;}",
       ".frontcalc-volume-input{display:flex;gap:8px;align-items:center;margin-bottom:12px;}",
       ".frontcalc-table-input{width:120px;height:44px;border:1px solid #d9dee7;border-radius:10px;padding:0 12px;font-size:22px;font-weight:600;box-sizing:border-box;}",
       ".frontcalc-volume-btns{display:flex;gap:6px;}",
@@ -528,83 +530,83 @@
     return String(priceObj.formatted || ((priceObj.price || 0) + " " + (priceObj.currency || "₽")));
   }
 
-  function getRangeQuantityFrom(row) {
-    if (!row || row.quantity_from === null || typeof row.quantity_from === "undefined") return null;
-    var quantityFrom = parseNumber(row.quantity_from, Number.NaN);
-    return Number.isFinite(quantityFrom) ? quantityFrom : null;
+  function getOfferPriceRanges(offer) {
+    var catalog = offer && offer.catalog ? offer.catalog : {};
+    if (Array.isArray(catalog.price_ranges)) return catalog.price_ranges;
+    if (Array.isArray(catalog.prices_view_all)) return catalog.prices_view_all;
+    if (Array.isArray(catalog.prices)) return catalog.prices;
+    if (Array.isArray(catalog.prices_view)) return catalog.prices_view;
+    return [];
   }
 
-  function getRangeQuantityTo(row) {
-    if (!row || row.quantity_to === null || typeof row.quantity_to === "undefined") return null;
-    var quantityTo = parseNumber(row.quantity_to, Number.NaN);
-    return Number.isFinite(quantityTo) ? quantityTo : null;
+  function normalizeRangeBound(value, fallback) {
+    if (value === null || typeof value === "undefined" || value === "") return fallback;
+    var num = parseNumber(value, Number.NaN);
+    return Number.isFinite(num) ? num : fallback;
   }
 
-  function sortRangePrices(ranges) {
-    return (Array.isArray(ranges) ? ranges : []).slice().sort(function (a, b) {
-      var aFrom = getRangeQuantityFrom(a);
-      var bFrom = getRangeQuantityFrom(b);
-      var aOrder = aFrom === null ? Number.NEGATIVE_INFINITY : aFrom;
-      var bOrder = bFrom === null ? Number.NEGATIVE_INFINITY : bFrom;
-      if (aOrder !== bOrder) return aOrder - bOrder;
+  function sortPriceRanges(ranges) {
+    return (Array.isArray(ranges) ? ranges.slice() : []).sort(function (a, b) {
+      var fromA = normalizeRangeBound(a && a.quantity_from, 0);
+      var fromB = normalizeRangeBound(b && b.quantity_from, 0);
+      if (fromA !== fromB) return fromA - fromB;
 
-      var aTo = getRangeQuantityTo(a);
-      var bTo = getRangeQuantityTo(b);
-      var aToOrder = aTo === null ? Number.POSITIVE_INFINITY : aTo;
-      var bToOrder = bTo === null ? Number.POSITIVE_INFINITY : bTo;
-      if (aToOrder !== bToOrder) return aToOrder - bToOrder;
+      var toA = normalizeRangeBound(a && a.quantity_to, Number.POSITIVE_INFINITY);
+      var toB = normalizeRangeBound(b && b.quantity_to, Number.POSITIVE_INFINITY);
+      if (toA !== toB) return toA - toB;
 
       return parseNumber(a && a.price, 0) - parseNumber(b && b.price, 0);
     });
   }
 
-  function getStrictRangePrice(ranges) {
-    var sorted = sortRangePrices(ranges);
-    if (!sorted.length) return null;
+  function getRangesByCatalogGroup(offer, catalogGroupId) {
+    var groupId = parseNumber(catalogGroupId, Number.NaN);
+    if (!Number.isFinite(groupId)) return [];
+    return sortPriceRanges(getOfferPriceRanges(offer).filter(function (row) {
+      return parseNumber(row && row.catalog_group_id, Number.NaN) === groupId;
+    }));
+  }
 
-    var firstUpper = null;
+  function pickStrictRangePrice(ranges) {
+    var sorted = sortPriceRanges(ranges);
     for (var i = 0; i < sorted.length; i++) {
-      var candidateTo = getRangeQuantityTo(sorted[i]);
-      if (candidateTo !== null) {
-        firstUpper = candidateTo;
-        break;
+      var from = normalizeRangeBound(sorted[i] && sorted[i].quantity_from, 0);
+      var to = normalizeRangeBound(sorted[i] && sorted[i].quantity_to, Number.POSITIVE_INFINITY);
+      if (from <= 1 && to >= 1) return sorted[i];
+    }
+    return sorted[0] || null;
+  }
+
+  function pickFlexibleRangePrice(ranges) {
+    var sorted = sortPriceRanges(ranges);
+    return sorted[sorted.length - 1] || null;
+  }
+
+  function collectAvailablePriceGroups(priceGroups, offers) {
+    var byId = {};
+    (Array.isArray(priceGroups) ? priceGroups : []).forEach(function (group) {
+      var id = parseNumber(group && group.id, Number.NaN);
+      if (Number.isFinite(id)) {
+        byId[id] = { id: id, name: String((group && group.name) || ("PRICE_" + id)) };
       }
-    }
-
-    for (var s = 0; s < sorted.length; s++) {
-      var quantityFrom = getRangeQuantityFrom(sorted[s]);
-      var quantityTo = getRangeQuantityTo(sorted[s]);
-      var fromMatches = quantityFrom === null || quantityFrom === 0 || quantityFrom === 1;
-      var toMatches = quantityTo === 1 || (firstUpper !== null && quantityTo === firstUpper);
-      if (fromMatches && toMatches) return sorted[s];
-    }
-
-    return sorted[0];
-  }
-
-  function getFlexibleRangePrice(ranges) {
-    var sorted = sortRangePrices(ranges);
-    if (!sorted.length) return null;
-
-    for (var f = sorted.length - 1; f >= 0; f--) {
-      if (getRangeQuantityTo(sorted[f]) === null) return sorted[f];
-    }
-
-    return sorted[sorted.length - 1];
-  }
-
-  function pickFlexiblePrice(priceRanges, strictPrice) {
-    if (!Array.isArray(priceRanges) || !priceRanges.length) return strictPrice;
-
-    var selectedGroupId = parseNumber(strictPrice && strictPrice.catalog_group_id, Number.NaN);
-    if (!Number.isFinite(selectedGroupId)) return strictPrice;
-
-    var selectedGroupRanges = priceRanges.filter(function (row) {
-      return parseNumber(row && row.catalog_group_id, Number.NaN) === selectedGroupId;
     });
-    if (!selectedGroupRanges.length) return strictPrice;
 
-    return getFlexibleRangePrice(selectedGroupRanges) || getStrictRangePrice(selectedGroupRanges) || strictPrice;
+    (Array.isArray(offers) ? offers : []).forEach(function (offer) {
+      getOfferPriceRanges(offer).forEach(function (row) {
+        var id = parseNumber(row && row.catalog_group_id, Number.NaN);
+        if (!Number.isFinite(id) || byId[id]) return;
+        byId[id] = { id: id, name: String((row && row.catalog_group_name) || ("PRICE_" + id)) };
+      });
+    });
+
+    return Object.keys(byId)
+      .map(function (key) { return byId[key]; })
+      .filter(function (group) {
+        return (Array.isArray(offers) ? offers : []).some(function (offer) {
+          return getRangesByCatalogGroup(offer, group.id).length > 0;
+        });
+      })
+      .sort(function (a, b) { return a.id - b.id; });
   }
 
   function deriveStepFromPresets(presets) {
@@ -644,35 +646,7 @@
     return Number.NaN;
   }
 
-  function renderPriceGroupTags(priceGroupsView) {
-    var groups = (Array.isArray(priceGroupsView) ? priceGroupsView : [])
-      .filter(function (group) {
-        return group && parseNumber(group.id, 0) > 0 && String(group.name || "").trim() !== "";
-      })
-      .slice()
-      .sort(function (a, b) {
-        var sortA = parseNumber(a.sort, Number.POSITIVE_INFINITY);
-        var sortB = parseNumber(b.sort, Number.POSITIVE_INFINITY);
-        if (sortA !== sortB) return sortA - sortB;
-        return parseNumber(a.id, 0) - parseNumber(b.id, 0);
-      });
-
-    if (!groups.length) return "";
-
-    var html = '<div class="frontcalc-price-groups" aria-label="Доступные типы цен">';
-    groups.forEach(function (group) {
-      html +=
-        '<span class="frontcalc-price-group-tag" data-price-group-id="' +
-        escapeHtml(group.id) +
-        '">' +
-        escapeHtml(group.name) +
-        "</span>";
-    });
-    html += "</div>";
-    return html;
-  }
-
-  function renderPriceTable($block, offers, presetsByCode, selectedByProperty, volumeCode, customVolumeValue, priceGroupsView) {
+  function renderPriceTable($block, offers, presetsByCode, selectedByProperty, volumeCode, customVolumeValue, priceGroups, selectedCatalogGroupId) {
     var volumePresets = (presetsByCode[volumeCode] || []).slice();
     if (!volumePresets.length) {
       $block.html('<div class="frontcalc-price-empty">Нет значений тиража для таблицы.</div>');
@@ -708,7 +682,20 @@
     merged.sort(function (a, b) { return a.num - b.num; });
     var selectedXml = String(selectedByProperty[volumeCode] || (merged[0] && merged[0].xml_id) || "");
 
-    var html = renderPriceGroupTags(priceGroupsView);
+    var html = "";
+    if (Array.isArray(priceGroups) && priceGroups.length) {
+      html += '<div class="frontcalc-price-groups">';
+      priceGroups.forEach(function (group) {
+        var id = parseNumber(group && group.id, Number.NaN);
+        if (!Number.isFinite(id)) return;
+        html += '<button type="button" class="frontcalc-price-group' +
+          (id === selectedCatalogGroupId ? ' is-active' : '') +
+          '" data-catalog-group-id="' + escapeHtml(String(id)) + '">' +
+          escapeHtml(group.name || ("PRICE_" + id)) +
+          '</button>';
+      });
+      html += '</div>';
+    }
     html += '<div class="frontcalc-volume-input">';
     html +=
       '<input type="text" class="frontcalc-table-input" value="' +
@@ -726,10 +713,11 @@
       var draftSel = Object.assign({}, selectedByProperty);
       draftSel[volumeCode] = xml;
       var offer = pickMatchedOffer(offers, draftSel, {});
-      var strictPrice = offer && offer.catalog ? offer.catalog.primary_buy_price || null : null;
+      var priceRanges = getRangesByCatalogGroup(offer, selectedCatalogGroupId);
+      var strictPrice = pickStrictRangePrice(priceRanges);
       var strictNum = parseNumber(strictPrice && strictPrice.price, 0);
       var qty = Math.max(1, parseNumber(xml, 1));
-      var flex = pickFlexiblePrice(offer && offer.catalog ? offer.catalog.prices_view_ranges : [], strictPrice);
+      var flex = pickFlexibleRangePrice(priceRanges) || strictPrice;
       var flexNum = parseNumber(flex && flex.price, strictNum);
       var weightKg = parseNumber(offer && offer.catalog && offer.catalog.weight_kg, 0).toFixed(3);
       var volumeM3 = parseNumber(offer && offer.catalog && offer.catalog.volume_m3, 0).toFixed(3);
@@ -804,6 +792,8 @@
     var data = payload && payload.data ? payload.data : {};
     var config = data.config || {};
     var offers = Array.isArray(data.offers) ? data.offers : [];
+    var priceGroups = collectAvailablePriceGroups(data.price_groups_view, offers);
+    var selectedCatalogGroupId = priceGroups.length ? parseNumber(priceGroups[0].id, Number.NaN) : Number.NaN;
     var propertyMeta = Array.isArray(data.property_meta) ? data.property_meta : [];
     var priceGroupsView = Array.isArray(data.price_groups_view) ? data.price_groups_view : [];
     var propertyMetaByCode = {};
@@ -904,6 +894,12 @@
     }
     if (!defaultOffer) {
       defaultOffer = pickDefaultOfferBySort(offers, allCodes);
+    }
+    if (defaultOffer && defaultOffer.catalog && defaultOffer.catalog.primary_buy_price) {
+      var primaryGroupId = parseNumber(defaultOffer.catalog.primary_buy_price.catalog_group_id, Number.NaN);
+      if (Number.isFinite(primaryGroupId) && priceGroups.some(function (group) { return parseNumber(group && group.id, Number.NaN) === primaryGroupId; })) {
+        selectedCatalogGroupId = primaryGroupId;
+      }
     }
     var selectorCodes = allCodes.filter(function (code) {
       return code !== volumeCode;
@@ -1114,12 +1110,19 @@
 
       var matched = pickMatchedOffer(offers, selectedByProperty, customByProperty);
       if (presetsByCode[volumeCode] && presetsByCode[volumeCode].length) {
-        renderPriceTable($priceInner, offers, presetsByCode, selectedByProperty, volumeCode, customVolumeValue, priceGroupsView);
+        renderPriceTable($priceInner, offers, presetsByCode, selectedByProperty, volumeCode, customVolumeValue, priceGroups, selectedCatalogGroupId);
       } else {
         renderPriceBlock($priceInner, matched);
       }
     }
 
+
+    $price.on("click", ".frontcalc-price-group", function () {
+      var groupId = parseNumber($(this).attr("data-catalog-group-id"), Number.NaN);
+      if (!Number.isFinite(groupId)) return;
+      selectedCatalogGroupId = groupId;
+      updatePrice();
+    });
 
     $price.on("click", ".frontcalc-table-row .frontcalc-cell", function () {
       var $cell = $(this);

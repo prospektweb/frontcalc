@@ -304,6 +304,17 @@ $xmlIdErrors = [];
 $userGroups = frontcalc_get_current_user_groups();
 $priceAccess = frontcalc_get_catalog_groups_by_rights($userGroups);
 $catalogGroupNames = frontcalc_get_catalog_group_names();
+$priceGroupsView = [];
+foreach ($priceAccess['view'] as $catalogGroupId) {
+    $catalogGroupId = (int)$catalogGroupId;
+    if ($catalogGroupId <= 0) {
+        continue;
+    }
+    $priceGroupsView[] = [
+        'id' => $catalogGroupId,
+        'name' => (string)($catalogGroupNames[$catalogGroupId] ?? ('PRICE_' . $catalogGroupId)),
+    ];
+}
 
 $offersMap = CCatalogSKU::getOffersList(
     [$productId],
@@ -438,24 +449,20 @@ if (!empty($offersMap[$productId]) && is_array($offersMap[$productId])) {
         if (is_array($optimalPrice) && !empty($optimalPrice['RESULT_PRICE'])) {
             $resultPrice = $optimalPrice['RESULT_PRICE'];
             $optGroupId = (int)($resultPrice['PRICE_TYPE_ID'] ?? 0);
-            $canViewOptimalPrice = in_array($optGroupId, $priceAccess['view'], true);
-            $canBuyOptimalPrice = in_array($optGroupId, $priceAccess['buy'], true);
-            if ($canViewOptimalPrice || $canBuyOptimalPrice) {
-                $optValue = (float)($resultPrice['DISCOUNT_PRICE'] ?? $resultPrice['BASE_PRICE'] ?? 0);
-                $optCurrency = (string)($resultPrice['CURRENCY'] ?? '');
+            if (in_array($optGroupId, $priceAccess['view'], true)) {
                 $optRounded = frontcalc_round_catalog_price($optValue, $optGroupId, $optCurrency);
-                $primaryBuyPrice = frontcalc_make_price_range(
-                    $optGroupId,
-                    (string)($catalogGroupNames[$optGroupId] ?? ('PRICE_' . $optGroupId)),
-                    $optRounded,
-                    $optCurrency,
-                    html_entity_decode((string)CCurrencyLang::CurrencyFormat($optRounded, $optCurrency, true), ENT_QUOTES | ENT_HTML5, 'UTF-8'),
-                    null,
-                    null
-                );
+                $primaryBuyPrice = [
+                    'id' => (int)($resultPrice['PRICE_ID'] ?? 0),
+                    'catalog_group_id' => $optGroupId,
+                    'catalog_group_name' => (string)($catalogGroupNames[$optGroupId] ?? ('PRICE_' . $optGroupId)),
+                    'price' => $optRounded,
+                    'currency' => $optCurrency,
+                    'formatted' => html_entity_decode((string)CCurrencyLang::CurrencyFormat($optRounded, $optCurrency, true), ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+                    'quantity_from' => null,
+                    'quantity_to' => null,
+                ];
             }
         }
-
         if ($primaryBuyPrice === null && !empty($pricesBuy)) {
             $primaryBuyPrice = $pricesBuy[0];
         } elseif ($primaryBuyPrice === null && !empty($pricesView)) {
@@ -480,13 +487,11 @@ if (!empty($offersMap[$productId]) && is_array($offersMap[$productId])) {
             'properties' => $offerProps,
             'catalog' => [
                 'prices' => $pricesViewAll,
-                'prices_view_ranges' => $pricesViewAll,
-                'prices_buy_ranges' => $pricesBuyAll,
-                'prices_by_group' => $pricesViewRangesByGroup,
-                'prices_view_by_group' => $pricesViewRangesByGroup,
-                'prices_buy_by_group' => $pricesBuyRangesByGroup,
+                'price_ranges' => $pricesViewAll,
                 'prices_view' => $pricesView,
+                'prices_view_all' => $pricesViewAll,
                 'prices_buy' => $pricesBuy,
+                'prices_buy_all' => $pricesBuyAll,
                 'primary_buy_price' => $primaryBuyPrice,
                 'weight_kg' => $weightKg,
                 'dimensions_mm' => [
