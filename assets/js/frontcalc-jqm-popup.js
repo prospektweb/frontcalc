@@ -646,6 +646,140 @@
     return Number.NaN;
   }
 
+
+  function getOfferQuantityNumber(offer, volumeCode) {
+    var prop = offer && offer.properties ? offer.properties[volumeCode] : null;
+    var xmlNum = parseNumber(prop && prop.xml_id, Number.NaN);
+    if (Number.isFinite(xmlNum)) return xmlNum;
+    return parseNumber(prop && prop.value, Number.NaN);
+  }
+
+  function getScopedOffersForQuantity(offers, selectedByProperty, customByProperty, volumeCode) {
+    return getFilteredOffers(offers, selectedByProperty, customByProperty, volumeCode)
+      .map(function (offer) {
+        return { offer: offer, qty: getOfferQuantityNumber(offer, volumeCode) };
+      })
+      .filter(function (row) {
+        return Number.isFinite(row.qty);
+      })
+      .sort(function (a, b) {
+        return a.qty - b.qty;
+      });
+  }
+
+  function pickNearestQuantityPoints(points, targetQty) {
+    if (!Array.isArray(points) || !points.length || !Number.isFinite(targetQty)) return [];
+
+    var exact = points.filter(function (point) {
+      return point.qty === targetQty;
+    });
+    if (exact.length) return [exact[0]];
+
+    if (points.length === 1) return [points[0]];
+
+    var lower = null;
+    var upper = null;
+    for (var i = 0; i < points.length; i++) {
+      if (points[i].qty < targetQty) lower = points[i];
+      if (points[i].qty > targetQty) {
+        upper = points[i];
+        break;
+      }
+    }
+
+    if (lower && upper) return [lower, upper];
+    if (!lower) return [points[0], points[1]];
+    return [points[points.length - 2], points[points.length - 1]];
+  }
+
+  function interpolateNumberAtQuantity(points, targetQty, valueGetter) {
+    var valuePoints = (Array.isArray(points) ? points : [])
+      .map(function (point) {
+        return {
+          offer: point.offer,
+          qty: point.qty,
+          value: parseNumber(valueGetter(point.offer), Number.NaN)
+        };
+      })
+      .filter(function (point) {
+        return Number.isFinite(point.qty) && Number.isFinite(point.value);
+      });
+    var nearest = pickNearestQuantityPoints(valuePoints, targetQty);
+    if (!nearest.length) return Number.NaN;
+
+    var firstValue = nearest[0].value;
+    if (nearest.length === 1) return firstValue;
+
+    var secondValue = nearest[1].value;
+    var firstQty = nearest[0].qty;
+    var secondQty = nearest[1].qty;
+    if (firstQty === secondQty) return firstValue;
+
+    return firstValue + ((secondValue - firstValue) * (targetQty - firstQty)) / (secondQty - firstQty);
+  }
+
+  function getRangePriceForColumn(offer, catalogGroupId, column) {
+    var ranges = getRangesByCatalogGroup(offer, catalogGroupId);
+    if (column === "flex") return pickFlexibleRangePrice(ranges) || pickStrictRangePrice(ranges);
+    return pickStrictRangePrice(ranges);
+  }
+
+  function buildInterpolatedRangePrice(points, targetQty, catalogGroupId, column) {
+    var sample = null;
+    var amount = interpolateNumberAtQuantity(points, targetQty, function (offer) {
+      var range = getRangePriceForColumn(offer, catalogGroupId, column);
+      if (!sample && range) sample = range;
+      return range && range.price;
+    });
+
+    if (!Number.isFinite(amount)) return null;
+
+    var currency = (sample && sample.currency) || "₽";
+    return {
+      price: amount,
+      currency: currency,
+      catalog_group_id: catalogGroupId,
+      catalog_group_name: sample && sample.catalog_group_name,
+      formatted: formatApproxMoney(amount, currency),
+      is_interpolated: true
+    };
+  }
+
+  function buildQuantityEstimate(points, targetQty, catalogGroupId, column, exactOffer) {
+    if (exactOffer) {
+      return {
+        price: getRangePriceForColumn(exactOffer, catalogGroupId, column),
+        weightKg: parseNumber(exactOffer && exactOffer.catalog && exactOffer.catalog.weight_kg, 0),
+        volumeM3: parseNumber(exactOffer && exactOffer.catalog && exactOffer.catalog.volume_m3, 0),
+        isEstimated: false
+      };
+    }
+
+    return {
+      price: buildInterpolatedRangePrice(points, targetQty, catalogGroupId, column),
+      weightKg: interpolateNumberAtQuantity(points, targetQty, function (offer) {
+        return offer && offer.catalog && offer.catalog.weight_kg;
+      }),
+      volumeM3: interpolateNumberAtQuantity(points, targetQty, function (offer) {
+        return offer && offer.catalog && offer.catalog.volume_m3;
+      }),
+      isEstimated: true
+    };
+  }
+
+  function formatApproxMoney(amount, currency) {
+    var rounded = Math.round(parseNumber(amount, 0));
+    var formatted = String(rounded).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+    var currencyText = String(currency || "₽");
+    if (currencyText === "RUB" || currencyText === "RUR") currencyText = "₽";
+    return "≈ " + formatted + " " + currencyText;
+  }
+
+  function formatMetric(value, suffix) {
+    var num = parseNumber(value, Number.NaN);
+    return Number.isFinite(num) ? num.toFixed(3) + " " + suffix : "—";
+  }
+
   function renderPriceTable($block, offers, presetsByCode, selectedByProperty, volumeCode, customVolumeValue, priceGroups, selectedCatalogGroupId) {
     var volumePresets = (presetsByCode[volumeCode] || []).slice();
     if (!volumePresets.length) {
@@ -670,13 +804,10 @@
       .sort(function (a, b) {
         return a.num - b.num;
       });
-    var minPreset = numericPresets.length ? numericPresets[0].num : Number.NaN;
-    var maxPreset = numericPresets.length ? numericPresets[numericPresets.length - 1].num : Number.NaN;
     var merged = numericPresets.slice();
     if (Number.isFinite(customVolumeValue)) {
-      var clamped = clamp(customVolumeValue, minPreset, maxPreset);
-      if (!merged.some(function (row) { return row.num === clamped; })) {
-        merged.push({ xml_id: String(clamped), value: String(clamped), num: clamped, isCustom: true });
+      if (!merged.some(function (row) { return row.num === customVolumeValue; })) {
+        merged.push({ xml_id: String(customVolumeValue), value: String(customVolumeValue), num: customVolumeValue, isCustom: true });
       }
     }
     merged.sort(function (a, b) { return a.num - b.num; });
@@ -708,19 +839,24 @@
       '<div class="frontcalc-table-head"><div>Тираж</div><div>Строгий <span class="frontcalc-tip" title="Отгрузка в соответствии с согласованным сроком"><svg width="17" height="16"><use xlink:href="/bitrix/templates/aspro-premier/images/svg/catalog/item_order_icons.svg?1774850114#attention-16-16"></use></svg></span></div><div>Гибкий <span class="frontcalc-tip" title="Срок отгрузки может быть изменен (не больше 10 рабочих дней)"><svg width="17" height="16"><use xlink:href="/bitrix/templates/aspro-premier/images/svg/catalog/item_order_icons.svg?1774850114#attention-16-16"></use></svg></span></div></div>';
     html += '<div class="frontcalc-table-body">';
 
+    var scopedQuantityPoints = getScopedOffersForQuantity(offers, selectedByProperty, {}, volumeCode);
+
     merged.forEach(function (preset, index) {
       var xml = String(preset.xml_id || "");
+      var qty = Math.max(1, parseNumber(xml, 1));
       var draftSel = Object.assign({}, selectedByProperty);
       draftSel[volumeCode] = xml;
       var offer = pickMatchedOffer(offers, draftSel, {});
-      var priceRanges = getRangesByCatalogGroup(offer, selectedCatalogGroupId);
-      var strictPrice = pickStrictRangePrice(priceRanges);
-      var strictNum = parseNumber(strictPrice && strictPrice.price, 0);
-      var qty = Math.max(1, parseNumber(xml, 1));
-      var flex = pickFlexibleRangePrice(priceRanges) || strictPrice;
+      var strictEstimate = buildQuantityEstimate(scopedQuantityPoints, qty, selectedCatalogGroupId, "strict", offer);
+      var flexEstimate = buildQuantityEstimate(scopedQuantityPoints, qty, selectedCatalogGroupId, "flex", offer);
+      var strictPrice = strictEstimate.price;
+      var flex = flexEstimate.price || strictPrice;
+      var strictNum = parseNumber(strictPrice && strictPrice.price, Number.NaN);
       var flexNum = parseNumber(flex && flex.price, strictNum);
-      var weightKg = parseNumber(offer && offer.catalog && offer.catalog.weight_kg, 0).toFixed(3);
-      var volumeM3 = parseNumber(offer && offer.catalog && offer.catalog.volume_m3, 0).toFixed(3);
+      var weightText = formatMetric(strictEstimate.weightKg, "кг");
+      var volumeText = formatMetric(strictEstimate.volumeM3, "м³");
+      var isEstimated = strictEstimate.isEstimated || flexEstimate.isEstimated;
+      var customMark = isEstimated ? " · расчёт" : "";
 
       html +=
         '<div class="frontcalc-table-row' +
@@ -736,21 +872,22 @@
         '</span><span class="frontcalc-cell-sub" title="' +
         escapeHtml(tooltip) +
         '">' +
-        weightKg +
-        " кг · " +
-        volumeM3 +
-        " м³</span></button>";
+        weightText +
+        " · " +
+        volumeText +
+        customMark +
+        "</span></button>";
       html +=
         '<button type="button" class="frontcalc-cell" data-col="strict"><span class="frontcalc-cell-main">' +
         escapeHtml(formatMoneyRow(strictPrice)) +
         '</span><span class="frontcalc-cell-sub">' +
-        escapeHtml((strictNum / qty).toFixed(2) + " ₽/экз") +
+        escapeHtml(Number.isFinite(strictNum) ? (strictNum / qty).toFixed(2) + " ₽/экз" : "—") +
         "</span></button>";
       html +=
         '<button type="button" class="frontcalc-cell" data-col="flex"><span class="frontcalc-cell-main">' +
         escapeHtml(formatMoneyRow(flex)) +
         '</span><span class="frontcalc-cell-sub">' +
-        escapeHtml((flexNum / qty).toFixed(2) + " ₽/экз") +
+        escapeHtml(Number.isFinite(flexNum) ? (flexNum / qty).toFixed(2) + " ₽/экз" : "—") +
         "</span></button>";
       html += "</div>";
     });
@@ -861,6 +998,8 @@
     var customVolumeValue = Number.NaN;
     var explicitVolumeStep = resolveConfiguredStep(fieldByCode[volumeCode]);
     var volumeStep = Math.max(1, Number.isFinite(explicitVolumeStep) ? explicitVolumeStep : deriveStepFromPresets(presetsByCode[volumeCode]));
+    var volumeMin = parseNumber(fieldByCode[volumeCode] && fieldByCode[volumeCode].min, Number.NaN);
+    var volumeMax = parseNumber(fieldByCode[volumeCode] && fieldByCode[volumeCode].max, Number.NaN);
 
     function pickDefaultOfferBySort(offersList, codes) {
       if (!Array.isArray(offersList) || !offersList.length) return null;
@@ -1132,7 +1271,9 @@
       $price.find(".frontcalc-cell.is-picked").removeClass("is-picked");
       $cell.addClass("is-picked");
       selectedByProperty[volumeCode] = xmlId;
-      customVolumeValue = Number.NaN;
+      var numericXmlId = parseNumber(xmlId, Number.NaN);
+      var knownPreset = findPresetByInputValue(presetsByCode[volumeCode] || [], xmlId);
+      customVolumeValue = !knownPreset && Number.isFinite(numericXmlId) ? numericXmlId : Number.NaN;
       customByProperty[volumeCode] = false;
       updatePrice();
     });
@@ -1155,10 +1296,10 @@
       var direction = parseNumber($(this).attr('data-step'), 0);
       var list = (presetsByCode[volumeCode] || []).map(function (p) { return parseNumber(p.xml_id, Number.NaN); }).filter(Number.isFinite).sort(function(a,b){return a-b;});
       if (!list.length) return;
-      var minV = list[0];
-      var maxV = list[list.length - 1];
-      var current = parseNumber(selectedByProperty[volumeCode], minV);
-      var next = clamp(current + direction * volumeStep, minV, maxV);
+      var minV = Number.isFinite(volumeMin) ? volumeMin : 1;
+      var maxV = Number.isFinite(volumeMax) ? volumeMax : Number.POSITIVE_INFINITY;
+      var current = parseNumber(selectedByProperty[volumeCode], list[0]);
+      var next = normalizeToStep(clamp(current + direction * volumeStep, minV, maxV), minV, volumeStep);
       customVolumeValue = next;
       selectedByProperty[volumeCode] = String(next);
       updatePrice();
@@ -1174,8 +1315,10 @@
       } else {
         var presetNums = list.map(function (p) { return parseNumber(p.xml_id, Number.NaN); }).filter(Number.isFinite).sort(function(a,b){return a-b;});
         if (!presetNums.length) return;
+        var minV = Number.isFinite(volumeMin) ? volumeMin : 1;
+        var maxV = Number.isFinite(volumeMax) ? volumeMax : Number.POSITIVE_INFINITY;
         var val = parseNumber(raw, presetNums[0]);
-        val = normalizeToStep(clamp(val, presetNums[0], presetNums[presetNums.length - 1]), presetNums[0], volumeStep);
+        val = normalizeToStep(clamp(val, minV, maxV), minV, volumeStep);
         customVolumeValue = val;
         selectedByProperty[volumeCode] = String(val);
       }
