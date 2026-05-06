@@ -479,7 +479,7 @@ if (!empty($offersMap[$productId]) && is_array($offersMap[$productId])) {
 
         $weightKg = $weightGrams > 0 ? round($weightGrams / 1000, 3) : 0.0;
         $volumeM3 = ($widthMm > 0 && $lengthMm > 0 && $heightMm > 0)
-            ? round(($widthMm * $lengthMm * $heightMm) / 1000000000, 3)
+            ? round(($widthMm * $lengthMm * $heightMm) / 1000000000, 6)
             : 0.0;
 
         $offers[] = [
