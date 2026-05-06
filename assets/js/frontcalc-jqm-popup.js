@@ -795,6 +795,7 @@
     var priceGroups = collectAvailablePriceGroups(data.price_groups_view, offers);
     var selectedCatalogGroupId = priceGroups.length ? parseNumber(priceGroups[0].id, Number.NaN) : Number.NaN;
     var propertyMeta = Array.isArray(data.property_meta) ? data.property_meta : [];
+    var priceGroupsView = Array.isArray(data.price_groups_view) ? data.price_groups_view : [];
     var propertyMetaByCode = {};
     propertyMeta.forEach(function (meta) {
       var code = String((meta && meta.code) || "").trim();

@@ -87,6 +87,87 @@ function frontcalc_get_catalog_groups_by_rights(array $userGroups): array
     ];
 }
 
+
+/**
+ * Price range payload contract used by ajax/frontcalc.php and assets/js/frontcalc-jqm-popup.js.
+ *
+ * Each range is intentionally limited to these fields:
+ * - catalog_group_id: Bitrix catalog price type ID;
+ * - catalog_group_name: localized catalog price type name;
+ * - price: rounded numeric price value;
+ * - currency: Bitrix currency code;
+ * - formatted: formatted price string;
+ * - quantity_from: inclusive lower quantity bound, or null for an open lower bound;
+ * - quantity_to: inclusive upper quantity bound, or null for an open upper bound.
+ *
+ * @phpstan-type FrontcalcPriceRange array{catalog_group_id:int,catalog_group_name:string,price:float,currency:string,formatted:string,quantity_from:int|null,quantity_to:int|null}
+ */
+
+/**
+ * @param mixed $value
+ */
+function frontcalc_normalize_quantity_bound($value): ?int
+{
+    if ($value === null || $value === '') {
+        return null;
+    }
+
+    return (int)$value;
+}
+
+/**
+ * @return FrontcalcPriceRange
+ */
+function frontcalc_make_price_range(
+    int $catalogGroupId,
+    string $catalogGroupName,
+    float $price,
+    string $currency,
+    string $formatted,
+    ?int $quantityFrom,
+    ?int $quantityTo
+): array
+{
+    return [
+        'catalog_group_id' => $catalogGroupId,
+        'catalog_group_name' => $catalogGroupName,
+        'price' => $price,
+        'currency' => $currency,
+        'formatted' => $formatted,
+        'quantity_from' => $quantityFrom,
+        'quantity_to' => $quantityTo,
+    ];
+}
+
+/**
+ * @param array<int,FrontcalcPriceRange> $rows
+ * @return array<string,array{catalog_group_id:int,catalog_group_name:string,prices:array<int,FrontcalcPriceRange>}>
+ */
+function frontcalc_group_price_ranges_by_catalog_group(array $rows): array
+{
+    $grouped = [];
+
+    foreach ($rows as $row) {
+        $groupId = (int)($row['catalog_group_id'] ?? 0);
+        if ($groupId <= 0) {
+            continue;
+        }
+
+        $groupKey = (string)$groupId;
+        if (!isset($grouped[$groupKey])) {
+            $grouped[$groupKey] = [
+                'catalog_group_id' => $groupId,
+                'catalog_group_name' => (string)($row['catalog_group_name'] ?? ('PRICE_' . $groupId)),
+                'prices' => [],
+            ];
+        }
+
+        $grouped[$groupKey]['prices'][] = $row;
+    }
+
+    return $grouped;
+}
+
 function frontcalc_pick_price_for_quantity(array $rows, int $quantity = 1): ?array
 {
     if (empty($rows)) {
@@ -310,16 +391,15 @@ if (!empty($offersMap[$productId]) && is_array($offersMap[$productId])) {
             $priceValue = (float)($price['PRICE'] ?? 0);
             $currency = (string)($price['CURRENCY'] ?? '');
             $roundedValue = frontcalc_round_catalog_price($priceValue, $catalogGroupId, $currency);
-            $pricesRaw[] = [
-                'id' => (int)($price['ID'] ?? 0),
-                'catalog_group_id' => $catalogGroupId,
-                'catalog_group_name' => (string)($catalogGroupNames[$catalogGroupId] ?? ('PRICE_' . $catalogGroupId)),
-                'price' => $roundedValue,
-                'currency' => $currency,
-                'formatted' => html_entity_decode((string)CCurrencyLang::CurrencyFormat($roundedValue, $currency, true), ENT_QUOTES | ENT_HTML5, 'UTF-8'),
-                'quantity_from' => isset($price['QUANTITY_FROM']) ? (int)$price['QUANTITY_FROM'] : null,
-                'quantity_to' => isset($price['QUANTITY_TO']) ? (int)$price['QUANTITY_TO'] : null,
-            ];
+            $pricesRaw[] = frontcalc_make_price_range(
+                $catalogGroupId,
+                (string)($catalogGroupNames[$catalogGroupId] ?? ('PRICE_' . $catalogGroupId)),
+                $roundedValue,
+                $currency,
+                html_entity_decode((string)CCurrencyLang::CurrencyFormat($roundedValue, $currency, true), ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+                frontcalc_normalize_quantity_bound($price['QUANTITY_FROM'] ?? null),
+                frontcalc_normalize_quantity_bound($price['QUANTITY_TO'] ?? null)
+            );
         }
 
         $pricesViewAll = array_values(array_filter($pricesRaw, static function ($row) use ($priceAccess) {
@@ -338,6 +418,7 @@ if (!empty($offersMap[$productId]) && is_array($offersMap[$productId])) {
             }
             $pricesViewByGroup[$groupId][] = $row;
         }
+        $pricesViewRangesByGroup = frontcalc_group_price_ranges_by_catalog_group($pricesViewAll);
         $pricesView = [];
         foreach ($pricesViewByGroup as $groupRows) {
             $picked = frontcalc_pick_price_for_quantity($groupRows, 1);
@@ -354,6 +435,7 @@ if (!empty($offersMap[$productId]) && is_array($offersMap[$productId])) {
             }
             $pricesBuyByGroup[$groupId][] = $row;
         }
+        $pricesBuyRangesByGroup = frontcalc_group_price_ranges_by_catalog_group($pricesBuyAll);
         $pricesBuy = [];
         foreach ($pricesBuyByGroup as $groupRows) {
             $picked = frontcalc_pick_price_for_quantity($groupRows, 1);
@@ -366,8 +448,6 @@ if (!empty($offersMap[$productId]) && is_array($offersMap[$productId])) {
         $optimalPrice = CCatalogProduct::GetOptimalPrice($offerId, 1, $userGroups, 'N', [], SITE_ID);
         if (is_array($optimalPrice) && !empty($optimalPrice['RESULT_PRICE'])) {
             $resultPrice = $optimalPrice['RESULT_PRICE'];
-            $optValue = (float)($resultPrice['DISCOUNT_PRICE'] ?? $resultPrice['BASE_PRICE'] ?? 0);
-            $optCurrency = (string)($resultPrice['CURRENCY'] ?? '');
             $optGroupId = (int)($resultPrice['PRICE_TYPE_ID'] ?? 0);
             if (in_array($optGroupId, $priceAccess['view'], true)) {
                 $optRounded = frontcalc_round_catalog_price($optValue, $optGroupId, $optCurrency);
@@ -442,6 +522,20 @@ foreach ($presetBuckets as $code => $rows) {
         return ($a['sort'] ?? 500) <=> ($b['sort'] ?? 500);
     });
     $propertyMeta[$code]['presets'] = $presets;
+}
+
+$priceGroupsView = [];
+foreach ($priceAccess['view'] as $sort => $catalogGroupId) {
+    $catalogGroupId = (int)$catalogGroupId;
+    if ($catalogGroupId <= 0) {
+        continue;
+    }
+
+    $priceGroupsView[] = [
+        'id' => $catalogGroupId,
+        'name' => (string)($catalogGroupNames[$catalogGroupId] ?? ('PRICE_' . $catalogGroupId)),
+        'sort' => $sort,
+    ];
 }
 
 echo json_encode([
