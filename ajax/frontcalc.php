@@ -470,6 +470,20 @@ foreach ($presetBuckets as $code => $rows) {
     $propertyMeta[$code]['presets'] = $presets;
 }
 
+$priceGroupsView = [];
+foreach ($priceAccess['view'] as $sort => $catalogGroupId) {
+    $catalogGroupId = (int)$catalogGroupId;
+    if ($catalogGroupId <= 0) {
+        continue;
+    }
+
+    $priceGroupsView[] = [
+        'id' => $catalogGroupId,
+        'name' => (string)($catalogGroupNames[$catalogGroupId] ?? ('PRICE_' . $catalogGroupId)),
+        'sort' => $sort,
+    ];
+}
+
 echo json_encode([
     'success' => true,
     'data' => [
@@ -477,6 +491,7 @@ echo json_encode([
         'requested_offer_id' => $requestedOfferId,
         'user_groups' => $userGroups,
         'price_access' => $priceAccess,
+        'price_groups_view' => $priceGroupsView,
         'config' => $config,
         'property_meta' => array_values($propertyMeta),
         'offers' => $offers,

@@ -23,6 +23,8 @@
       ".frontcalc-layout{display:grid;grid-template-columns:minmax(0,2fr) minmax(320px,1fr);gap:20px;align-items:start;}",
       ".frontcalc-selectors{display:flex;flex-direction:column;gap:20px;}",
       ".frontcalc-price-panel__inner{position:sticky;top:12px;border:1px solid #d9dee7;border-radius:12px;background:#fafbff;padding:16px;}",
+      ".frontcalc-price-groups{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;}",
+      ".frontcalc-price-group-tag{display:inline-flex;align-items:center;min-height:28px;border:1px solid #d9dee7;border-radius:999px;background:#fff;padding:3px 10px;font-size:12px;font-weight:600;color:#2f3a52;}",
       ".frontcalc-volume-input{display:flex;gap:8px;align-items:center;margin-bottom:12px;}",
       ".frontcalc-table-input{width:120px;height:44px;border:1px solid #d9dee7;border-radius:10px;padding:0 12px;font-size:22px;font-weight:600;box-sizing:border-box;}",
       ".frontcalc-volume-btns{display:flex;gap:6px;}",
@@ -635,7 +637,35 @@
     return Number.NaN;
   }
 
-  function renderPriceTable($block, offers, presetsByCode, selectedByProperty, volumeCode, customVolumeValue) {
+  function renderPriceGroupTags(priceGroupsView) {
+    var groups = (Array.isArray(priceGroupsView) ? priceGroupsView : [])
+      .filter(function (group) {
+        return group && parseNumber(group.id, 0) > 0 && String(group.name || "").trim() !== "";
+      })
+      .slice()
+      .sort(function (a, b) {
+        var sortA = parseNumber(a.sort, Number.POSITIVE_INFINITY);
+        var sortB = parseNumber(b.sort, Number.POSITIVE_INFINITY);
+        if (sortA !== sortB) return sortA - sortB;
+        return parseNumber(a.id, 0) - parseNumber(b.id, 0);
+      });
+
+    if (!groups.length) return "";
+
+    var html = '<div class="frontcalc-price-groups" aria-label="Доступные типы цен">';
+    groups.forEach(function (group) {
+      html +=
+        '<span class="frontcalc-price-group-tag" data-price-group-id="' +
+        escapeHtml(group.id) +
+        '">' +
+        escapeHtml(group.name) +
+        "</span>";
+    });
+    html += "</div>";
+    return html;
+  }
+
+  function renderPriceTable($block, offers, presetsByCode, selectedByProperty, volumeCode, customVolumeValue, priceGroupsView) {
     var volumePresets = (presetsByCode[volumeCode] || []).slice();
     if (!volumePresets.length) {
       $block.html('<div class="frontcalc-price-empty">Нет значений тиража для таблицы.</div>');
@@ -671,7 +701,8 @@
     merged.sort(function (a, b) { return a.num - b.num; });
     var selectedXml = String(selectedByProperty[volumeCode] || (merged[0] && merged[0].xml_id) || "");
 
-    var html = '<div class="frontcalc-volume-input">';
+    var html = renderPriceGroupTags(priceGroupsView);
+    html += '<div class="frontcalc-volume-input">';
     html +=
       '<input type="text" class="frontcalc-table-input" value="' +
       escapeHtml(selectedXml) +
@@ -767,6 +798,7 @@
     var config = data.config || {};
     var offers = Array.isArray(data.offers) ? data.offers : [];
     var propertyMeta = Array.isArray(data.property_meta) ? data.property_meta : [];
+    var priceGroupsView = Array.isArray(data.price_groups_view) ? data.price_groups_view : [];
     var propertyMetaByCode = {};
     propertyMeta.forEach(function (meta) {
       var code = String((meta && meta.code) || "").trim();
@@ -1075,7 +1107,7 @@
 
       var matched = pickMatchedOffer(offers, selectedByProperty, customByProperty);
       if (presetsByCode[volumeCode] && presetsByCode[volumeCode].length) {
-        renderPriceTable($priceInner, offers, presetsByCode, selectedByProperty, volumeCode, customVolumeValue);
+        renderPriceTable($priceInner, offers, presetsByCode, selectedByProperty, volumeCode, customVolumeValue, priceGroupsView);
       } else {
         renderPriceBlock($priceInner, matched);
       }
