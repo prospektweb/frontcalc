@@ -528,76 +528,83 @@
     return String(priceObj.formatted || ((priceObj.price || 0) + " " + (priceObj.currency || "₽")));
   }
 
-  function pickFlexiblePrice(priceRanges, strictPrice) {
-    if (!Array.isArray(priceRanges) || !priceRanges.length) return strictPrice;
+  function getRangeQuantityFrom(row) {
+    if (!row || row.quantity_from === null || typeof row.quantity_from === "undefined") return null;
+    var quantityFrom = parseNumber(row.quantity_from, Number.NaN);
+    return Number.isFinite(quantityFrom) ? quantityFrom : null;
+  }
 
-    var selectedGroupId = parseNumber(strictPrice && strictPrice.catalog_group_id, Number.NaN);
-    if (!Number.isFinite(selectedGroupId)) return strictPrice;
+  function getRangeQuantityTo(row) {
+    if (!row || row.quantity_to === null || typeof row.quantity_to === "undefined") return null;
+    var quantityTo = parseNumber(row.quantity_to, Number.NaN);
+    return Number.isFinite(quantityTo) ? quantityTo : null;
+  }
 
-    function getQuantityFrom(row) {
-      if (!row || row.quantity_from === null || typeof row.quantity_from === "undefined") return null;
-      var from = parseNumber(row.quantity_from, Number.NaN);
-      return Number.isFinite(from) ? from : null;
-    }
+  function sortRangePrices(ranges) {
+    return (Array.isArray(ranges) ? ranges : []).slice().sort(function (a, b) {
+      var aFrom = getRangeQuantityFrom(a);
+      var bFrom = getRangeQuantityFrom(b);
+      var aOrder = aFrom === null ? Number.NEGATIVE_INFINITY : aFrom;
+      var bOrder = bFrom === null ? Number.NEGATIVE_INFINITY : bFrom;
+      if (aOrder !== bOrder) return aOrder - bOrder;
 
-    function getQuantityTo(row) {
-      if (!row || row.quantity_to === null || typeof row.quantity_to === "undefined") return null;
-      var to = parseNumber(row.quantity_to, Number.NaN);
-      return Number.isFinite(to) ? to : null;
-    }
+      var aTo = getRangeQuantityTo(a);
+      var bTo = getRangeQuantityTo(b);
+      var aToOrder = aTo === null ? Number.POSITIVE_INFINITY : aTo;
+      var bToOrder = bTo === null ? Number.POSITIVE_INFINITY : bTo;
+      if (aToOrder !== bToOrder) return aToOrder - bToOrder;
 
-    var sorted = priceRanges
-      .filter(function (row) {
-        return parseNumber(row && row.catalog_group_id, Number.NaN) === selectedGroupId;
-      })
-      .sort(function (a, b) {
-        var aFrom = getQuantityFrom(a);
-        var bFrom = getQuantityFrom(b);
-        var aOrder = aFrom === null ? Number.NEGATIVE_INFINITY : aFrom;
-        var bOrder = bFrom === null ? Number.NEGATIVE_INFINITY : bFrom;
-        if (aOrder !== bOrder) return aOrder - bOrder;
+      return parseNumber(a && a.price, 0) - parseNumber(b && b.price, 0);
+    });
+  }
 
-        var aTo = getQuantityTo(a);
-        var bTo = getQuantityTo(b);
-        var aToOrder = aTo === null ? Number.POSITIVE_INFINITY : aTo;
-        var bToOrder = bTo === null ? Number.POSITIVE_INFINITY : bTo;
-        if (aToOrder !== bToOrder) return aToOrder - bToOrder;
-
-        return parseNumber(a && a.price, 0) - parseNumber(b && b.price, 0);
-      });
-
-    if (!sorted.length) return strictPrice;
+  function getStrictRangePrice(ranges) {
+    var sorted = sortRangePrices(ranges);
+    if (!sorted.length) return null;
 
     var firstUpper = null;
     for (var i = 0; i < sorted.length; i++) {
-      var candidateTo = getQuantityTo(sorted[i]);
+      var candidateTo = getRangeQuantityTo(sorted[i]);
       if (candidateTo !== null) {
         firstUpper = candidateTo;
         break;
       }
     }
 
-    var strictRange = null;
     for (var s = 0; s < sorted.length; s++) {
-      var from = getQuantityFrom(sorted[s]);
-      var to = getQuantityTo(sorted[s]);
-      var fromMatches = from === null || from === 0 || from === 1;
-      var toMatches = to === 1 || (firstUpper !== null && to === firstUpper);
-      if (fromMatches && toMatches) {
-        strictRange = sorted[s];
-        break;
-      }
+      var quantityFrom = getRangeQuantityFrom(sorted[s]);
+      var quantityTo = getRangeQuantityTo(sorted[s]);
+      var fromMatches = quantityFrom === null || quantityFrom === 0 || quantityFrom === 1;
+      var toMatches = quantityTo === 1 || (firstUpper !== null && quantityTo === firstUpper);
+      if (fromMatches && toMatches) return sorted[s];
     }
 
-    var flexibleRange = null;
+    return sorted[0];
+  }
+
+  function getFlexibleRangePrice(ranges) {
+    var sorted = sortRangePrices(ranges);
+    if (!sorted.length) return null;
+
     for (var f = sorted.length - 1; f >= 0; f--) {
-      if (getQuantityTo(sorted[f]) === null) {
-        flexibleRange = sorted[f];
-        break;
-      }
+      if (getRangeQuantityTo(sorted[f]) === null) return sorted[f];
     }
 
-    return flexibleRange || sorted[sorted.length - 1] || strictRange || strictPrice;
+    return sorted[sorted.length - 1];
+  }
+
+  function pickFlexiblePrice(priceRanges, strictPrice) {
+    if (!Array.isArray(priceRanges) || !priceRanges.length) return strictPrice;
+
+    var selectedGroupId = parseNumber(strictPrice && strictPrice.catalog_group_id, Number.NaN);
+    if (!Number.isFinite(selectedGroupId)) return strictPrice;
+
+    var selectedGroupRanges = priceRanges.filter(function (row) {
+      return parseNumber(row && row.catalog_group_id, Number.NaN) === selectedGroupId;
+    });
+    if (!selectedGroupRanges.length) return strictPrice;
+
+    return getFlexibleRangePrice(selectedGroupRanges) || getStrictRangePrice(selectedGroupRanges) || strictPrice;
   }
 
   function deriveStepFromPresets(presets) {
