@@ -526,39 +526,76 @@
     return String(priceObj.formatted || ((priceObj.price || 0) + " " + (priceObj.currency || "₽")));
   }
 
-  function pickFlexiblePrice(pricesView, strictPrice) {
-    if (!Array.isArray(pricesView) || !pricesView.length) return strictPrice;
-    var strictGroupId = parseNumber(strictPrice && strictPrice.catalog_group_id, Number.NaN);
-    var pool = pricesView.filter(function (row) {
-      if (!Number.isFinite(strictGroupId)) return true;
-      return parseNumber(row && row.catalog_group_id, Number.NaN) === strictGroupId;
-    });
-    if (!pool.length) pool = pricesView.slice();
+  function pickFlexiblePrice(priceRanges, strictPrice) {
+    if (!Array.isArray(priceRanges) || !priceRanges.length) return strictPrice;
 
-    function rangeOrder(row) {
-      var from = parseNumber(row && (row.from || row.from_value || row.quantity_from || row.range_from), Number.NaN);
-      if (Number.isFinite(from)) return from;
-      var name = String((row && (row.catalog_group_name || row.title || row.name)) || "").toLowerCase();
-      var m = name.match(/(?:от\s*)(\d+)/);
-      if (m) return parseNumber(m[1], Number.NaN);
-      return Number.NaN;
+    var selectedGroupId = parseNumber(strictPrice && strictPrice.catalog_group_id, Number.NaN);
+    if (!Number.isFinite(selectedGroupId)) return strictPrice;
+
+    function getQuantityFrom(row) {
+      if (!row || row.quantity_from === null || typeof row.quantity_from === "undefined") return null;
+      var from = parseNumber(row.quantity_from, Number.NaN);
+      return Number.isFinite(from) ? from : null;
     }
 
-    var sorted = pool
-      .map(function (row) {
-        return { row: row, order: rangeOrder(row) };
+    function getQuantityTo(row) {
+      if (!row || row.quantity_to === null || typeof row.quantity_to === "undefined") return null;
+      var to = parseNumber(row.quantity_to, Number.NaN);
+      return Number.isFinite(to) ? to : null;
+    }
+
+    var sorted = priceRanges
+      .filter(function (row) {
+        return parseNumber(row && row.catalog_group_id, Number.NaN) === selectedGroupId;
       })
       .sort(function (a, b) {
-        var ao = Number.isFinite(a.order) ? a.order : Number.POSITIVE_INFINITY;
-        var bo = Number.isFinite(b.order) ? b.order : Number.POSITIVE_INFINITY;
-        if (ao !== bo) return ao - bo;
-        return parseNumber(a.row && a.row.price, 0) - parseNumber(b.row && b.row.price, 0);
-      })
-      .map(function (entry) {
-        return entry.row;
+        var aFrom = getQuantityFrom(a);
+        var bFrom = getQuantityFrom(b);
+        var aOrder = aFrom === null ? Number.NEGATIVE_INFINITY : aFrom;
+        var bOrder = bFrom === null ? Number.NEGATIVE_INFINITY : bFrom;
+        if (aOrder !== bOrder) return aOrder - bOrder;
+
+        var aTo = getQuantityTo(a);
+        var bTo = getQuantityTo(b);
+        var aToOrder = aTo === null ? Number.POSITIVE_INFINITY : aTo;
+        var bToOrder = bTo === null ? Number.POSITIVE_INFINITY : bTo;
+        if (aToOrder !== bToOrder) return aToOrder - bToOrder;
+
+        return parseNumber(a && a.price, 0) - parseNumber(b && b.price, 0);
       });
 
-    return sorted[2] || sorted[1] || sorted[0] || strictPrice;
+    if (!sorted.length) return strictPrice;
+
+    var firstUpper = null;
+    for (var i = 0; i < sorted.length; i++) {
+      var candidateTo = getQuantityTo(sorted[i]);
+      if (candidateTo !== null) {
+        firstUpper = candidateTo;
+        break;
+      }
+    }
+
+    var strictRange = null;
+    for (var s = 0; s < sorted.length; s++) {
+      var from = getQuantityFrom(sorted[s]);
+      var to = getQuantityTo(sorted[s]);
+      var fromMatches = from === null || from === 0 || from === 1;
+      var toMatches = to === 1 || (firstUpper !== null && to === firstUpper);
+      if (fromMatches && toMatches) {
+        strictRange = sorted[s];
+        break;
+      }
+    }
+
+    var flexibleRange = null;
+    for (var f = sorted.length - 1; f >= 0; f--) {
+      if (getQuantityTo(sorted[f]) === null) {
+        flexibleRange = sorted[f];
+        break;
+      }
+    }
+
+    return flexibleRange || sorted[sorted.length - 1] || strictRange || strictPrice;
   }
 
   function deriveStepFromPresets(presets) {
@@ -654,7 +691,7 @@
       var strictPrice = offer && offer.catalog ? offer.catalog.primary_buy_price || null : null;
       var strictNum = parseNumber(strictPrice && strictPrice.price, 0);
       var qty = Math.max(1, parseNumber(xml, 1));
-      var flex = pickFlexiblePrice(offer && offer.catalog ? offer.catalog.prices_view : [], strictPrice);
+      var flex = pickFlexiblePrice(offer && offer.catalog ? offer.catalog.prices_view_ranges : [], strictPrice);
       var flexNum = parseNumber(flex && flex.price, strictNum);
       var weightKg = parseNumber(offer && offer.catalog && offer.catalog.weight_kg, 0).toFixed(3);
       var volumeM3 = parseNumber(offer && offer.catalog && offer.catalog.volume_m3, 0).toFixed(3);
