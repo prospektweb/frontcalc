@@ -82,6 +82,39 @@ if ($offersIblockId > 0) {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && check_bitrix_sessid() && $elementId > 0 && $iblockId > 0 && $propertyCode !== '') {
     $schema = trim((string)($_POST['CALC_EDITOR_SCHEMA'] ?? ''));
+    $requiredVolumeCode = 'CALC_PROP_VOLUME';
+    $postedSchema = json_decode($schema, true);
+    if (is_array($postedSchema) && isset($propertyMap[$requiredVolumeCode])) {
+        $postedSchema['fields'] = (isset($postedSchema['fields']) && is_array($postedSchema['fields'])) ? $postedSchema['fields'] : [];
+        $hasRequiredVolume = false;
+        foreach ($postedSchema['fields'] as $field) {
+            if ((string)($field['property_code'] ?? '') === $requiredVolumeCode) {
+                $hasRequiredVolume = true;
+                break;
+            }
+        }
+        if (!$hasRequiredVolume) {
+            array_unshift($postedSchema['fields'], [
+                'property_code' => $requiredVolumeCode,
+                'inputs' => [[
+                    'code' => strtolower(str_replace('CALC_PROP_', '', $requiredVolumeCode)),
+                    'min' => '',
+                    'max' => '',
+                    'step' => '',
+                    'unit' => '',
+                ]],
+                'show_presets' => true,
+                'show_unit' => true,
+                'concat_unit' => false,
+                'is_group' => false,
+                'group_code' => '',
+                'group_delimiter' => 'x',
+                'hidden_preset_xml_ids' => [],
+                'technical_value_ids' => [],
+            ]);
+        }
+        $schema = json_encode($postedSchema, JSON_UNESCAPED_UNICODE);
+    }
     Option::set($moduleId, 'HIDDEN_OFFER_VALUE_IDS', trim((string)($_POST['HIDDEN_OFFER_VALUE_IDS'] ?? '')));
 
     CIBlockElement::SetPropertyValuesEx($elementId, $iblockId, [
@@ -106,6 +139,36 @@ if (is_array($decoded) && isset($decoded['fields']) && is_array($decoded['fields
         }
         $initialFields[] = $field;
     }
+}
+
+$requiredVolumeCode = 'CALC_PROP_VOLUME';
+$hasRequiredVolume = false;
+foreach ($initialFields as $field) {
+    if ((string)($field['property_code'] ?? '') === $requiredVolumeCode) {
+        $hasRequiredVolume = true;
+        break;
+    }
+}
+
+if (!$hasRequiredVolume && isset($propertyMap[$requiredVolumeCode])) {
+    array_unshift($initialFields, [
+        'property_code' => $requiredVolumeCode,
+        'inputs' => [[
+            'code' => strtolower(str_replace('CALC_PROP_', '', $requiredVolumeCode)),
+            'min' => '',
+            'max' => '',
+            'step' => '',
+            'unit' => '',
+        ]],
+        'show_presets' => true,
+        'show_unit' => true,
+        'concat_unit' => false,
+        'is_group' => false,
+        'group_code' => '',
+        'group_delimiter' => 'x',
+        'hidden_preset_xml_ids' => [],
+        'technical_value_ids' => [],
+    ]);
 }
 
 $selectedCodes = [];
@@ -136,6 +199,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
 .fc-input-block{border:1px dashed #d7e2fb;border-radius:10px;padding:8px;margin-bottom:8px;background:#fbfdff;}
 .fc-input-row-actions{display:flex;justify-content:flex-end;margin-top:6px;}
 .fc-btn-remove-input{height:30px;padding:0 10px;border:1px solid #f2c1c1;background:#fff5f5;color:#a93434;border-radius:8px;cursor:pointer;}
+.fc-btn-inline[disabled]{opacity:.45;cursor:not-allowed;}
 @media (max-width: 900px){.fc-row,.fc-pills{grid-template-columns:1fr;}}
 </style>
 
@@ -184,7 +248,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
                 <button type="button" class="fc-card-head js-fc-toggle">
                     <span class="fc-card-title"><?= htmlspecialcharsbx($prop['NAME']) ?> <small style="opacity:.65; font-weight:400;">(<?= htmlspecialcharsbx($code) ?>)</small></span>
                     <span class="fc-head-actions">
-                        <button type="button" class="fc-btn-inline js-remove-prop">Удалить</button>
+                        <button type="button" class="fc-btn-inline js-remove-prop"<?= $code === $requiredVolumeCode ? ' disabled title="CALC_PROP_VOLUME обязательно для калькулятора"' : '' ?>>Удалить</button>
                         <span>▾</span>
                     </span>
                 </button>
@@ -251,6 +315,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
 <script>
 (function() {
     const allProperties = <?= \Bitrix\Main\Web\Json::encode($allProperties) ?>;
+    const requiredVolumeCode = 'CALC_PROP_VOLUME';
     const propsByCode = {};
     allProperties.forEach(p => { propsByCode[p.CODE] = p; });
 
@@ -314,7 +379,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
         const html = '\n<div class="fc-card open" data-prop-code="' + escapeHtml(prop.CODE) + '">\n'
             + '  <button type="button" class="fc-card-head js-fc-toggle">\n'
             + '    <span class="fc-card-title">' + escapeHtml(prop.NAME) + ' <small style="opacity:.65; font-weight:400;">(' + escapeHtml(prop.CODE) + ')</small></span>\n'
-            + '    <span class="fc-head-actions"><button type="button" class="fc-btn-inline js-remove-prop">Удалить</button> <span>▾</span></span>\n'
+            + '    <span class="fc-head-actions"><button type="button" class="fc-btn-inline js-remove-prop"' + (prop.CODE === requiredVolumeCode ? ' disabled title="CALC_PROP_VOLUME обязательно для калькулятора"' : '') + '>Удалить</button> <span>▾</span></span>\n'
             + '  </button>\n'
             + '  <div class="fc-card-body">\n'
             + '    <div class="fc-subtitle">Инпуты поля</div>\n'
@@ -399,7 +464,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
             const removeProp = event.target.closest('.js-remove-prop');
             if (removeProp) {
                 const card = removeProp.closest('.fc-card');
-                if (card) {
+                if (card && card.dataset.propCode !== requiredVolumeCode) {
                     card.remove();
                     refreshAddSelect();
                 }

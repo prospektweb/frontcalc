@@ -740,7 +740,7 @@
       currency: currency,
       catalog_group_id: catalogGroupId,
       catalog_group_name: sample && sample.catalog_group_name,
-      formatted: formatApproxMoney(amount, currency),
+      formatted: formatMoneyAmount(amount, currency),
       is_interpolated: true
     };
   }
@@ -767,17 +767,37 @@
     };
   }
 
-  function formatApproxMoney(amount, currency) {
+  function formatMoneyAmount(amount, currency) {
     var rounded = Math.round(parseNumber(amount, 0));
     var formatted = String(rounded).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
     var currencyText = String(currency || "₽");
     if (currencyText === "RUB" || currencyText === "RUR") currencyText = "₽";
-    return "≈ " + formatted + " " + currencyText;
+    return formatted + " " + currencyText;
   }
 
   function formatMetric(value, suffix) {
     var num = parseNumber(value, Number.NaN);
     return Number.isFinite(num) ? num.toFixed(3) + " " + suffix : "—";
+  }
+
+
+  function getVisibleQuantityPoints(offers, selectedByProperty, volumeCode, numericPresets) {
+    var byQty = {};
+    (Array.isArray(numericPresets) ? numericPresets : []).forEach(function (preset) {
+      var qty = parseNumber(preset && preset.num, Number.NaN);
+      if (!Number.isFinite(qty) || byQty[String(qty)]) return;
+
+      var draftSel = Object.assign({}, selectedByProperty);
+      draftSel[volumeCode] = String(preset.xml_id || qty);
+      var offer = pickMatchedOffer(offers, draftSel, {});
+      if (offer) byQty[String(qty)] = { offer: offer, qty: qty };
+    });
+
+    return Object.keys(byQty).map(function (key) {
+      return byQty[key];
+    }).sort(function (a, b) {
+      return a.qty - b.qty;
+    });
   }
 
   function renderPriceTable($block, offers, presetsByCode, selectedByProperty, volumeCode, customVolumeValue, priceGroups, selectedCatalogGroupId) {
@@ -839,7 +859,10 @@
       '<div class="frontcalc-table-head"><div>Тираж</div><div>Строгий <span class="frontcalc-tip" title="Отгрузка в соответствии с согласованным сроком"><svg width="17" height="16"><use xlink:href="/bitrix/templates/aspro-premier/images/svg/catalog/item_order_icons.svg?1774850114#attention-16-16"></use></svg></span></div><div>Гибкий <span class="frontcalc-tip" title="Срок отгрузки может быть изменен (не больше 10 рабочих дней)"><svg width="17" height="16"><use xlink:href="/bitrix/templates/aspro-premier/images/svg/catalog/item_order_icons.svg?1774850114#attention-16-16"></use></svg></span></div></div>';
     html += '<div class="frontcalc-table-body">';
 
-    var scopedQuantityPoints = getScopedOffersForQuantity(offers, selectedByProperty, {}, volumeCode);
+    var scopedQuantityPoints = getVisibleQuantityPoints(offers, selectedByProperty, volumeCode, numericPresets);
+    if (!scopedQuantityPoints.length) {
+      scopedQuantityPoints = getScopedOffersForQuantity(offers, selectedByProperty, {}, volumeCode);
+    }
 
     merged.forEach(function (preset, index) {
       var xml = String(preset.xml_id || "");
@@ -855,8 +878,6 @@
       var flexNum = parseNumber(flex && flex.price, strictNum);
       var weightText = formatMetric(strictEstimate.weightKg, "кг");
       var volumeText = formatMetric(strictEstimate.volumeM3, "м³");
-      var isEstimated = strictEstimate.isEstimated || flexEstimate.isEstimated;
-      var customMark = isEstimated ? " · расчёт" : "";
 
       html +=
         '<div class="frontcalc-table-row' +
@@ -875,7 +896,6 @@
         weightText +
         " · " +
         volumeText +
-        customMark +
         "</span></button>";
       html +=
         '<button type="button" class="frontcalc-cell" data-col="strict"><span class="frontcalc-cell-main">' +
@@ -997,7 +1017,10 @@
     var volumeCode = "CALC_PROP_VOLUME";
     var customVolumeValue = Number.NaN;
     var explicitVolumeStep = resolveConfiguredStep(fieldByCode[volumeCode]);
-    var volumeStep = Math.max(1, Number.isFinite(explicitVolumeStep) ? explicitVolumeStep : deriveStepFromPresets(presetsByCode[volumeCode]));
+    var derivedVolumeStep = deriveStepFromPresets(presetsByCode[volumeCode]);
+    var volumeStep = Number.isFinite(explicitVolumeStep) && explicitVolumeStep > 0
+      ? explicitVolumeStep
+      : (Number.isFinite(derivedVolumeStep) && derivedVolumeStep > 0 ? derivedVolumeStep : 1);
     var volumeMin = parseNumber(fieldByCode[volumeCode] && fieldByCode[volumeCode].min, Number.NaN);
     var volumeMax = parseNumber(fieldByCode[volumeCode] && fieldByCode[volumeCode].max, Number.NaN);
 
@@ -1296,7 +1319,7 @@
       var direction = parseNumber($(this).attr('data-step'), 0);
       var list = (presetsByCode[volumeCode] || []).map(function (p) { return parseNumber(p.xml_id, Number.NaN); }).filter(Number.isFinite).sort(function(a,b){return a-b;});
       if (!list.length) return;
-      var minV = Number.isFinite(volumeMin) ? volumeMin : 1;
+      var minV = Number.isFinite(volumeMin) ? volumeMin : list[0];
       var maxV = Number.isFinite(volumeMax) ? volumeMax : Number.POSITIVE_INFINITY;
       var current = parseNumber(selectedByProperty[volumeCode], list[0]);
       var next = normalizeToStep(clamp(current + direction * volumeStep, minV, maxV), minV, volumeStep);
@@ -1315,7 +1338,7 @@
       } else {
         var presetNums = list.map(function (p) { return parseNumber(p.xml_id, Number.NaN); }).filter(Number.isFinite).sort(function(a,b){return a-b;});
         if (!presetNums.length) return;
-        var minV = Number.isFinite(volumeMin) ? volumeMin : 1;
+        var minV = Number.isFinite(volumeMin) ? volumeMin : presetNums[0];
         var maxV = Number.isFinite(volumeMax) ? volumeMax : Number.POSITIVE_INFINITY;
         var val = parseNumber(raw, presetNums[0]);
         val = normalizeToStep(clamp(val, minV, maxV), minV, volumeStep);
