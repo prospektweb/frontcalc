@@ -448,6 +448,8 @@ if (!empty($offersMap[$productId]) && is_array($offersMap[$productId])) {
         $optimalPrice = CCatalogProduct::GetOptimalPrice($offerId, 1, $userGroups, 'N', [], SITE_ID);
         if (is_array($optimalPrice) && !empty($optimalPrice['RESULT_PRICE'])) {
             $resultPrice = $optimalPrice['RESULT_PRICE'];
+            $optValue = (float)($resultPrice['DISCOUNT_PRICE'] ?? $resultPrice['BASE_PRICE'] ?? 0);
+            $optCurrency = (string)($resultPrice['CURRENCY'] ?? '');
             $optGroupId = (int)($resultPrice['PRICE_TYPE_ID'] ?? 0);
             if (in_array($optGroupId, $priceAccess['view'], true)) {
                 $optRounded = frontcalc_round_catalog_price($optValue, $optGroupId, $optCurrency);
