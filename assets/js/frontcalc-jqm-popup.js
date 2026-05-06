@@ -4,6 +4,46 @@
   }
   window.__frontcalcJqmReady = true;
 
+  ensurePopupStyles();
+
+
+  function ensurePopupStyles() {
+    if (document.getElementById("frontcalc-jqm-popup-runtime-styles")) {
+      return;
+    }
+
+    var style = document.createElement("style");
+    style.id = "frontcalc-jqm-popup-runtime-styles";
+    style.textContent = [
+      "#popup_iframe_wrapper .frontcalc_frame{width:min(1320px,calc(100vw - 32px)) !important;max-width:calc(100vw - 32px) !important;}",
+      "#popup_iframe_wrapper .frontcalc_frame .scrollbar{max-height:calc(100vh - 40px);overflow:auto;}",
+      ".frontcalc-popup-shell{width:100%;max-width:100%;box-sizing:border-box;}",
+      ".frontcalc-popup-shell.form.popup{display:block;padding:0;background:#fff;}",
+      ".frontcalc-popup-content{min-height:220px;padding:24px;}",
+      ".frontcalc-layout{display:grid;grid-template-columns:minmax(0,2fr) minmax(320px,1fr);gap:20px;align-items:start;}",
+      ".frontcalc-selectors{display:flex;flex-direction:column;gap:20px;}",
+      ".frontcalc-price-panel__inner{position:sticky;top:12px;border:1px solid #d9dee7;border-radius:12px;background:#fafbff;padding:16px;}",
+      ".frontcalc-volume-input{display:flex;gap:8px;align-items:center;margin-bottom:12px;}",
+      ".frontcalc-table-input{width:120px;height:44px;border:1px solid #d9dee7;border-radius:10px;padding:0 12px;font-size:22px;font-weight:600;box-sizing:border-box;}",
+      ".frontcalc-volume-btns{display:flex;gap:6px;}",
+      ".frontcalc-volume-btn{width:40px;height:40px;border:1px solid #d9dee7;border-radius:10px;background:#f2f4f8;font-size:24px;line-height:1;cursor:pointer;}",
+      ".frontcalc-table-head{display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:8px;margin-bottom:8px;font-weight:600;color:#1a2236;}",
+      ".frontcalc-table-head>div{display:flex;align-items:center;gap:6px;}",
+      ".frontcalc-tip svg{fill:#8591aa;}",
+      ".frontcalc-table-body{display:flex;flex-direction:column;gap:6px;max-height:320px;overflow:auto;}",
+      ".frontcalc-table-row{display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:8px;}",
+      ".frontcalc-cell{border:1px solid #d9dee7;border-radius:10px;background:#fff;min-height:52px;padding:6px 10px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;cursor:pointer;box-sizing:border-box;font:inherit;text-align:left;}",
+      ".frontcalc-cell-main{font-size:16px;line-height:1.2;color:#212a3f;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}",
+      ".frontcalc-cell-sub{font-size:12px;color:#8b93a6;margin-top:2px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}",
+      ".frontcalc-table-row:hover .frontcalc-cell,.frontcalc-cell:hover{border-color:#4f7bd9;background:#f8fbff;}",
+      ".frontcalc-table-row.is-selected .frontcalc-cell{border-color:#2f3a52;box-shadow:inset 0 0 0 1px #2f3a52;}",
+      ".frontcalc-cell.is-hover-row,.frontcalc-cell.is-hover-col{border-color:#4f7bd9;background:#f8fbff;}",
+      ".frontcalc-cell.is-picked{border-color:#2f3a52 !important;box-shadow:inset 0 0 0 1px #2f3a52;}",
+      "@media (max-width: 991px){.frontcalc-layout{grid-template-columns:1fr;}.frontcalc-price-panel{order:-1;}}"
+    ].join("\n");
+    document.head.appendChild(style);
+  }
+
   function escapeHtml(str) {
     return String(str || "").replace(/[&<>"']/g, function (ch) {
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[ch] || ch;
