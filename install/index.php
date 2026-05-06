@@ -94,10 +94,10 @@ class prospektweb_frontcalc extends CModule
             $this->InstallFiles();
             $this->InstallDB();
             $this->patchAsproBasketFile();
-            $this->patchAsproPricesFile();
+            $this->frontcalcInstallReplaceAsproPricesTemplate();
         } catch (\Throwable $e) {
-            $this->restoreAsproPricesFile();
-            $this->removeFrontcalcBasketSnippetFromBasketFile();
+            $this->frontcalcInstallRestoreAsproPricesTemplate();
+            $this->frontcalcInstallRemoveBasketSnippet();
             $this->UnInstallFiles();
             ModuleManager::unRegisterModule($this->MODULE_ID);
             $APPLICATION->ThrowException($e->getMessage());
@@ -128,8 +128,8 @@ class prospektweb_frontcalc extends CModule
 
         $removeData = (isset($_REQUEST['remove_data']) && $_REQUEST['remove_data'] === 'Y');
 
-        $this->restoreAsproPricesFile();
-        $this->removeFrontcalcBasketSnippetFromBasketFile();
+        $this->frontcalcInstallRestoreAsproPricesTemplate();
+        $this->frontcalcInstallRemoveBasketSnippet();
         $this->UnInstallDB($removeData);
         $this->UnInstallFiles();
         ModuleManager::unRegisterModule($this->MODULE_ID);
@@ -444,7 +444,7 @@ class prospektweb_frontcalc extends CModule
     }
 
 
-    protected function removeFrontcalcBasketSnippetFromBasketFile(): void
+    protected function frontcalcInstallRemoveBasketSnippet(): void
     {
         $basketPath = $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/aspro.premier/lib/product/basket.php';
         if (!is_file($basketPath)) {
@@ -463,13 +463,13 @@ class prospektweb_frontcalc extends CModule
         }
 
         if (@file_put_contents($basketPath, $updated) === false) {
-            $this->logFrontcalcWarning('Не удалось удалить патч FrontCalc из файла: ' . $basketPath);
+            $this->frontcalcInstallLogWarning('Не удалось удалить патч FrontCalc из файла: ' . $basketPath);
         }
     }
 
-    protected function patchAsproPricesFile(): void
+    protected function frontcalcInstallReplaceAsproPricesTemplate(): void
     {
-        $targetPath = $this->getAsproPricesPath();
+        $targetPath = $this->frontcalcInstallGetAsproPricesPath();
         $sourcePath = dirname(__DIR__) . '/prices_with_edit.php';
 
         if (!is_file($targetPath)) {
@@ -515,14 +515,14 @@ class prospektweb_frontcalc extends CModule
         Option::set($this->MODULE_ID, 'ASPRO_PRICES_PATCHED_HASH', (string)hash_file('sha256', $targetPath));
     }
 
-    protected function restoreAsproPricesFile(): void
+    protected function frontcalcInstallRestoreAsproPricesTemplate(): void
     {
         $targetPath = (string)Option::get($this->MODULE_ID, 'ASPRO_PRICES_PATH', '');
         $backupPath = (string)Option::get($this->MODULE_ID, 'ASPRO_PRICES_BACKUP_PATH', '');
         $patchedHash = (string)Option::get($this->MODULE_ID, 'ASPRO_PRICES_PATCHED_HASH', '');
 
         if ($targetPath === '') {
-            $targetPath = $this->getAsproPricesPath();
+            $targetPath = $this->frontcalcInstallGetAsproPricesPath();
         }
         if ($backupPath === '' || !is_file($backupPath)) {
             return;
@@ -531,7 +531,7 @@ class prospektweb_frontcalc extends CModule
         if (is_file($targetPath) && $patchedHash !== '') {
             $currentHash = (string)hash_file('sha256', $targetPath);
             if ($currentHash !== $patchedHash) {
-                $this->logFrontcalcWarning(
+                $this->frontcalcInstallLogWarning(
                     'Файл Aspro prices.php изменён после установки FrontCalc, автоматическое восстановление пропущено: ' . $targetPath . '. Резервная копия: ' . $backupPath
                 );
                 return;
@@ -540,21 +540,21 @@ class prospektweb_frontcalc extends CModule
 
         $targetDir = dirname($targetPath);
         if (!is_dir($targetDir) && !@mkdir($targetDir, 0775, true) && !is_dir($targetDir)) {
-            $this->logFrontcalcWarning('Не удалось создать каталог для восстановления prices.php: ' . $targetDir);
+            $this->frontcalcInstallLogWarning('Не удалось создать каталог для восстановления prices.php: ' . $targetDir);
             return;
         }
 
         if (!@copy($backupPath, $targetPath)) {
-            $this->logFrontcalcWarning('Не удалось восстановить Aspro prices.php из резервной копии: ' . $backupPath);
+            $this->frontcalcInstallLogWarning('Не удалось восстановить Aspro prices.php из резервной копии: ' . $backupPath);
         }
     }
 
-    protected function getAsproPricesPath(): string
+    protected function frontcalcInstallGetAsproPricesPath(): string
     {
         return $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/aspro.premier/lib/product/prices.php';
     }
 
-    protected function logFrontcalcWarning(string $message): void
+    protected function frontcalcInstallLogWarning(string $message): void
     {
         if (function_exists('AddMessage2Log')) {
             AddMessage2Log($message, $this->MODULE_ID);
