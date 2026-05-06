@@ -87,6 +87,36 @@ function frontcalc_get_catalog_groups_by_rights(array $userGroups): array
     ];
 }
 
+
+/**
+ * @param array<int,array<string,mixed>> $rows
+ * @return array<string,array{catalog_group_id:int,catalog_group_name:string,prices:array<int,array<string,mixed>>}>
+ */
+function frontcalc_group_price_ranges_by_catalog_group(array $rows): array
+{
+    $grouped = [];
+
+    foreach ($rows as $row) {
+        $groupId = (int)($row['catalog_group_id'] ?? 0);
+        if ($groupId <= 0) {
+            continue;
+        }
+
+        $groupKey = (string)$groupId;
+        if (!isset($grouped[$groupKey])) {
+            $grouped[$groupKey] = [
+                'catalog_group_id' => $groupId,
+                'catalog_group_name' => (string)($row['catalog_group_name'] ?? ('PRICE_' . $groupId)),
+                'prices' => [],
+            ];
+        }
+
+        $grouped[$groupKey]['prices'][] = $row;
+    }
+
+    return $grouped;
+}
+
 function frontcalc_pick_price_for_quantity(array $rows, int $quantity = 1): ?array
 {
     if (empty($rows)) {
@@ -327,6 +357,7 @@ if (!empty($offersMap[$productId]) && is_array($offersMap[$productId])) {
             }
             $pricesViewByGroup[$groupId][] = $row;
         }
+        $pricesViewRangesByGroup = frontcalc_group_price_ranges_by_catalog_group($pricesViewAll);
         $pricesView = [];
         foreach ($pricesViewByGroup as $groupRows) {
             $picked = frontcalc_pick_price_for_quantity($groupRows, 1);
@@ -343,6 +374,7 @@ if (!empty($offersMap[$productId]) && is_array($offersMap[$productId])) {
             }
             $pricesBuyByGroup[$groupId][] = $row;
         }
+        $pricesBuyRangesByGroup = frontcalc_group_price_ranges_by_catalog_group($pricesBuyAll);
         $pricesBuy = [];
         foreach ($pricesBuyByGroup as $groupRows) {
             $picked = frontcalc_pick_price_for_quantity($groupRows, 1);
@@ -399,6 +431,11 @@ if (!empty($offersMap[$productId]) && is_array($offersMap[$productId])) {
             'properties' => $offerProps,
             'catalog' => [
                 'prices' => $pricesViewAll,
+                'prices_view_ranges' => $pricesViewAll,
+                'prices_buy_ranges' => $pricesBuyAll,
+                'prices_by_group' => $pricesViewRangesByGroup,
+                'prices_view_by_group' => $pricesViewRangesByGroup,
+                'prices_buy_by_group' => $pricesBuyRangesByGroup,
                 'prices_view' => $pricesView,
                 'prices_buy' => $pricesBuy,
                 'primary_buy_price' => $primaryBuyPrice,
