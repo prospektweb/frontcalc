@@ -94,7 +94,10 @@ class prospektweb_frontcalc extends CModule
             $this->InstallFiles();
             $this->InstallDB();
             $this->patchAsproBasketFile();
+            $this->frontcalcInstallReplaceAsproPricesTemplate();
         } catch (\Throwable $e) {
+            $this->frontcalcInstallRestoreAsproPricesTemplate();
+            $this->frontcalcInstallRemoveBasketSnippet();
             $this->UnInstallFiles();
             ModuleManager::unRegisterModule($this->MODULE_ID);
             $APPLICATION->ThrowException($e->getMessage());
@@ -125,6 +128,8 @@ class prospektweb_frontcalc extends CModule
 
         $removeData = (isset($_REQUEST['remove_data']) && $_REQUEST['remove_data'] === 'Y');
 
+        $this->frontcalcInstallRestoreAsproPricesTemplate();
+        $this->frontcalcInstallRemoveBasketSnippet();
         $this->UnInstallDB($removeData);
         $this->UnInstallFiles();
         ModuleManager::unRegisterModule($this->MODULE_ID);
@@ -248,6 +253,124 @@ class prospektweb_frontcalc extends CModule
 "
             . "<?php /* FRONTCALC_BUTTON_END */ ?>
 ";
+    }
+
+
+    protected function frontcalcInstallRemoveBasketSnippet(): void
+    {
+        $basketPath = $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/aspro.premier/lib/product/basket.php';
+        if (!is_file($basketPath)) {
+            return;
+        }
+
+        $content = (string)file_get_contents($basketPath);
+        if ($content === '') {
+            return;
+        }
+
+        $pattern = '#\s*<\?php\s*/\*\s*FRONTCALC_BUTTON_START\s*\*/\s*\?>[\s\S]*?<\?php\s*/\*\s*FRONTCALC_BUTTON_END\s*\*/\s*\?>\s*#';
+        $updated = preg_replace($pattern, "\n", $content, -1, $replaceCount);
+        if (!is_string($updated) || $replaceCount < 1) {
+            return;
+        }
+
+        if (@file_put_contents($basketPath, $updated) === false) {
+            $this->frontcalcInstallLogWarning('Не удалось удалить патч FrontCalc из файла: ' . $basketPath);
+        }
+    }
+
+    protected function frontcalcInstallReplaceAsproPricesTemplate(): void
+    {
+        $targetPath = $this->frontcalcInstallGetAsproPricesPath();
+        $sourcePath = dirname(__DIR__) . '/prices_with_edit.php';
+
+        if (!is_file($targetPath)) {
+            throw new \RuntimeException('Не найден файл Aspro для замены: ' . $targetPath);
+        }
+        if (!is_readable($targetPath) || !is_writable($targetPath)) {
+            throw new \RuntimeException('Файл Aspro prices.php недоступен для чтения или записи: ' . $targetPath);
+        }
+        if (!is_file($sourcePath)) {
+            throw new \RuntimeException('Не найден исходный файл prices_with_edit.php');
+        }
+
+        $patchedContent = (string)file_get_contents($sourcePath);
+        if ($patchedContent === '') {
+            throw new \RuntimeException('Файл prices_with_edit.php пуст или не читается');
+        }
+
+        $patchedSourceHash = hash('sha256', $patchedContent);
+        $currentHash = hash_file('sha256', $targetPath);
+        if ($currentHash === $patchedSourceHash) {
+            Option::set($this->MODULE_ID, 'ASPRO_PRICES_PATH', $targetPath);
+            Option::set($this->MODULE_ID, 'ASPRO_PRICES_PATCHED_HASH', $patchedSourceHash);
+            return;
+        }
+
+        $backupDir = $_SERVER['DOCUMENT_ROOT'] . '/local/modules/' . $this->MODULE_ID . '/backup/aspro_premier';
+        if (!is_dir($backupDir) && !@mkdir($backupDir, 0775, true) && !is_dir($backupDir)) {
+            throw new \RuntimeException('Не удалось создать каталог резервных копий: ' . $backupDir);
+        }
+
+        $backupPath = $backupDir . '/prices.php.' . date('YmdHis') . '.bak';
+        if (!@copy($targetPath, $backupPath)) {
+            throw new \RuntimeException('Не удалось создать резервную копию prices.php: ' . $backupPath);
+        }
+
+        if (@file_put_contents($targetPath, $patchedContent) === false) {
+            throw new \RuntimeException('Не удалось заменить файл Aspro prices.php: ' . $targetPath);
+        }
+
+        Option::set($this->MODULE_ID, 'ASPRO_PRICES_PATH', $targetPath);
+        Option::set($this->MODULE_ID, 'ASPRO_PRICES_BACKUP_PATH', $backupPath);
+        Option::set($this->MODULE_ID, 'ASPRO_PRICES_ORIGINAL_HASH', (string)$currentHash);
+        Option::set($this->MODULE_ID, 'ASPRO_PRICES_PATCHED_HASH', (string)hash_file('sha256', $targetPath));
+    }
+
+    protected function frontcalcInstallRestoreAsproPricesTemplate(): void
+    {
+        $targetPath = (string)Option::get($this->MODULE_ID, 'ASPRO_PRICES_PATH', '');
+        $backupPath = (string)Option::get($this->MODULE_ID, 'ASPRO_PRICES_BACKUP_PATH', '');
+        $patchedHash = (string)Option::get($this->MODULE_ID, 'ASPRO_PRICES_PATCHED_HASH', '');
+
+        if ($targetPath === '') {
+            $targetPath = $this->frontcalcInstallGetAsproPricesPath();
+        }
+        if ($backupPath === '' || !is_file($backupPath)) {
+            return;
+        }
+
+        if (is_file($targetPath) && $patchedHash !== '') {
+            $currentHash = (string)hash_file('sha256', $targetPath);
+            if ($currentHash !== $patchedHash) {
+                $this->frontcalcInstallLogWarning(
+                    'Файл Aspro prices.php изменён после установки FrontCalc, автоматическое восстановление пропущено: ' . $targetPath . '. Резервная копия: ' . $backupPath
+                );
+                return;
+            }
+        }
+
+        $targetDir = dirname($targetPath);
+        if (!is_dir($targetDir) && !@mkdir($targetDir, 0775, true) && !is_dir($targetDir)) {
+            $this->frontcalcInstallLogWarning('Не удалось создать каталог для восстановления prices.php: ' . $targetDir);
+            return;
+        }
+
+        if (!@copy($backupPath, $targetPath)) {
+            $this->frontcalcInstallLogWarning('Не удалось восстановить Aspro prices.php из резервной копии: ' . $backupPath);
+        }
+    }
+
+    protected function frontcalcInstallGetAsproPricesPath(): string
+    {
+        return $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/aspro.premier/lib/product/prices.php';
+    }
+
+    protected function frontcalcInstallLogWarning(string $message): void
+    {
+        if (function_exists('AddMessage2Log')) {
+            AddMessage2Log($message, $this->MODULE_ID);
+        }
     }
 
     protected function registerAdminHandlers()
@@ -502,6 +625,24 @@ class prospektweb_frontcalc extends CModule
             throw new \RuntimeException('Не удалось скопировать hide-technical-values.css в /local/modules');
         }
 
+        $modulePricesCssSource = dirname(__DIR__) . '/assets/css/prices-popup-ext.css';
+        $modulePricesCssTarget = $moduleRootPath . '/assets/css/prices-popup-ext.css';
+        if (!is_file($modulePricesCssSource)) {
+            throw new \RuntimeException('Не найден исходный файл assets/css/prices-popup-ext.css');
+        }
+        if (!@copy($modulePricesCssSource, $modulePricesCssTarget)) {
+            throw new \RuntimeException('Не удалось скопировать prices-popup-ext.css в /local/modules');
+        }
+
+        $modulePricesSource = dirname(__DIR__) . '/prices_with_edit.php';
+        $modulePricesTarget = $moduleRootPath . '/prices_with_edit.php';
+        if (!is_file($modulePricesSource)) {
+            throw new \RuntimeException('Не найден исходный файл prices_with_edit.php');
+        }
+        if (!@copy($modulePricesSource, $modulePricesTarget)) {
+            throw new \RuntimeException('Не удалось скопировать prices_with_edit.php в /local/modules');
+        }
+
         return true;
     }
 
@@ -562,6 +703,14 @@ class prospektweb_frontcalc extends CModule
         $moduleHideCssTarget = $moduleRootPath . '/assets/css/hide-technical-values.css';
         if (is_file($moduleHideCssTarget)) {
             @unlink($moduleHideCssTarget);
+        }
+        $modulePricesCssTarget = $moduleRootPath . '/assets/css/prices-popup-ext.css';
+        if (is_file($modulePricesCssTarget)) {
+            @unlink($modulePricesCssTarget);
+        }
+        $modulePricesTarget = $moduleRootPath . '/prices_with_edit.php';
+        if (is_file($modulePricesTarget)) {
+            @unlink($modulePricesTarget);
         }
 
         @rmdir($moduleRootPath . '/admin');
