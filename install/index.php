@@ -97,7 +97,7 @@ class prospektweb_frontcalc extends CModule
             $this->patchAsproPricesFile();
         } catch (\Throwable $e) {
             $this->restoreAsproPricesFile();
-            $this->unpatchAsproBasketFile();
+            $this->removeFrontcalcBasketSnippetFromBasketFile();
             $this->UnInstallFiles();
             ModuleManager::unRegisterModule($this->MODULE_ID);
             $APPLICATION->ThrowException($e->getMessage());
@@ -129,7 +129,7 @@ class prospektweb_frontcalc extends CModule
         $removeData = (isset($_REQUEST['remove_data']) && $_REQUEST['remove_data'] === 'Y');
 
         $this->restoreAsproPricesFile();
-        $this->unpatchAsproBasketFile();
+        $this->removeFrontcalcBasketSnippetFromBasketFile();
         $this->UnInstallDB($removeData);
         $this->UnInstallFiles();
         ModuleManager::unRegisterModule($this->MODULE_ID);
@@ -444,7 +444,7 @@ class prospektweb_frontcalc extends CModule
     }
 
 
-    protected function unpatchAsproBasketFile(): void
+    protected function removeFrontcalcBasketSnippetFromBasketFile(): void
     {
         $basketPath = $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/aspro.premier/lib/product/basket.php';
         if (!is_file($basketPath)) {
