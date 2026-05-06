@@ -127,6 +127,7 @@ class prospektweb_frontcalc extends CModule
         $removeData = (isset($_REQUEST['remove_data']) && $_REQUEST['remove_data'] === 'Y');
 
         $this->restoreAsproPricesFile();
+        $this->unpatchAsproBasketFile();
         $this->UnInstallDB($removeData);
         $this->UnInstallFiles();
         ModuleManager::unRegisterModule($this->MODULE_ID);
@@ -325,7 +326,7 @@ class prospektweb_frontcalc extends CModule
         $snippet = $this->buildFrontcalcBasketSnippet();
 
         if (strpos($content, $startMarker) !== false) {
-            $replacePattern = '#<\?php\s*/\*\s*FRONTCALC_BUTTON_START\s*\*/\s*\?>[\s\S]*?<\?php\s*/\*\s*FRONTCALC_BUTTON_END\s*\*/\s*\?>#';
+            $replacePattern = '#(?:<\?php\s*)?/\*\s*FRONTCALC_BUTTON_START\s*\*/(?:\s*\?>)?[\s\S]*?(?:<\?php\s*)?/\*\s*FRONTCALC_BUTTON_END\s*\*/(?:\s*\?>)?#';
             $replaced = preg_replace($replacePattern, trim($snippet), $content, -1, $replaceCount);
 
             if (!is_string($replaced) || $replaceCount < 1) {
@@ -369,6 +370,58 @@ class prospektweb_frontcalc extends CModule
         if (@file_put_contents($basketPath, $content) === false) {
             throw new \RuntimeException('Не удалось записать патч в файл: ' . $basketPath);
         }
+    }
+
+    protected function unpatchAsproBasketFile()
+    {
+        $basketPath = $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/aspro.premier/lib/product/basket.php';
+        if (!is_file($basketPath)) {
+            return $this->addAsproBasketRestoreWarning('Не найден файл Aspro basket.php для удаления патча: ' . $basketPath);
+        }
+
+        if (!is_readable($basketPath)) {
+            return $this->addAsproBasketRestoreWarning('Файл Aspro basket.php не читается, удаление патча пропущено: ' . $basketPath);
+        }
+
+        $content = file_get_contents($basketPath);
+        if (!is_string($content) || $content === '') {
+            return $this->addAsproBasketRestoreWarning('Файл Aspro basket.php пуст или не читается, удаление патча пропущено: ' . $basketPath);
+        }
+
+        $startMarker = '/* FRONTCALC_BUTTON_START */';
+        $endMarker = '/* FRONTCALC_BUTTON_END */';
+        if (strpos($content, $startMarker) === false || strpos($content, $endMarker) === false) {
+            return $this->addAsproBasketRestoreWarning(
+                'Маркеры FrontCalc не найдены в Aspro basket.php, удаление патча пропущено: ' . $basketPath
+            );
+        }
+
+        $replacePattern = '#(?:<\?php\s*)?/\*\s*FRONTCALC_BUTTON_START\s*\*/(?:\s*\?>)?[\s\S]*?(?:<\?php\s*)?/\*\s*FRONTCALC_BUTTON_END\s*\*/(?:\s*\?>)?#';
+        $unpatchedContent = preg_replace($replacePattern, '', $content, -1, $replaceCount);
+        if (!is_string($unpatchedContent) || $replaceCount < 1) {
+            return $this->addAsproBasketRestoreWarning(
+                'Не удалось удалить блок FrontCalc по маркерам из Aspro basket.php: ' . $basketPath
+            );
+        }
+
+        if (@file_put_contents($basketPath, $unpatchedContent) === false) {
+            return $this->addAsproBasketRestoreWarning('Не удалось записать Aspro basket.php после удаления патча: ' . $basketPath);
+        }
+
+        Option::set($this->MODULE_ID, 'ASPRO_BASKET_UNPATCHED_AT', date('c'));
+
+        return '';
+    }
+
+    protected function addAsproBasketRestoreWarning($message)
+    {
+        Option::set($this->MODULE_ID, 'ASPRO_BASKET_RESTORE_WARNING', $message);
+
+        if (function_exists('AddMessage2Log')) {
+            AddMessage2Log($message, $this->MODULE_ID);
+        }
+
+        return $message;
     }
 
     protected function buildFrontcalcBasketSnippet()
