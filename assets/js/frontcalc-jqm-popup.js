@@ -4,6 +4,50 @@
   }
   window.__frontcalcJqmReady = true;
 
+  ensurePopupStyles();
+
+
+  function ensurePopupStyles() {
+    if (document.getElementById("frontcalc-jqm-popup-runtime-styles")) {
+      return;
+    }
+
+    var style = document.createElement("style");
+    style.id = "frontcalc-jqm-popup-runtime-styles";
+    style.textContent = [
+      "#popup_iframe_wrapper .frontcalc_frame{width:min(1320px,calc(100vw - 32px)) !important;max-width:calc(100vw - 32px) !important;}",
+      "#popup_iframe_wrapper .frontcalc_frame .scrollbar{max-height:calc(100vh - 40px);overflow:auto;}",
+      ".frontcalc-popup-shell{width:100%;max-width:100%;box-sizing:border-box;}",
+      ".frontcalc-popup-shell.form.popup{display:block;padding:0;background:#fff;}",
+      ".frontcalc-popup-content{min-height:220px;padding:24px;}",
+      ".frontcalc-layout{display:grid;grid-template-columns:minmax(0,2fr) minmax(320px,1fr);gap:20px;align-items:start;}",
+      ".frontcalc-selectors{display:flex;flex-direction:column;gap:20px;}",
+      ".frontcalc-price-panel__inner{position:sticky;top:12px;border:1px solid #d9dee7;border-radius:12px;background:#fafbff;padding:16px;}",
+      ".frontcalc-price-groups{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;}",
+      ".frontcalc-price-group{min-height:34px;padding:6px 12px;border:1px solid #d9dee7;border-radius:999px;background:#fff;color:#33405a;font-size:14px;line-height:1.2;cursor:pointer;}",
+      ".frontcalc-price-group:hover{border-color:#2f3a52;}",
+      ".frontcalc-price-group.is-active{border-color:#2f3a52;background:#101933;color:#fff;font-weight:600;}",
+      ".frontcalc-volume-input{display:flex;gap:8px;align-items:center;margin-bottom:12px;}",
+      ".frontcalc-table-input{width:120px;height:44px;border:1px solid #d9dee7;border-radius:10px;padding:0 12px;font-size:22px;font-weight:600;box-sizing:border-box;}",
+      ".frontcalc-volume-btns{display:flex;gap:6px;}",
+      ".frontcalc-volume-btn{width:40px;height:40px;border:1px solid #d9dee7;border-radius:10px;background:#f2f4f8;font-size:24px;line-height:1;cursor:pointer;}",
+      ".frontcalc-table-head{display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:8px;margin-bottom:8px;font-weight:600;color:#1a2236;}",
+      ".frontcalc-table-head>div{display:flex;align-items:center;gap:6px;}",
+      ".frontcalc-tip svg{fill:#8591aa;}",
+      ".frontcalc-table-body{display:flex;flex-direction:column;gap:6px;max-height:320px;overflow:auto;}",
+      ".frontcalc-table-row{display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:8px;}",
+      ".frontcalc-cell{border:1px solid #d9dee7;border-radius:10px;background:#fff;min-height:52px;padding:6px 10px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;cursor:pointer;box-sizing:border-box;font:inherit;text-align:left;}",
+      ".frontcalc-cell-main{font-size:16px;line-height:1.2;color:#212a3f;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}",
+      ".frontcalc-cell-sub{font-size:12px;color:#8b93a6;margin-top:2px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}",
+      ".frontcalc-table-row:hover .frontcalc-cell,.frontcalc-cell:hover{border-color:#4f7bd9;background:#f8fbff;}",
+      ".frontcalc-table-row.is-selected .frontcalc-cell{border-color:#2f3a52;box-shadow:inset 0 0 0 1px #2f3a52;}",
+      ".frontcalc-cell.is-hover-row,.frontcalc-cell.is-hover-col{border-color:#4f7bd9;background:#f8fbff;}",
+      ".frontcalc-cell.is-picked{border-color:#2f3a52 !important;box-shadow:inset 0 0 0 1px #2f3a52;}",
+      "@media (max-width: 991px){.frontcalc-layout{grid-template-columns:1fr;}.frontcalc-price-panel{order:-1;}}"
+    ].join("\n");
+    document.head.appendChild(style);
+  }
+
   function escapeHtml(str) {
     return String(str || "").replace(/[&<>"']/g, function (ch) {
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[ch] || ch;
@@ -486,39 +530,83 @@
     return String(priceObj.formatted || ((priceObj.price || 0) + " " + (priceObj.currency || "₽")));
   }
 
-  function pickFlexiblePrice(pricesView, strictPrice) {
-    if (!Array.isArray(pricesView) || !pricesView.length) return strictPrice;
-    var strictGroupId = parseNumber(strictPrice && strictPrice.catalog_group_id, Number.NaN);
-    var pool = pricesView.filter(function (row) {
-      if (!Number.isFinite(strictGroupId)) return true;
-      return parseNumber(row && row.catalog_group_id, Number.NaN) === strictGroupId;
+  function getOfferPriceRanges(offer) {
+    var catalog = offer && offer.catalog ? offer.catalog : {};
+    if (Array.isArray(catalog.price_ranges)) return catalog.price_ranges;
+    if (Array.isArray(catalog.prices_view_all)) return catalog.prices_view_all;
+    if (Array.isArray(catalog.prices)) return catalog.prices;
+    if (Array.isArray(catalog.prices_view)) return catalog.prices_view;
+    return [];
+  }
+
+  function normalizeRangeBound(value, fallback) {
+    if (value === null || typeof value === "undefined" || value === "") return fallback;
+    var num = parseNumber(value, Number.NaN);
+    return Number.isFinite(num) ? num : fallback;
+  }
+
+  function sortPriceRanges(ranges) {
+    return (Array.isArray(ranges) ? ranges.slice() : []).sort(function (a, b) {
+      var fromA = normalizeRangeBound(a && a.quantity_from, 0);
+      var fromB = normalizeRangeBound(b && b.quantity_from, 0);
+      if (fromA !== fromB) return fromA - fromB;
+
+      var toA = normalizeRangeBound(a && a.quantity_to, Number.POSITIVE_INFINITY);
+      var toB = normalizeRangeBound(b && b.quantity_to, Number.POSITIVE_INFINITY);
+      if (toA !== toB) return toA - toB;
+
+      return parseNumber(a && a.price, 0) - parseNumber(b && b.price, 0);
     });
-    if (!pool.length) pool = pricesView.slice();
+  }
 
-    function rangeOrder(row) {
-      var from = parseNumber(row && (row.from || row.from_value || row.quantity_from || row.range_from), Number.NaN);
-      if (Number.isFinite(from)) return from;
-      var name = String((row && (row.catalog_group_name || row.title || row.name)) || "").toLowerCase();
-      var m = name.match(/(?:от\s*)(\d+)/);
-      if (m) return parseNumber(m[1], Number.NaN);
-      return Number.NaN;
+  function getRangesByCatalogGroup(offer, catalogGroupId) {
+    var groupId = parseNumber(catalogGroupId, Number.NaN);
+    if (!Number.isFinite(groupId)) return [];
+    return sortPriceRanges(getOfferPriceRanges(offer).filter(function (row) {
+      return parseNumber(row && row.catalog_group_id, Number.NaN) === groupId;
+    }));
+  }
+
+  function pickStrictRangePrice(ranges) {
+    var sorted = sortPriceRanges(ranges);
+    for (var i = 0; i < sorted.length; i++) {
+      var from = normalizeRangeBound(sorted[i] && sorted[i].quantity_from, 0);
+      var to = normalizeRangeBound(sorted[i] && sorted[i].quantity_to, Number.POSITIVE_INFINITY);
+      if (from <= 1 && to >= 1) return sorted[i];
     }
+    return sorted[0] || null;
+  }
 
-    var sorted = pool
-      .map(function (row) {
-        return { row: row, order: rangeOrder(row) };
-      })
-      .sort(function (a, b) {
-        var ao = Number.isFinite(a.order) ? a.order : Number.POSITIVE_INFINITY;
-        var bo = Number.isFinite(b.order) ? b.order : Number.POSITIVE_INFINITY;
-        if (ao !== bo) return ao - bo;
-        return parseNumber(a.row && a.row.price, 0) - parseNumber(b.row && b.row.price, 0);
-      })
-      .map(function (entry) {
-        return entry.row;
+  function pickFlexibleRangePrice(ranges) {
+    var sorted = sortPriceRanges(ranges);
+    return sorted[sorted.length - 1] || null;
+  }
+
+  function collectAvailablePriceGroups(priceGroups, offers) {
+    var byId = {};
+    (Array.isArray(priceGroups) ? priceGroups : []).forEach(function (group) {
+      var id = parseNumber(group && group.id, Number.NaN);
+      if (Number.isFinite(id)) {
+        byId[id] = { id: id, name: String((group && group.name) || ("PRICE_" + id)) };
+      }
+    });
+
+    (Array.isArray(offers) ? offers : []).forEach(function (offer) {
+      getOfferPriceRanges(offer).forEach(function (row) {
+        var id = parseNumber(row && row.catalog_group_id, Number.NaN);
+        if (!Number.isFinite(id) || byId[id]) return;
+        byId[id] = { id: id, name: String((row && row.catalog_group_name) || ("PRICE_" + id)) };
       });
+    });
 
-    return sorted[2] || sorted[1] || sorted[0] || strictPrice;
+    return Object.keys(byId)
+      .map(function (key) { return byId[key]; })
+      .filter(function (group) {
+        return (Array.isArray(offers) ? offers : []).some(function (offer) {
+          return getRangesByCatalogGroup(offer, group.id).length > 0;
+        });
+      })
+      .sort(function (a, b) { return a.id - b.id; });
   }
 
   function deriveStepFromPresets(presets) {
@@ -558,7 +646,7 @@
     return Number.NaN;
   }
 
-  function renderPriceTable($block, offers, presetsByCode, selectedByProperty, volumeCode, customVolumeValue) {
+  function renderPriceTable($block, offers, presetsByCode, selectedByProperty, volumeCode, customVolumeValue, priceGroups, selectedCatalogGroupId) {
     var volumePresets = (presetsByCode[volumeCode] || []).slice();
     if (!volumePresets.length) {
       $block.html('<div class="frontcalc-price-empty">Нет значений тиража для таблицы.</div>');
@@ -594,7 +682,21 @@
     merged.sort(function (a, b) { return a.num - b.num; });
     var selectedXml = String(selectedByProperty[volumeCode] || (merged[0] && merged[0].xml_id) || "");
 
-    var html = '<div class="frontcalc-volume-input">';
+    var html = "";
+    if (Array.isArray(priceGroups) && priceGroups.length) {
+      html += '<div class="frontcalc-price-groups">';
+      priceGroups.forEach(function (group) {
+        var id = parseNumber(group && group.id, Number.NaN);
+        if (!Number.isFinite(id)) return;
+        html += '<button type="button" class="frontcalc-price-group' +
+          (id === selectedCatalogGroupId ? ' is-active' : '') +
+          '" data-catalog-group-id="' + escapeHtml(String(id)) + '">' +
+          escapeHtml(group.name || ("PRICE_" + id)) +
+          '</button>';
+      });
+      html += '</div>';
+    }
+    html += '<div class="frontcalc-volume-input">';
     html +=
       '<input type="text" class="frontcalc-table-input" value="' +
       escapeHtml(selectedXml) +
@@ -611,10 +713,11 @@
       var draftSel = Object.assign({}, selectedByProperty);
       draftSel[volumeCode] = xml;
       var offer = pickMatchedOffer(offers, draftSel, {});
-      var strictPrice = offer && offer.catalog ? offer.catalog.primary_buy_price || null : null;
+      var priceRanges = getRangesByCatalogGroup(offer, selectedCatalogGroupId);
+      var strictPrice = pickStrictRangePrice(priceRanges);
       var strictNum = parseNumber(strictPrice && strictPrice.price, 0);
       var qty = Math.max(1, parseNumber(xml, 1));
-      var flex = pickFlexiblePrice(offer && offer.catalog ? offer.catalog.prices_view : [], strictPrice);
+      var flex = pickFlexibleRangePrice(priceRanges) || strictPrice;
       var flexNum = parseNumber(flex && flex.price, strictNum);
       var weightKg = parseNumber(offer && offer.catalog && offer.catalog.weight_kg, 0).toFixed(3);
       var volumeM3 = parseNumber(offer && offer.catalog && offer.catalog.volume_m3, 0).toFixed(3);
@@ -689,6 +792,8 @@
     var data = payload && payload.data ? payload.data : {};
     var config = data.config || {};
     var offers = Array.isArray(data.offers) ? data.offers : [];
+    var priceGroups = collectAvailablePriceGroups(data.price_groups_view, offers);
+    var selectedCatalogGroupId = priceGroups.length ? parseNumber(priceGroups[0].id, Number.NaN) : Number.NaN;
     var propertyMeta = Array.isArray(data.property_meta) ? data.property_meta : [];
     var propertyMetaByCode = {};
     propertyMeta.forEach(function (meta) {
@@ -788,6 +893,12 @@
     }
     if (!defaultOffer) {
       defaultOffer = pickDefaultOfferBySort(offers, allCodes);
+    }
+    if (defaultOffer && defaultOffer.catalog && defaultOffer.catalog.primary_buy_price) {
+      var primaryGroupId = parseNumber(defaultOffer.catalog.primary_buy_price.catalog_group_id, Number.NaN);
+      if (Number.isFinite(primaryGroupId) && priceGroups.some(function (group) { return parseNumber(group && group.id, Number.NaN) === primaryGroupId; })) {
+        selectedCatalogGroupId = primaryGroupId;
+      }
     }
     var selectorCodes = allCodes.filter(function (code) {
       return code !== volumeCode;
@@ -998,12 +1109,19 @@
 
       var matched = pickMatchedOffer(offers, selectedByProperty, customByProperty);
       if (presetsByCode[volumeCode] && presetsByCode[volumeCode].length) {
-        renderPriceTable($priceInner, offers, presetsByCode, selectedByProperty, volumeCode, customVolumeValue);
+        renderPriceTable($priceInner, offers, presetsByCode, selectedByProperty, volumeCode, customVolumeValue, priceGroups, selectedCatalogGroupId);
       } else {
         renderPriceBlock($priceInner, matched);
       }
     }
 
+
+    $price.on("click", ".frontcalc-price-group", function () {
+      var groupId = parseNumber($(this).attr("data-catalog-group-id"), Number.NaN);
+      if (!Number.isFinite(groupId)) return;
+      selectedCatalogGroupId = groupId;
+      updatePrice();
+    });
 
     $price.on("click", ".frontcalc-table-row .frontcalc-cell", function () {
       var $cell = $(this);

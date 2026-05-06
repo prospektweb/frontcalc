@@ -223,6 +223,17 @@ $xmlIdErrors = [];
 $userGroups = frontcalc_get_current_user_groups();
 $priceAccess = frontcalc_get_catalog_groups_by_rights($userGroups);
 $catalogGroupNames = frontcalc_get_catalog_group_names();
+$priceGroupsView = [];
+foreach ($priceAccess['view'] as $catalogGroupId) {
+    $catalogGroupId = (int)$catalogGroupId;
+    if ($catalogGroupId <= 0) {
+        continue;
+    }
+    $priceGroupsView[] = [
+        'id' => $catalogGroupId,
+        'name' => (string)($catalogGroupNames[$catalogGroupId] ?? ('PRICE_' . $catalogGroupId)),
+    ];
+}
 
 $offersMap = CCatalogSKU::getOffersList(
     [$productId],
@@ -358,23 +369,24 @@ if (!empty($offersMap[$productId]) && is_array($offersMap[$productId])) {
             $optValue = (float)($resultPrice['DISCOUNT_PRICE'] ?? $resultPrice['BASE_PRICE'] ?? 0);
             $optCurrency = (string)($resultPrice['CURRENCY'] ?? '');
             $optGroupId = (int)($resultPrice['PRICE_TYPE_ID'] ?? 0);
-            $optRounded = frontcalc_round_catalog_price($optValue, $optGroupId, $optCurrency);
-            $primaryBuyPrice = [
-                'id' => (int)($resultPrice['PRICE_ID'] ?? 0),
-                'catalog_group_id' => $optGroupId,
-                'catalog_group_name' => (string)($catalogGroupNames[$optGroupId] ?? ('PRICE_' . $optGroupId)),
-                'price' => $optRounded,
-                'currency' => $optCurrency,
-                'formatted' => html_entity_decode((string)CCurrencyLang::CurrencyFormat($optRounded, $optCurrency, true), ENT_QUOTES | ENT_HTML5, 'UTF-8'),
-                'quantity_from' => null,
-                'quantity_to' => null,
-            ];
-        } elseif (!empty($pricesBuy)) {
+            if (in_array($optGroupId, $priceAccess['view'], true)) {
+                $optRounded = frontcalc_round_catalog_price($optValue, $optGroupId, $optCurrency);
+                $primaryBuyPrice = [
+                    'id' => (int)($resultPrice['PRICE_ID'] ?? 0),
+                    'catalog_group_id' => $optGroupId,
+                    'catalog_group_name' => (string)($catalogGroupNames[$optGroupId] ?? ('PRICE_' . $optGroupId)),
+                    'price' => $optRounded,
+                    'currency' => $optCurrency,
+                    'formatted' => html_entity_decode((string)CCurrencyLang::CurrencyFormat($optRounded, $optCurrency, true), ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+                    'quantity_from' => null,
+                    'quantity_to' => null,
+                ];
+            }
+        }
+        if ($primaryBuyPrice === null && !empty($pricesBuy)) {
             $primaryBuyPrice = $pricesBuy[0];
-        } elseif (!empty($pricesView)) {
+        } elseif ($primaryBuyPrice === null && !empty($pricesView)) {
             $primaryBuyPrice = $pricesView[0];
-        } elseif (!empty($pricesRaw)) {
-            $primaryBuyPrice = $pricesRaw[0];
         }
 
         $catalogProduct = CCatalogProduct::GetByID($offerId);
@@ -394,9 +406,12 @@ if (!empty($offersMap[$productId]) && is_array($offersMap[$productId])) {
             'xml_id' => (string)($offerRow['XML_ID'] ?? ''),
             'properties' => $offerProps,
             'catalog' => [
-                'prices' => $pricesRaw,
+                'prices' => $pricesViewAll,
+                'price_ranges' => $pricesViewAll,
                 'prices_view' => $pricesView,
+                'prices_view_all' => $pricesViewAll,
                 'prices_buy' => $pricesBuy,
+                'prices_buy_all' => $pricesBuyAll,
                 'primary_buy_price' => $primaryBuyPrice,
                 'weight_kg' => $weightKg,
                 'dimensions_mm' => [
@@ -436,6 +451,7 @@ echo json_encode([
         'requested_offer_id' => $requestedOfferId,
         'user_groups' => $userGroups,
         'price_access' => $priceAccess,
+        'price_groups_view' => $priceGroupsView,
         'config' => $config,
         'property_meta' => array_values($propertyMeta),
         'offers' => $offers,
