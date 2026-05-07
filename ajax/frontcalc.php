@@ -320,7 +320,7 @@ $offersMap = CCatalogSKU::getOffersList(
     [$productId],
     $productsIblockId,
     ['ACTIVE' => 'Y'],
-    ['ID', 'IBLOCK_ID', 'NAME', 'XML_ID'],
+    ['ID', 'IBLOCK_ID', 'NAME', 'XML_ID', 'SORT'],
     array_values($calcPropertyCodes)
 );
 
@@ -486,6 +486,7 @@ if (!empty($offersMap[$productId]) && is_array($offersMap[$productId])) {
             'id' => $offerId,
             'name' => (string)($offerRow['NAME'] ?? ''),
             'xml_id' => (string)($offerRow['XML_ID'] ?? ''),
+            'sort' => (int)($offerRow['SORT'] ?? 500),
             'properties' => $offerProps,
             'catalog' => [
                 'prices' => $pricesViewAll,
