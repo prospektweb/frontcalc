@@ -22,6 +22,7 @@
       ".frontcalc-popup-content{min-height:220px;padding:24px;}",
       ".frontcalc-layout{display:grid;grid-template-columns:minmax(0,2fr) minmax(320px,1fr);gap:20px;align-items:start;}",
       ".frontcalc-selectors{display:flex;flex-direction:column;gap:20px;}",
+      ".frontcalc-offer-title{margin:0 0 4px;font-size:24px;line-height:1.25;font-weight:700;color:#101933;}",
       ".frontcalc-price-panel__inner{position:sticky;top:12px;border:1px solid #d9dee7;border-radius:12px;background:#fafbff;padding:16px;}",
       ".frontcalc-price-groups{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;}",
       ".frontcalc-price-group{min-height:34px;padding:6px 12px;border:1px solid #d9dee7;border-radius:999px;background:#fff;color:#33405a;font-size:14px;line-height:1.2;cursor:pointer;}",
@@ -945,6 +946,103 @@
     $block.html(html);
   }
 
+
+  function getInputItemsForField(field) {
+    if (Array.isArray(field && field.group_inputs)) return field.group_inputs;
+    if (Array.isArray(field && field.inputs)) return field.inputs;
+    return field ? [field] : [];
+  }
+
+  function makeTemplateTargetMap(fields) {
+    var map = {};
+    (Array.isArray(fields) ? fields : []).forEach(function (field) {
+      var propertyCode = getFieldCode(field);
+      if (!propertyCode) return;
+      var groupCode = String((field.group_code || "") || propertyCode.replace(/^CALC_PROP_/, "").toLowerCase()).trim();
+      if (groupCode) map[groupCode] = { propertyCode: propertyCode, group: true };
+      getInputItemsForField(field).forEach(function (input) {
+        var inputCode = String((input && input.code) || "").trim();
+        if (!inputCode) return;
+        map[inputCode] = { propertyCode: propertyCode, inputCode: inputCode };
+        if (groupCode) map[groupCode + "." + inputCode] = { propertyCode: propertyCode, inputCode: inputCode };
+      });
+    });
+    return map;
+  }
+
+  function getDisplayValueForProperty(code, selectedByProperty, customByProperty, offers, anchorOffer) {
+    var selected = String(selectedByProperty[code] || "");
+    if (customByProperty[code]) return selected;
+    var anchorProp = anchorOffer && anchorOffer.properties ? anchorOffer.properties[code] : null;
+    if (anchorProp && String(anchorProp.xml_id || "") === selected) return String(anchorProp.value || selected);
+    var draft = {};
+    draft[code] = selected;
+    var offer = pickMatchedOffer(offers || [], draft, {});
+    var prop = offer && offer.properties ? offer.properties[code] : null;
+    return String((prop && prop.value) || selected);
+  }
+
+  function formatTemplateTargetValue(target, fieldByCode, selectedByProperty, customByProperty, offers, anchorOffer) {
+    if (!target || !target.propertyCode) return "";
+    var field = fieldByCode[target.propertyCode] || {};
+    var delimiter = field.group_delimiter || field.split_delimiter || "x";
+    var raw = getDisplayValueForProperty(target.propertyCode, selectedByProperty, customByProperty, offers, anchorOffer);
+    var values = String(raw).split(delimiter);
+    var items = getInputItemsForField(field);
+    var pieces = [];
+
+    items.forEach(function (input, index) {
+      if (target.inputCode && String(input && input.code || "") !== target.inputCode) return;
+      var value = values[index] !== undefined ? values[index] : raw;
+      var unit = String((input && input.unit) || "");
+      var concatUnit = Object.prototype.hasOwnProperty.call(input || {}, "concat_unit")
+        ? isTruthyFlag(input.concat_unit)
+        : isTruthyFlag(field.concat_unit);
+      if (unit && concatUnit) value += unit;
+      pieces.push(value);
+    });
+
+    if (!pieces.length) pieces.push(raw);
+    return pieces.join(delimiter);
+  }
+
+  function renderTitleTemplateNode(node, targetMap, fieldByCode, selectedByProperty, customByProperty, offers, anchorOffer) {
+    if (!node || typeof node !== "object") return "";
+    var mapping = node.mapping || null;
+    var targetKey = String((mapping && mapping.target) || "").trim();
+    if (targetKey && targetMap[targetKey]) {
+      return formatTemplateTargetValue(targetMap[targetKey], fieldByCode, selectedByProperty, customByProperty, offers, anchorOffer);
+    }
+    var children = Array.isArray(node.children) ? node.children : [];
+    if (children.length) {
+      var delimiter = String(node.delimiter || "");
+      return children.map(function (child) {
+        return renderTitleTemplateNode(child, targetMap, fieldByCode, selectedByProperty, customByProperty, offers, anchorOffer);
+      }).join(delimiter);
+    }
+    return String(node.text || "");
+  }
+
+
+  function hasAnyCustomValue(customByProperty) {
+    for (var code in customByProperty) {
+      if (Object.prototype.hasOwnProperty.call(customByProperty, code) && customByProperty[code]) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function buildOfferTitle(config, targetMap, fieldByCode, selectedByProperty, customByProperty, offers, anchorOffer) {
+    var template = config && config.title_template;
+    var root = template && template.root;
+    if (root && typeof root === "object") {
+      var title = renderTitleTemplateNode(root, targetMap, fieldByCode, selectedByProperty, customByProperty, offers, anchorOffer);
+      if (title) return title;
+    }
+    return String((anchorOffer && anchorOffer.name) || "");
+  }
+
   function renderCalculator($content, payload) {
     var data = payload && payload.data ? payload.data : {};
     var config = data.config || {};
@@ -965,6 +1063,7 @@
 
     var fields = Array.isArray(config.fields) ? config.fields : [];
     var fieldByCode = makeFieldIndexMap(fields);
+    var titleTargetMap = makeTemplateTargetMap(fields);
     var metaOrderByCode = makeCodeOrderMapFromMeta(propertyMeta);
     var fieldOrderByCode = makeCodeOrderMapFromFields(fields);
     var hiddenByProperty = buildHiddenPresetMap(config);
@@ -1057,6 +1156,11 @@
     if (!defaultOffer) {
       defaultOffer = pickDefaultOfferBySort(offers, allCodes);
     }
+    if (defaultOffer && defaultOffer.properties && defaultOffer.properties[volumeCode]) {
+      selectedByProperty[volumeCode] = String(defaultOffer.properties[volumeCode].xml_id || "").trim();
+      customByProperty[volumeCode] = false;
+    }
+    var anchorOffer = defaultOffer;
     if (defaultOffer && defaultOffer.catalog && defaultOffer.catalog.primary_buy_price) {
       var primaryGroupId = parseNumber(defaultOffer.catalog.primary_buy_price.catalog_group_id, Number.NaN);
       if (Number.isFinite(primaryGroupId) && priceGroups.some(function (group) { return parseNumber(group && group.id, Number.NaN) === primaryGroupId; })) {
@@ -1087,8 +1191,15 @@
       customByProperty[code] = false;
     });
 
+    if (!selectedByProperty[volumeCode] && Array.isArray(presetsByCode[volumeCode]) && presetsByCode[volumeCode].length) {
+      selectedByProperty[volumeCode] = String(presetsByCode[volumeCode][0].xml_id || "");
+      customByProperty[volumeCode] = false;
+    }
+
     var $layout = $('<div class="frontcalc-layout"></div>');
     var $selectors = $('<div class="frontcalc-selectors"></div>');
+    var $title = $('<h2 class="frontcalc-offer-title"></h2>');
+    $selectors.append($title);
     var $price = $('<aside class="frontcalc-price-panel"><div class="frontcalc-price-panel__inner"></div></aside>');
     var $priceInner = $price.find(".frontcalc-price-panel__inner");
 
@@ -1271,6 +1382,13 @@
       });
 
       var matched = pickMatchedOffer(offers, selectedByProperty, customByProperty);
+      if (matched) {
+        anchorOffer = matched;
+      }
+      var titleText = matched && !hasAnyCustomValue(customByProperty)
+        ? String(matched.name || "")
+        : buildOfferTitle(config, titleTargetMap, fieldByCode, selectedByProperty, customByProperty, offers, anchorOffer);
+      $title.text(titleText);
       if (presetsByCode[volumeCode] && presetsByCode[volumeCode].length) {
         renderPriceTable($priceInner, offers, presetsByCode, selectedByProperty, volumeCode, customVolumeValue, priceGroups, selectedCatalogGroupId);
       } else {
@@ -1297,7 +1415,7 @@
       var numericXmlId = parseNumber(xmlId, Number.NaN);
       var knownPreset = findPresetByInputValue(presetsByCode[volumeCode] || [], xmlId);
       customVolumeValue = !knownPreset && Number.isFinite(numericXmlId) ? numericXmlId : Number.NaN;
-      customByProperty[volumeCode] = false;
+      customByProperty[volumeCode] = !knownPreset;
       updatePrice();
     });
 
@@ -1323,8 +1441,10 @@
       var maxV = Number.isFinite(volumeMax) ? volumeMax : Number.POSITIVE_INFINITY;
       var current = parseNumber(selectedByProperty[volumeCode], list[0]);
       var next = normalizeToStep(clamp(current + direction * volumeStep, minV, maxV), minV, volumeStep);
-      customVolumeValue = next;
-      selectedByProperty[volumeCode] = String(next);
+      var nextPreset = findPresetByInputValue(presetsByCode[volumeCode] || [], String(next));
+      customVolumeValue = nextPreset ? Number.NaN : next;
+      selectedByProperty[volumeCode] = nextPreset ? String(nextPreset.xml_id || next) : String(next);
+      customByProperty[volumeCode] = !nextPreset;
       updatePrice();
     });
 
@@ -1335,6 +1455,7 @@
       if (preset) {
         selectedByProperty[volumeCode] = String(preset.xml_id || '');
         customVolumeValue = Number.NaN;
+        customByProperty[volumeCode] = false;
       } else {
         var presetNums = list.map(function (p) { return parseNumber(p.xml_id, Number.NaN); }).filter(Number.isFinite).sort(function(a,b){return a-b;});
         if (!presetNums.length) return;
@@ -1344,6 +1465,7 @@
         val = normalizeToStep(clamp(val, minV, maxV), minV, volumeStep);
         customVolumeValue = val;
         selectedByProperty[volumeCode] = String(val);
+        customByProperty[volumeCode] = true;
       }
       updatePrice();
     });
