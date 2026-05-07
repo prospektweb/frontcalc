@@ -294,6 +294,10 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
                                     <input class="fc-input js-inp-step" placeholder="Шаг" value="<?= htmlspecialcharsbx((string)($input['step'] ?? '')) ?>">
                                     <input class="fc-input js-inp-unit" placeholder="Ед. изм." value="<?= htmlspecialcharsbx((string)($input['unit'] ?? '')) ?>">
                                 </div>
+                                <div class="fc-pills">
+                                    <label class="fc-pill"><input type="checkbox" class="js-inp-show-unit"<?= array_key_exists('show_unit', $input) ? (!empty($input['show_unit']) ? ' checked' : '') : (!isset($field['show_unit']) || $field['show_unit'] ? ' checked' : '') ?>> Показывать ед. изм.</label>
+                                    <label class="fc-pill"><input type="checkbox" class="js-inp-concat-unit"<?= array_key_exists('concat_unit', $input) ? (!empty($input['concat_unit']) ? ' checked' : '') : (!empty($field['concat_unit']) ? ' checked' : '') ?>> Склеивать значение с ед. изм.</label>
+                                </div>
                                 <div class="fc-input-row-actions">
                                     <button type="button" class="fc-btn-remove-input js-remove-input">Удалить инпут</button>
                                 </div>
@@ -307,8 +311,6 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
 
                     <div class="fc-pills">
                         <label class="fc-pill"><input type="checkbox" class="js-show-presets"<?= !isset($field['show_presets']) || $field['show_presets'] ? ' checked' : '' ?>> Показывать пресеты</label>
-                        <label class="fc-pill"><input type="checkbox" class="js-show-unit"<?= !isset($field['show_unit']) || $field['show_unit'] ? ' checked' : '' ?>> Показывать ед. изм.</label>
-                        <label class="fc-pill"><input type="checkbox" class="js-concat-unit"<?= !empty($field['concat_unit']) ? ' checked' : '' ?>> Склеивать значение с ед. изм.</label>
                     </div>
 
                     <div class="fc-subtitle">Скрыть варианты (XML_ID)</div>
@@ -406,7 +408,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
                 const inputCode = (row.querySelector('.js-inp-code')?.value || '').trim();
                 if (!inputCode) return;
                 targets.push({value: inputCode, label: inputCode});
-                if (groupCode) targets.push({value: groupCode + '.' + inputCode, label: groupCode + ' → ' + inputCode});
+                if (groupCode && groupCode !== inputCode) targets.push({value: groupCode + '.' + inputCode, label: inputCode + ' (группа ' + groupCode + ')'});
             });
         });
         const seen = new Set();
@@ -520,14 +522,16 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
             + '          <input class="fc-input js-inp-step" placeholder="Шаг">\n'
             + '          <input class="fc-input js-inp-unit" placeholder="Ед. изм.">\n'
             + '        </div>\n'
+            + '        <div class="fc-pills">\n'
+            + '          <label class="fc-pill"><input type="checkbox" class="js-inp-show-unit" checked> Показывать ед. изм.</label>\n'
+            + '          <label class="fc-pill"><input type="checkbox" class="js-inp-concat-unit"> Склеивать значение с ед. изм.</label>\n'
+            + '        </div>\n'
             + '        <div class="fc-input-row-actions"><button type="button" class="fc-btn-remove-input js-remove-input">Удалить инпут</button></div>\n'
             + '      </div>\n'
             + '    </div>\n'
             + '    <div class="fc-actions"><button type="button" class="adm-btn js-add-input">+ Добавить инпут</button></div>\n'
             + '    <div class="fc-pills">\n'
             + '      <label class="fc-pill"><input type="checkbox" class="js-show-presets" checked> Показывать пресеты</label>\n'
-            + '      <label class="fc-pill"><input type="checkbox" class="js-show-unit" checked> Показывать ед. изм.</label>\n'
-            + '      <label class="fc-pill"><input type="checkbox" class="js-concat-unit"> Склеивать значение с ед. изм.</label>\n'
             + '    </div>\n'
             + '    <div class="fc-subtitle">Скрыть варианты (XML_ID)</div>\n'
             + '    <select class="fc-select js-hidden-presets" multiple size="5" style="height:auto; min-height:120px;">' + renderEnumOptions(prop) + '</select>\n'
@@ -660,7 +664,9 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
                     min: row.querySelector('.js-inp-min').value || '',
                     max: row.querySelector('.js-inp-max').value || '',
                     step: row.querySelector('.js-inp-step').value || '',
-                    unit: row.querySelector('.js-inp-unit').value || ''
+                    unit: row.querySelector('.js-inp-unit').value || '',
+                    show_unit: row.querySelector('.js-inp-show-unit') ? row.querySelector('.js-inp-show-unit').checked : true,
+                    concat_unit: row.querySelector('.js-inp-concat-unit') ? row.querySelector('.js-inp-concat-unit').checked : false
                 }));
                 const hiddenPresetXmlIds = Array.from(card.querySelector('.js-hidden-presets').selectedOptions).map(opt => opt.value);
                 const technicalSelect = card.querySelector('.js-technical-values');
@@ -670,8 +676,8 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
                     property_code: card.dataset.propCode || '',
                     inputs: inputs,
                     show_presets: card.querySelector('.js-show-presets').checked,
-                    show_unit: card.querySelector('.js-show-unit').checked,
-                    concat_unit: card.querySelector('.js-concat-unit').checked,
+                    show_unit: inputs.some(input => input.show_unit),
+                    concat_unit: inputs.some(input => input.concat_unit),
                     is_group: inputs.length > 1,
                     group_code: card.querySelector('.js-group-code').value || '',
                     group_delimiter: card.querySelector('.js-group-delimiter').value || 'x',

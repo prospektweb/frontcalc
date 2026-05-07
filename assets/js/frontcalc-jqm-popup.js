@@ -995,7 +995,10 @@
       if (target.inputCode && String(input && input.code || "") !== target.inputCode) return;
       var value = values[index] !== undefined ? values[index] : raw;
       var unit = String((input && input.unit) || "").trim();
-      if (unit && isTruthyFlag(field.concat_unit)) value += unit;
+      var concatUnit = Object.prototype.hasOwnProperty.call(input || {}, "concat_unit")
+        ? isTruthyFlag(input.concat_unit)
+        : isTruthyFlag(field.concat_unit);
+      if (unit && concatUnit) value += unit;
       pieces.push(value);
     });
 
@@ -1018,6 +1021,16 @@
       }).join(delimiter);
     }
     return String(node.text || "");
+  }
+
+
+  function hasAnyCustomValue(customByProperty) {
+    for (var code in customByProperty) {
+      if (Object.prototype.hasOwnProperty.call(customByProperty, code) && customByProperty[code]) {
+        return true;
+      }
+    }
+    return false;
   }
 
   function buildOfferTitle(config, targetMap, fieldByCode, selectedByProperty, customByProperty, offers, anchorOffer) {
@@ -1372,7 +1385,10 @@
       if (matched) {
         anchorOffer = matched;
       }
-      $title.text(buildOfferTitle(config, titleTargetMap, fieldByCode, selectedByProperty, customByProperty, offers, anchorOffer));
+      var titleText = matched && !hasAnyCustomValue(customByProperty)
+        ? String(matched.name || "")
+        : buildOfferTitle(config, titleTargetMap, fieldByCode, selectedByProperty, customByProperty, offers, anchorOffer);
+      $title.text(titleText);
       if (presetsByCode[volumeCode] && presetsByCode[volumeCode].length) {
         renderPriceTable($priceInner, offers, presetsByCode, selectedByProperty, volumeCode, customVolumeValue, priceGroups, selectedCatalogGroupId);
       } else {
