@@ -994,7 +994,7 @@
     items.forEach(function (input, index) {
       if (target.inputCode && String(input && input.code || "") !== target.inputCode) return;
       var value = values[index] !== undefined ? values[index] : raw;
-      var unit = String((input && input.unit) || "").trim();
+      var unit = String((input && input.unit) || "");
       var concatUnit = Object.prototype.hasOwnProperty.call(input || {}, "concat_unit")
         ? isTruthyFlag(input.concat_unit)
         : isTruthyFlag(field.concat_unit);
