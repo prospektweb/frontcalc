@@ -171,6 +171,29 @@ if (!$hasRequiredVolume && isset($propertyMap[$requiredVolumeCode])) {
     ]);
 }
 
+
+$sampleOfferName = '';
+if ($elementId > 0 && $productsIblockId > 0 && $offersIblockId > 0 && Loader::includeModule('catalog')) {
+    $offersMap = CCatalogSKU::getOffersList(
+        [$elementId],
+        $productsIblockId,
+        ['ACTIVE' => 'Y'],
+        ['ID', 'NAME', 'SORT'],
+        []
+    );
+    if (!empty($offersMap[$elementId]) && is_array($offersMap[$elementId])) {
+        $sampleOffer = null;
+        foreach ($offersMap[$elementId] as $offerRow) {
+            if ($sampleOffer === null || (int)($offerRow['SORT'] ?? 500) < (int)($sampleOffer['SORT'] ?? 500)) {
+                $sampleOffer = $offerRow;
+            }
+        }
+        if ($sampleOffer !== null) {
+            $sampleOfferName = (string)($sampleOffer['NAME'] ?? '');
+        }
+    }
+}
+
 $selectedCodes = [];
 foreach ($initialFields as $field) {
     $selectedCodes[] = (string)($field['property_code'] ?? '');
@@ -200,6 +223,13 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
 .fc-input-row-actions{display:flex;justify-content:flex-end;margin-top:6px;}
 .fc-btn-remove-input{height:30px;padding:0 10px;border:1px solid #f2c1c1;background:#fff5f5;color:#a93434;border-radius:8px;cursor:pointer;}
 .fc-btn-inline[disabled]{opacity:.45;cursor:not-allowed;}
+.fc-title-builder{margin:14px 0;border:1px solid #d9e3f8;border-radius:14px;background:#fff;padding:14px;}
+.fc-sample-title{padding:12px;border:1px dashed #b8c8ee;border-radius:10px;background:#f8fbff;line-height:1.5;user-select:text;}
+.fc-template-tree{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
+.fc-template-node{border:1px solid #d7e2fb;border-radius:999px;background:#fff;padding:7px 10px;cursor:pointer;}
+.fc-template-node.is-mapped{background:#eef6ff;border-color:#7aa8ff;}
+.fc-template-panel{margin-top:10px;padding:10px;border-radius:10px;background:#f7f9ff;}
+.fc-match-select{max-width:360px;}
 @media (max-width: 900px){.fc-row,.fc-pills{grid-template-columns:1fr;}}
 </style>
 
@@ -307,6 +337,20 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
         <?php endforeach; ?>
     </div>
 
+
+    <div class="fc-title-builder">
+        <h3 style="margin-top:0;">Шаблон названия ТП</h3>
+        <p>Опорное ТП с наименьшей сортировкой:</p>
+        <div class="fc-sample-title" id="fc-sample-title"><?= htmlspecialcharsbx($sampleOfferName !== '' ? $sampleOfferName : 'Название опорного ТП не найдено') ?></div>
+        <div class="fc-row" style="margin-top:10px;">
+            <input class="fc-input" id="fc-title-delimiter" placeholder="Выделите подстроку или введите разделитель вручную">
+            <button type="button" class="adm-btn" id="fc-title-split">Разбить выбранный элемент</button>
+        </div>
+        <div class="fc-subtitle">Предпросмотр разбивки</div>
+        <div class="fc-template-tree" id="fc-title-tree"></div>
+        <div class="fc-template-panel" id="fc-title-panel">Кликните элемент разбивки, чтобы уточнить или сопоставить его с инпутом.</div>
+    </div>
+
     <br>
     <input type="submit" value="Сохранить" class="adm-btn-save">
 </form>
@@ -315,6 +359,8 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
 <script>
 (function() {
     const allProperties = <?= \Bitrix\Main\Web\Json::encode($allProperties) ?>;
+    const savedSchema = (() => { try { return JSON.parse(<?= \Bitrix\Main\Web\Json::encode($schema ?: '{}') ?>) || {}; } catch (e) { return {}; } })();
+    const sampleOfferName = <?= \Bitrix\Main\Web\Json::encode($sampleOfferName) ?>;
     const requiredVolumeCode = 'CALC_PROP_VOLUME';
     const propsByCode = {};
     allProperties.forEach(p => { propsByCode[p.CODE] = p; });
@@ -324,6 +370,88 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
     const schemaInput = document.getElementById('fc-schema-json');
     const addSelect = document.getElementById('fc-add-property');
     const addBtn = document.getElementById('fc-add-property-btn');
+    const titleDelimiter = document.getElementById('fc-title-delimiter');
+    const titleSplit = document.getElementById('fc-title-split');
+    const titleTree = document.getElementById('fc-title-tree');
+    const titlePanel = document.getElementById('fc-title-panel');
+    const titleTemplate = savedSchema.title_template && savedSchema.title_template.root ? savedSchema.title_template : {root: {text: sampleOfferName || ''}};
+    let selectedTitlePath = [];
+
+
+
+    function getNode(path){
+        let node = titleTemplate.root;
+        (path || []).forEach(index => {
+            if (node && Array.isArray(node.children)) node = node.children[index];
+        });
+        return node;
+    }
+
+    function walkNodes(node, path, list){
+        list.push({node: node, path: path});
+        if (node && Array.isArray(node.children)) {
+            node.children.forEach((child, index) => walkNodes(child, path.concat(index), list));
+        }
+        return list;
+    }
+
+    function mappingTargets(){
+        const targets = [];
+        document.querySelectorAll('.fc-card').forEach(card => {
+            const propCode = card.dataset.propCode || '';
+            const groupCode = (card.querySelector('.js-group-code')?.value || propCode.replace('CALC_PROP_', '').toLowerCase()).trim();
+            const rows = getRows(card);
+            if (groupCode) targets.push({value: groupCode, label: groupCode});
+            rows.forEach(row => {
+                const inputCode = (row.querySelector('.js-inp-code')?.value || '').trim();
+                if (!inputCode) return;
+                targets.push({value: inputCode, label: inputCode});
+                if (groupCode) targets.push({value: groupCode + '.' + inputCode, label: groupCode + ' → ' + inputCode});
+            });
+        });
+        const seen = new Set();
+        return targets.filter(item => {
+            if (seen.has(item.value)) return false;
+            seen.add(item.value);
+            return true;
+        });
+    }
+
+    function renderTitleTree(){
+        if (!titleTree) return;
+        titleTree.innerHTML = '';
+        walkNodes(titleTemplate.root, [], []).filter(item => item.path.length || !item.node.children).forEach(item => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'fc-template-node' + (item.node.mapping ? ' is-mapped' : '');
+            btn.dataset.path = item.path.join('.');
+            btn.textContent = item.node.text || (Array.isArray(item.node.children) ? item.node.children.map(child => child.text).join(item.node.delimiter || '') : '');
+            if (item.node.mapping) btn.title = 'Сопоставлено: ' + item.node.mapping.target;
+            titleTree.appendChild(btn);
+        });
+    }
+
+    function splitSelectedTitleNode(){
+        const node = getNode(selectedTitlePath);
+        const delimiter = titleDelimiter ? titleDelimiter.value : '';
+        if (!node || !delimiter) return;
+        const text = node.text || (Array.isArray(node.children) ? node.children.map(child => child.text || '').join(node.delimiter || '') : '');
+        const parts = String(text).split(delimiter);
+        if (parts.length < 2) return;
+        node.text = text;
+        node.delimiter = delimiter;
+        node.children = parts.map(part => ({text: part}));
+        delete node.mapping;
+        renderTitleTree();
+    }
+
+    function renderTitlePanel(path){
+        selectedTitlePath = path;
+        const node = getNode(path);
+        if (!titlePanel || !node) return;
+        const text = node.text || '';
+        titlePanel.innerHTML = '<b>' + escapeHtml(text) + '</b><div class="fc-actions"><button type="button" class="adm-btn js-title-refine">Уточнить</button><button type="button" class="adm-btn js-title-match">Сопоставить</button></div>';
+    }
 
     function getRows(card){ return Array.from(card.querySelectorAll('.js-fc-input-row')); }
     function syncGroup(card){
@@ -403,6 +531,8 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
             + '    </div>\n'
             + '    <div class="fc-subtitle">Скрыть варианты (XML_ID)</div>\n'
             + '    <select class="fc-select js-hidden-presets" multiple size="5" style="height:auto; min-height:120px;">' + renderEnumOptions(prop) + '</select>\n'
+            + '    <div class="fc-subtitle">Технические варианты (скрыть на фронте)</div>\n'
+            + '    <select class="fc-select js-technical-values" multiple size="5" style="height:auto; min-height:120px;">' + renderTechnicalEnumOptions(prop) + '</select>\n'
             + '    <div class="fc-subtitle">Групповые настройки (авто при >1 инпута)</div>\n'
             + '    <div class="js-group-settings" style="display:none;">\n'
             + '      <div class="fc-row">\n'
@@ -487,6 +617,40 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
         });
     }
 
+
+
+    document.addEventListener('selectionchange', function(){
+        const selected = String(window.getSelection ? window.getSelection().toString() : '').trim();
+        if (selected && titleDelimiter) titleDelimiter.value = selected;
+    });
+    if (titleSplit) titleSplit.addEventListener('click', splitSelectedTitleNode);
+    if (titleTree) titleTree.addEventListener('click', function(event){
+        const nodeButton = event.target.closest('.fc-template-node');
+        if (!nodeButton) return;
+        const path = (nodeButton.dataset.path || '').split('.').filter(Boolean).map(v => parseInt(v, 10));
+        renderTitlePanel(path);
+    });
+    if (titlePanel) titlePanel.addEventListener('click', function(event){
+        if (event.target.closest('.js-title-refine')) {
+            if (titleDelimiter) titleDelimiter.focus();
+            return;
+        }
+        if (event.target.closest('.js-title-match')) {
+            const targets = mappingTargets();
+            const select = '<select class="fc-select fc-match-select js-title-target">' + targets.map(t => '<option value="' + escapeHtml(t.value) + '">' + escapeHtml(t.label) + '</option>').join('') + '</select><button type="button" class="adm-btn js-title-save-match">Сохранить сопоставление</button>';
+            titlePanel.insertAdjacentHTML('beforeend', '<div class="fc-actions">' + select + '</div>');
+            return;
+        }
+        if (event.target.closest('.js-title-save-match')) {
+            const node = getNode(selectedTitlePath);
+            const value = titlePanel.querySelector('.js-title-target')?.value || '';
+            if (node && value) {
+                node.mapping = {target: value};
+                renderTitleTree();
+            }
+        }
+    });
+
     if (form) {
         form.addEventListener('submit', function(){
             const fields = [];
@@ -499,7 +663,8 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
                     unit: row.querySelector('.js-inp-unit').value || ''
                 }));
                 const hiddenPresetXmlIds = Array.from(card.querySelector('.js-hidden-presets').selectedOptions).map(opt => opt.value);
-                const technicalValueIds = Array.from(card.querySelector('.js-technical-values').selectedOptions).map(opt => parseInt(opt.value, 10)).filter(Boolean);
+                const technicalSelect = card.querySelector('.js-technical-values');
+                const technicalValueIds = technicalSelect ? Array.from(technicalSelect.selectedOptions).map(opt => parseInt(opt.value, 10)).filter(Boolean) : [];
 
                 fields.push({
                     property_code: card.dataset.propCode || '',
@@ -524,12 +689,13 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
                 form.appendChild(hiddenInput);
             }
             hiddenInput.value = allTechnicalIds;
-            schemaInput.value = JSON.stringify({version: 1, fields: fields});
+            schemaInput.value = JSON.stringify({version: 1, fields: fields, title_template: titleTemplate});
         });
     }
 
     document.querySelectorAll('.fc-card').forEach(syncGroup);
     refreshAddSelect();
+    renderTitleTree();
 })();
 </script>
 
