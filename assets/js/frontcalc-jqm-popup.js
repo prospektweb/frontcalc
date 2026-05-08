@@ -460,6 +460,12 @@
     });
   }
 
+
+  function pickMatchedOfferIgnoringCustom(offers, selectedByProperty, customByProperty, skipCode) {
+    var filtered = getFilteredOffers(offers, selectedByProperty, customByProperty || {}, skipCode || null);
+    return filtered.length ? filtered[0] : null;
+  }
+
   function buildAvailableValuesByCode(offers, allCodes, selectedByProperty, customByProperty) {
     var availableByCode = {};
     (Array.isArray(allCodes) ? allCodes : []).forEach(function (code) {
@@ -797,9 +803,16 @@
   }
 
   function parseCompositeNumbers(value, delimiter) {
-    return String(value || "")
+    var normalized = String(value || "").replace(/,/g, ".").trim();
+    var directParts = normalized
       .split(delimiter || "x")
       .map(function (part) { return parseNumber(normalizeValueToken(part), Number.NaN); })
+      .filter(function (num) { return Number.isFinite(num); });
+    if (directParts.length >= 2) return directParts;
+
+    var matches = normalized.match(/-?\d+(?:\.\d+)?/g) || [];
+    return matches
+      .map(function (part) { return parseNumber(part, Number.NaN); })
       .filter(function (num) { return Number.isFinite(num); });
   }
 
@@ -809,14 +822,23 @@
   }
 
   function getOfferPropertyNumbers(offer, code, delimiter) {
-    return parseCompositeNumbers(getOfferPropertyRawValue(offer, code), delimiter);
+    var prop = offer && offer.properties ? offer.properties[code] : null;
+    var xmlNumbers = parseCompositeNumbers(prop && prop.xml_id, delimiter);
+    if (xmlNumbers.length >= 2) return xmlNumbers;
+    var valueNumbers = parseCompositeNumbers(prop && prop.value, delimiter);
+    return valueNumbers.length ? valueNumbers : xmlNumbers;
   }
 
   function getOfferPropertyScalar(offer, code) {
     var prop = offer && offer.properties ? offer.properties[code] : null;
     var xmlNum = parseNumber(normalizeValueToken(prop && prop.xml_id), Number.NaN);
     if (Number.isFinite(xmlNum)) return xmlNum;
-    return parseNumber(normalizeValueToken(prop && prop.value), Number.NaN);
+    var xmlNumbers = parseCompositeNumbers(prop && prop.xml_id, "x");
+    if (xmlNumbers.length === 1) return xmlNumbers[0];
+    var valueNum = parseNumber(normalizeValueToken(prop && prop.value), Number.NaN);
+    if (Number.isFinite(valueNum)) return valueNum;
+    var valueNumbers = parseCompositeNumbers(prop && prop.value, "x");
+    return valueNumbers.length === 1 ? valueNumbers[0] : Number.NaN;
   }
 
   function getDimensionArea(nums) {
@@ -960,15 +982,17 @@
     });
   }
 
-  function getVisibleQuantityPoints(offers, selectedByProperty, volumeCode, numericPresets) {
+  function getVisibleQuantityPoints(offers, selectedByProperty, customByProperty, volumeCode, numericPresets) {
     var byQty = {};
     (Array.isArray(numericPresets) ? numericPresets : []).forEach(function (preset) {
       var qty = parseNumber(preset && preset.num, Number.NaN);
       if (!Number.isFinite(qty) || byQty[String(qty)]) return;
 
       var draftSel = Object.assign({}, selectedByProperty);
+      var draftCustom = Object.assign({}, customByProperty || {});
       draftSel[volumeCode] = String(preset.xml_id || qty);
-      var offer = pickMatchedOffer(offers, draftSel, {});
+      draftCustom[volumeCode] = false;
+      var offer = pickMatchedOfferIgnoringCustom(offers, draftSel, draftCustom, null);
       if (offer) byQty[String(qty)] = { offer: offer, qty: qty };
     });
 
@@ -1038,17 +1062,20 @@
       '<div class="frontcalc-table-head"><div>Тираж</div><div>Строгий <span class="frontcalc-tip" title="Отгрузка в соответствии с согласованным сроком"><svg width="17" height="16"><use xlink:href="/bitrix/templates/aspro-premier/images/svg/catalog/item_order_icons.svg?1774850114#attention-16-16"></use></svg></span></div><div>Гибкий <span class="frontcalc-tip" title="Срок отгрузки может быть изменен (не больше 10 рабочих дней)"><svg width="17" height="16"><use xlink:href="/bitrix/templates/aspro-premier/images/svg/catalog/item_order_icons.svg?1774850114#attention-16-16"></use></svg></span></div></div>';
     html += '<div class="frontcalc-table-body">';
 
-    var scopedQuantityPoints = getVisibleQuantityPoints(offers, selectedByProperty, volumeCode, numericPresets);
+    var tableCustomByProperty = driverContext && driverContext.customByProperty ? driverContext.customByProperty : {};
+    var scopedQuantityPoints = getVisibleQuantityPoints(offers, selectedByProperty, tableCustomByProperty, volumeCode, numericPresets);
     if (!scopedQuantityPoints.length) {
-      scopedQuantityPoints = getScopedOffersForQuantity(offers, selectedByProperty, {}, volumeCode);
+      scopedQuantityPoints = getScopedOffersForQuantity(offers, selectedByProperty, tableCustomByProperty, volumeCode);
     }
 
     merged.forEach(function (preset, index) {
       var xml = String(preset.xml_id || "");
       var qty = Math.max(1, parseNumber(xml, 1));
       var draftSel = Object.assign({}, selectedByProperty);
+      var draftCustom = Object.assign({}, tableCustomByProperty || {});
       draftSel[volumeCode] = xml;
-      var offer = pickMatchedOffer(offers, draftSel, {});
+      draftCustom[volumeCode] = false;
+      var offer = pickMatchedOfferIgnoringCustom(offers, draftSel, draftCustom, null);
       var strictEstimate = buildQuantityEstimate(scopedQuantityPoints, qty, selectedCatalogGroupId, "strict", offer);
       var flexEstimate = buildQuantityEstimate(scopedQuantityPoints, qty, selectedCatalogGroupId, "flex", offer);
       var strictPrice = strictEstimate.price;
