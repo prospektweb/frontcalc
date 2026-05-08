@@ -876,6 +876,77 @@
     return parseNumber(range && range.price, Number.NaN);
   }
 
+
+  function scoreOfferForCustomDriver(offer, code, fieldConfig, customRaw) {
+    var type = getPriceDriverType(fieldConfig, code);
+    if (!type || type === "none" || type === "quantity" || type === "multiplier") return 0;
+
+    var delimiter = fieldConfig.group_delimiter || fieldConfig.split_delimiter || "x";
+    if (type === "size_area" || type === "size_covering") {
+      var customSize = parseCompositeNumbers(customRaw, delimiter);
+      var offerSize = getOfferPropertyNumbers(offer, code, delimiter);
+      var customArea = getDimensionArea(customSize);
+      var offerArea = getDimensionArea(offerSize);
+      if (!Number.isFinite(customArea) || customArea <= 0 || !Number.isFinite(offerArea) || offerArea <= 0) {
+        return Number.POSITIVE_INFINITY;
+      }
+
+      var areaScore = Math.abs(Math.log(offerArea / customArea));
+      var customRatio = customSize[1] > 0 ? customSize[0] / customSize[1] : Number.NaN;
+      var offerRatio = offerSize[1] > 0 ? offerSize[0] / offerSize[1] : Number.NaN;
+      var ratioScore = Number.isFinite(customRatio) && Number.isFinite(offerRatio)
+        ? Math.abs(Math.log(offerRatio / customRatio)) * 0.25
+        : 0;
+
+      if (type === "size_covering") {
+        var options = getCalcOptions(fieldConfig);
+        var allowRotate = Object.prototype.hasOwnProperty.call(options, "allow_rotate") ? isTruthyFlag(options.allow_rotate) : true;
+        if (!canSizeFit(customSize, offerSize, allowRotate)) {
+          areaScore += 1000;
+        }
+      }
+
+      return areaScore + ratioScore;
+    }
+
+    if (type === "pages") {
+      var customValue = parseNumber(normalizeValueToken(customRaw), Number.NaN);
+      var offerValue = getOfferPropertyScalar(offer, code);
+      if (!Number.isFinite(customValue) || customValue <= 0 || !Number.isFinite(offerValue) || offerValue <= 0) {
+        return Number.POSITIVE_INFINITY;
+      }
+      return Math.abs(Math.log(offerValue / customValue));
+    }
+
+    return 0;
+  }
+
+  function pickBestReferenceOfferForCustomDrivers(offers, selectedByProperty, customByProperty, fieldByCode) {
+    var candidates = getFilteredOffers(offers, selectedByProperty, customByProperty || {}, null);
+    if (!candidates.length) return null;
+
+    var best = null;
+    candidates.forEach(function (offer) {
+      var totalScore = 0;
+      var hasScore = false;
+      Object.keys(customByProperty || {}).forEach(function (code) {
+        if (!customByProperty[code]) return;
+        var fieldConfig = (fieldByCode && fieldByCode[code]) || {};
+        var score = scoreOfferForCustomDriver(offer, code, fieldConfig, selectedByProperty[code]);
+        if (!Number.isFinite(score)) return;
+        totalScore += score;
+        hasScore = true;
+      });
+
+      if (!hasScore) totalScore = 0;
+      if (!best || totalScore < best.score) {
+        best = { offer: offer, score: totalScore };
+      }
+    });
+
+    return best ? best.offer : candidates[0];
+  }
+
   function buildCustomDriverAdjustment(context) {
     var offers = Array.isArray(context.offers) ? context.offers : [];
     var fieldByCode = context.fieldByCode || {};
@@ -982,7 +1053,7 @@
     });
   }
 
-  function getVisibleQuantityPoints(offers, selectedByProperty, customByProperty, volumeCode, numericPresets) {
+  function getVisibleQuantityPoints(offers, selectedByProperty, customByProperty, fieldByCode, volumeCode, numericPresets) {
     var byQty = {};
     (Array.isArray(numericPresets) ? numericPresets : []).forEach(function (preset) {
       var qty = parseNumber(preset && preset.num, Number.NaN);
@@ -992,7 +1063,7 @@
       var draftCustom = Object.assign({}, customByProperty || {});
       draftSel[volumeCode] = String(preset.xml_id || qty);
       draftCustom[volumeCode] = false;
-      var offer = pickMatchedOfferIgnoringCustom(offers, draftSel, draftCustom, null);
+      var offer = pickBestReferenceOfferForCustomDrivers(offers, draftSel, draftCustom, fieldByCode);
       if (offer) byQty[String(qty)] = { offer: offer, qty: qty };
     });
 
@@ -1063,7 +1134,8 @@
     html += '<div class="frontcalc-table-body">';
 
     var tableCustomByProperty = driverContext && driverContext.customByProperty ? driverContext.customByProperty : {};
-    var scopedQuantityPoints = getVisibleQuantityPoints(offers, selectedByProperty, tableCustomByProperty, volumeCode, numericPresets);
+    var tableFieldByCode = driverContext && driverContext.fieldByCode ? driverContext.fieldByCode : {};
+    var scopedQuantityPoints = getVisibleQuantityPoints(offers, selectedByProperty, tableCustomByProperty, tableFieldByCode, volumeCode, numericPresets);
     if (!scopedQuantityPoints.length) {
       scopedQuantityPoints = getScopedOffersForQuantity(offers, selectedByProperty, tableCustomByProperty, volumeCode);
     }
@@ -1075,7 +1147,7 @@
       var draftCustom = Object.assign({}, tableCustomByProperty || {});
       draftSel[volumeCode] = xml;
       draftCustom[volumeCode] = false;
-      var offer = pickMatchedOfferIgnoringCustom(offers, draftSel, draftCustom, null);
+      var offer = pickBestReferenceOfferForCustomDrivers(offers, draftSel, draftCustom, tableFieldByCode);
       var strictEstimate = buildQuantityEstimate(scopedQuantityPoints, qty, selectedCatalogGroupId, "strict", offer);
       var flexEstimate = buildQuantityEstimate(scopedQuantityPoints, qty, selectedCatalogGroupId, "flex", offer);
       var strictPrice = strictEstimate.price;
