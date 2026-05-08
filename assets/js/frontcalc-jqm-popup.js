@@ -460,6 +460,12 @@
     });
   }
 
+
+  function pickMatchedOfferIgnoringCustom(offers, selectedByProperty, customByProperty, skipCode) {
+    var filtered = getFilteredOffers(offers, selectedByProperty, customByProperty || {}, skipCode || null);
+    return filtered.length ? filtered[0] : null;
+  }
+
   function buildAvailableValuesByCode(offers, allCodes, selectedByProperty, customByProperty) {
     var availableByCode = {};
     (Array.isArray(allCodes) ? allCodes : []).forEach(function (code) {
@@ -782,15 +788,282 @@
   }
 
 
-  function getVisibleQuantityPoints(offers, selectedByProperty, volumeCode, numericPresets) {
+
+
+  function getPriceDriverType(fieldConfig, code) {
+    var type = String((fieldConfig && fieldConfig.price_driver_type) || "").trim();
+    if (!type && code === "CALC_PROP_VOLUME") return "quantity";
+    return type || "none";
+  }
+
+  function getCalcOptions(fieldConfig) {
+    return fieldConfig && fieldConfig.calc_options && typeof fieldConfig.calc_options === "object"
+      ? fieldConfig.calc_options
+      : {};
+  }
+
+  function parseCompositeNumbers(value, delimiter) {
+    var normalized = String(value || "").replace(/,/g, ".").trim();
+    var directParts = normalized
+      .split(delimiter || "x")
+      .map(function (part) { return parseNumber(normalizeValueToken(part), Number.NaN); })
+      .filter(function (num) { return Number.isFinite(num); });
+    if (directParts.length >= 2) return directParts;
+
+    var matches = normalized.match(/-?\d+(?:\.\d+)?/g) || [];
+    return matches
+      .map(function (part) { return parseNumber(part, Number.NaN); })
+      .filter(function (num) { return Number.isFinite(num); });
+  }
+
+  function getOfferPropertyRawValue(offer, code) {
+    var prop = offer && offer.properties ? offer.properties[code] : null;
+    return String((prop && (prop.xml_id || prop.value)) || "").trim();
+  }
+
+  function getOfferPropertyNumbers(offer, code, delimiter) {
+    var prop = offer && offer.properties ? offer.properties[code] : null;
+    var xmlNumbers = parseCompositeNumbers(prop && prop.xml_id, delimiter);
+    if (xmlNumbers.length >= 2) return xmlNumbers;
+    var valueNumbers = parseCompositeNumbers(prop && prop.value, delimiter);
+    return valueNumbers.length ? valueNumbers : xmlNumbers;
+  }
+
+  function getOfferPropertyScalar(offer, code) {
+    var prop = offer && offer.properties ? offer.properties[code] : null;
+    var xmlNum = parseNumber(normalizeValueToken(prop && prop.xml_id), Number.NaN);
+    if (Number.isFinite(xmlNum)) return xmlNum;
+    var xmlNumbers = parseCompositeNumbers(prop && prop.xml_id, "x");
+    if (xmlNumbers.length === 1) return xmlNumbers[0];
+    var valueNum = parseNumber(normalizeValueToken(prop && prop.value), Number.NaN);
+    if (Number.isFinite(valueNum)) return valueNum;
+    var valueNumbers = parseCompositeNumbers(prop && prop.value, "x");
+    return valueNumbers.length === 1 ? valueNumbers[0] : Number.NaN;
+  }
+
+  function getDimensionArea(nums) {
+    return Array.isArray(nums) && nums.length >= 2 && nums[0] > 0 && nums[1] > 0 ? nums[0] * nums[1] : Number.NaN;
+  }
+
+  function isWithinRange(value, values, allowExtrapolation) {
+    if (allowExtrapolation) return true;
+    var finite = (Array.isArray(values) ? values : []).filter(function (num) { return Number.isFinite(num); });
+    if (!finite.length || !Number.isFinite(value)) return false;
+    var min = Math.min.apply(Math, finite);
+    var max = Math.max.apply(Math, finite);
+    return value >= min && value <= max;
+  }
+
+  function canSizeFit(customSize, offerSize, allowRotate) {
+    if (!Array.isArray(customSize) || !Array.isArray(offerSize) || customSize.length < 2 || offerSize.length < 2) return false;
+    var direct = customSize[0] <= offerSize[0] && customSize[1] <= offerSize[1];
+    var rotated = allowRotate && customSize[1] <= offerSize[0] && customSize[0] <= offerSize[1];
+    return direct || rotated;
+  }
+
+  function clonePriceWithAmount(priceObj, amount, flags) {
+    if (!priceObj || !Number.isFinite(amount)) return priceObj || null;
+    var result = Object.assign({}, priceObj);
+    result.price = amount;
+    result.formatted = formatMoneyAmount(amount, result.currency || "₽");
+    if (flags && flags.isEstimated) result.is_estimated = true;
+    if (flags && flags.drivers) result.drivers = flags.drivers;
+    return result;
+  }
+
+  function getPriceAmountForDriverOffer(offer, catalogGroupId, column) {
+    var range = getRangePriceForColumn(offer, catalogGroupId, column || "strict");
+    return parseNumber(range && range.price, Number.NaN);
+  }
+
+
+  function scoreOfferForCustomDriver(offer, code, fieldConfig, customRaw) {
+    var type = getPriceDriverType(fieldConfig, code);
+    if (!type || type === "none" || type === "quantity" || type === "multiplier") return 0;
+
+    var delimiter = fieldConfig.group_delimiter || fieldConfig.split_delimiter || "x";
+    if (type === "size_area" || type === "size_covering") {
+      var customSize = parseCompositeNumbers(customRaw, delimiter);
+      var offerSize = getOfferPropertyNumbers(offer, code, delimiter);
+      var customArea = getDimensionArea(customSize);
+      var offerArea = getDimensionArea(offerSize);
+      if (!Number.isFinite(customArea) || customArea <= 0 || !Number.isFinite(offerArea) || offerArea <= 0) {
+        return Number.POSITIVE_INFINITY;
+      }
+
+      var areaScore = Math.abs(Math.log(offerArea / customArea));
+      var customRatio = customSize[1] > 0 ? customSize[0] / customSize[1] : Number.NaN;
+      var offerRatio = offerSize[1] > 0 ? offerSize[0] / offerSize[1] : Number.NaN;
+      var ratioScore = Number.isFinite(customRatio) && Number.isFinite(offerRatio)
+        ? Math.abs(Math.log(offerRatio / customRatio)) * 0.25
+        : 0;
+
+      if (type === "size_covering") {
+        var options = getCalcOptions(fieldConfig);
+        var allowRotate = Object.prototype.hasOwnProperty.call(options, "allow_rotate") ? isTruthyFlag(options.allow_rotate) : true;
+        if (!canSizeFit(customSize, offerSize, allowRotate)) {
+          areaScore += 1000;
+        }
+      }
+
+      return areaScore + ratioScore;
+    }
+
+    if (type === "pages") {
+      var customValue = parseNumber(normalizeValueToken(customRaw), Number.NaN);
+      var offerValue = getOfferPropertyScalar(offer, code);
+      if (!Number.isFinite(customValue) || customValue <= 0 || !Number.isFinite(offerValue) || offerValue <= 0) {
+        return Number.POSITIVE_INFINITY;
+      }
+      return Math.abs(Math.log(offerValue / customValue));
+    }
+
+    return 0;
+  }
+
+  function pickBestReferenceOfferForCustomDrivers(offers, selectedByProperty, customByProperty, fieldByCode) {
+    var candidates = getFilteredOffers(offers, selectedByProperty, customByProperty || {}, null);
+    if (!candidates.length) return null;
+
+    var best = null;
+    candidates.forEach(function (offer) {
+      var totalScore = 0;
+      var hasScore = false;
+      Object.keys(customByProperty || {}).forEach(function (code) {
+        if (!customByProperty[code]) return;
+        var fieldConfig = (fieldByCode && fieldByCode[code]) || {};
+        var score = scoreOfferForCustomDriver(offer, code, fieldConfig, selectedByProperty[code]);
+        if (!Number.isFinite(score)) return;
+        totalScore += score;
+        hasScore = true;
+      });
+
+      if (!hasScore) totalScore = 0;
+      if (!best || totalScore < best.score) {
+        best = { offer: offer, score: totalScore };
+      }
+    });
+
+    return best ? best.offer : candidates[0];
+  }
+
+  function buildCustomDriverAdjustment(context) {
+    var offers = Array.isArray(context.offers) ? context.offers : [];
+    var fieldByCode = context.fieldByCode || {};
+    var selectedByProperty = context.selectedByProperty || {};
+    var customByProperty = context.customByProperty || {};
+    var referenceOffer = context.referenceOffer || context.anchorOffer || null;
+    var selectedCatalogGroupId = context.selectedCatalogGroupId;
+    var column = context.column || "strict";
+    var adjustment = { multiplier: 1, valid: true, messages: [], drivers: [] };
+
+    Object.keys(customByProperty).forEach(function (code) {
+      if (!customByProperty[code]) return;
+      var fieldConfig = fieldByCode[code] || {};
+      var type = getPriceDriverType(fieldConfig, code);
+      if (!type || type === "none" || type === "quantity") return;
+
+      var options = getCalcOptions(fieldConfig);
+      var allowExtrapolation = isTruthyFlag(options.allow_extrapolation);
+      var sensitivity = parseNumber(options.sensitivity, 1);
+      if (!Number.isFinite(sensitivity) || sensitivity <= 0) sensitivity = 1;
+      var delimiter = fieldConfig.group_delimiter || fieldConfig.split_delimiter || "x";
+      var customRaw = selectedByProperty[code];
+
+      if (type === "multiplier") {
+        var coefficient = parseNumber(options.coefficient, Number.NaN);
+        if (Number.isFinite(coefficient) && coefficient > 0) {
+          adjustment.multiplier *= coefficient;
+          adjustment.drivers.push(code + ":coefficient");
+        }
+        return;
+      }
+
+      if (type === "size_area" || type === "size_covering") {
+        var customSize = parseCompositeNumbers(customRaw, delimiter);
+        var customArea = getDimensionArea(customSize);
+        if (!Number.isFinite(customArea) || customArea <= 0) return;
+        var offerAreas = offers.map(function (offer) {
+          return getDimensionArea(getOfferPropertyNumbers(offer, code, delimiter));
+        }).filter(function (area) { return Number.isFinite(area) && area > 0; });
+        if (!isWithinRange(customArea, offerAreas, allowExtrapolation)) {
+          adjustment.valid = false;
+          adjustment.messages.push("Значение " + code + " вне рамок опорных ТП");
+          return;
+        }
+
+        if (type === "size_covering") {
+          var allowRotate = Object.prototype.hasOwnProperty.call(options, "allow_rotate") ? isTruthyFlag(options.allow_rotate) : true;
+          var covering = null;
+          offers.forEach(function (offer) {
+            var nums = getOfferPropertyNumbers(offer, code, delimiter);
+            var area = getDimensionArea(nums);
+            if (!Number.isFinite(area) || !canSizeFit(customSize, nums, allowRotate)) return;
+            if (!covering || area < covering.area) covering = { offer: offer, area: area };
+          });
+          var baseAmount = getPriceAmountForDriverOffer(referenceOffer, selectedCatalogGroupId, column);
+          var coveringAmount = getPriceAmountForDriverOffer(covering && covering.offer, selectedCatalogGroupId, column);
+          if (Number.isFinite(baseAmount) && baseAmount > 0 && Number.isFinite(coveringAmount)) {
+            adjustment.multiplier *= Math.pow(coveringAmount / baseAmount, sensitivity);
+            adjustment.drivers.push(code + ":covering");
+            return;
+          }
+        }
+
+        var referenceArea = getDimensionArea(getOfferPropertyNumbers(referenceOffer, code, delimiter));
+        if (Number.isFinite(referenceArea) && referenceArea > 0) {
+          adjustment.multiplier *= Math.pow(customArea / referenceArea, sensitivity);
+          adjustment.drivers.push(code + ":area");
+        }
+        return;
+      }
+
+      if (type === "pages") {
+        var customValue = parseNumber(normalizeValueToken(customRaw), Number.NaN);
+        if (!Number.isFinite(customValue) || customValue <= 0) return;
+        var values = offers.map(function (offer) {
+          return getOfferPropertyScalar(offer, code);
+        }).filter(function (num) { return Number.isFinite(num) && num > 0; });
+        if (!isWithinRange(customValue, values, allowExtrapolation)) {
+          adjustment.valid = false;
+          adjustment.messages.push("Значение " + code + " вне рамок опорных ТП");
+          return;
+        }
+        var referenceValue = getOfferPropertyScalar(referenceOffer, code);
+        if (Number.isFinite(referenceValue) && referenceValue > 0) {
+          adjustment.multiplier *= Math.pow(customValue / referenceValue, sensitivity);
+          adjustment.drivers.push(code + ":pages");
+        }
+      }
+    });
+
+    return adjustment;
+  }
+
+  function applyCustomPriceDrivers(priceObj, context) {
+    if (!priceObj) return null;
+    var adjustment = buildCustomDriverAdjustment(context || {});
+    if (!adjustment.valid) return null;
+    var amount = parseNumber(priceObj.price, Number.NaN);
+    if (!Number.isFinite(amount)) return priceObj;
+    if (adjustment.multiplier === 1 && !adjustment.drivers.length) return priceObj;
+    return clonePriceWithAmount(priceObj, amount * adjustment.multiplier, {
+      isEstimated: true,
+      drivers: adjustment.drivers
+    });
+  }
+
+  function getVisibleQuantityPoints(offers, selectedByProperty, customByProperty, fieldByCode, volumeCode, numericPresets) {
     var byQty = {};
     (Array.isArray(numericPresets) ? numericPresets : []).forEach(function (preset) {
       var qty = parseNumber(preset && preset.num, Number.NaN);
       if (!Number.isFinite(qty) || byQty[String(qty)]) return;
 
       var draftSel = Object.assign({}, selectedByProperty);
+      var draftCustom = Object.assign({}, customByProperty || {});
       draftSel[volumeCode] = String(preset.xml_id || qty);
-      var offer = pickMatchedOffer(offers, draftSel, {});
+      draftCustom[volumeCode] = false;
+      var offer = pickBestReferenceOfferForCustomDrivers(offers, draftSel, draftCustom, fieldByCode);
       if (offer) byQty[String(qty)] = { offer: offer, qty: qty };
     });
 
@@ -801,7 +1074,7 @@
     });
   }
 
-  function renderPriceTable($block, offers, presetsByCode, selectedByProperty, volumeCode, customVolumeValue, priceGroups, selectedCatalogGroupId) {
+  function renderPriceTable($block, offers, presetsByCode, selectedByProperty, volumeCode, customVolumeValue, priceGroups, selectedCatalogGroupId, driverContext) {
     var volumePresets = (presetsByCode[volumeCode] || []).slice();
     if (!volumePresets.length) {
       $block.html('<div class="frontcalc-price-empty">Нет значений тиража для таблицы.</div>');
@@ -860,21 +1133,31 @@
       '<div class="frontcalc-table-head"><div>Тираж</div><div>Строгий <span class="frontcalc-tip" title="Отгрузка в соответствии с согласованным сроком"><svg width="17" height="16"><use xlink:href="/bitrix/templates/aspro-premier/images/svg/catalog/item_order_icons.svg?1774850114#attention-16-16"></use></svg></span></div><div>Гибкий <span class="frontcalc-tip" title="Срок отгрузки может быть изменен (не больше 10 рабочих дней)"><svg width="17" height="16"><use xlink:href="/bitrix/templates/aspro-premier/images/svg/catalog/item_order_icons.svg?1774850114#attention-16-16"></use></svg></span></div></div>';
     html += '<div class="frontcalc-table-body">';
 
-    var scopedQuantityPoints = getVisibleQuantityPoints(offers, selectedByProperty, volumeCode, numericPresets);
+    var tableCustomByProperty = driverContext && driverContext.customByProperty ? driverContext.customByProperty : {};
+    var tableFieldByCode = driverContext && driverContext.fieldByCode ? driverContext.fieldByCode : {};
+    var scopedQuantityPoints = getVisibleQuantityPoints(offers, selectedByProperty, tableCustomByProperty, tableFieldByCode, volumeCode, numericPresets);
     if (!scopedQuantityPoints.length) {
-      scopedQuantityPoints = getScopedOffersForQuantity(offers, selectedByProperty, {}, volumeCode);
+      scopedQuantityPoints = getScopedOffersForQuantity(offers, selectedByProperty, tableCustomByProperty, volumeCode);
     }
 
     merged.forEach(function (preset, index) {
       var xml = String(preset.xml_id || "");
       var qty = Math.max(1, parseNumber(xml, 1));
       var draftSel = Object.assign({}, selectedByProperty);
+      var draftCustom = Object.assign({}, tableCustomByProperty || {});
       draftSel[volumeCode] = xml;
-      var offer = pickMatchedOffer(offers, draftSel, {});
+      draftCustom[volumeCode] = false;
+      var offer = pickBestReferenceOfferForCustomDrivers(offers, draftSel, draftCustom, tableFieldByCode);
       var strictEstimate = buildQuantityEstimate(scopedQuantityPoints, qty, selectedCatalogGroupId, "strict", offer);
       var flexEstimate = buildQuantityEstimate(scopedQuantityPoints, qty, selectedCatalogGroupId, "flex", offer);
       var strictPrice = strictEstimate.price;
       var flex = flexEstimate.price || strictPrice;
+      var rowDriverContext = Object.assign({}, driverContext || {}, {
+        referenceOffer: offer || (driverContext && driverContext.anchorOffer) || null,
+        column: "strict"
+      });
+      strictPrice = applyCustomPriceDrivers(strictPrice, rowDriverContext);
+      flex = applyCustomPriceDrivers(flex, Object.assign({}, rowDriverContext, { column: "flex" })) || strictPrice;
       var strictNum = parseNumber(strictPrice && strictPrice.price, Number.NaN);
       var flexNum = parseNumber(flex && flex.price, strictNum);
       var weightText = formatMetric(strictEstimate.weightKg, "кг");
@@ -931,18 +1214,22 @@
     }
   }
 
-  function renderPriceBlock($block, matchedOffer) {
+  function renderPriceBlock($block, matchedOffer, driverContext) {
     if (!matchedOffer) {
-      $block.html('<div class="frontcalc-price-empty">Для произвольных значений цена пока не рассчитывается.</div>');
+      $block.html('<div class="frontcalc-price-empty">Для выбранных значений не найдено опорное ТП.</div>');
       return;
     }
 
     var primaryBuyPrice = (matchedOffer.catalog && matchedOffer.catalog.primary_buy_price) || null;
+    primaryBuyPrice = applyCustomPriceDrivers(primaryBuyPrice, Object.assign({}, driverContext || {}, {
+      referenceOffer: matchedOffer,
+      column: "strict"
+    }));
     var weightKg = parseNumber(matchedOffer.catalog && matchedOffer.catalog.weight_kg, 0).toFixed(3);
     var volumeM3 = parseNumber(matchedOffer.catalog && matchedOffer.catalog.volume_m3, 0).toFixed(3);
     var html = "<div class=\"frontcalc-price-main\">";
     html += primaryBuyPrice ? "<div class=\"frontcalc-price-value\">" + escapeHtml(primaryBuyPrice.formatted || (primaryBuyPrice.price + " " + primaryBuyPrice.currency)) + "</div>" : "<div class=\"frontcalc-price-value\">Цена не найдена</div>";
-    html += "<div class=\"frontcalc-price-meta\">Вес: " + weightKg + " кг · Объём: " + volumeM3 + " м³</div></div>";
+    html += "<div class=\"frontcalc-price-meta\">Вес: " + weightKg + " кг · Объём: " + volumeM3 + " м³" + (primaryBuyPrice && primaryBuyPrice.is_estimated ? " · предварительный расчёт" : "") + "</div></div>";
     $block.html(html);
   }
 
@@ -1389,10 +1676,18 @@
         ? String(matched.name || "")
         : buildOfferTitle(config, titleTargetMap, fieldByCode, selectedByProperty, customByProperty, offers, anchorOffer);
       $title.text(titleText);
+      var driverContext = {
+        offers: getFilteredOffers(offers, selectedByProperty, customByProperty, null),
+        fieldByCode: fieldByCode,
+        selectedByProperty: selectedByProperty,
+        customByProperty: customByProperty,
+        anchorOffer: anchorOffer,
+        selectedCatalogGroupId: selectedCatalogGroupId
+      };
       if (presetsByCode[volumeCode] && presetsByCode[volumeCode].length) {
-        renderPriceTable($priceInner, offers, presetsByCode, selectedByProperty, volumeCode, customVolumeValue, priceGroups, selectedCatalogGroupId);
+        renderPriceTable($priceInner, offers, presetsByCode, selectedByProperty, volumeCode, customVolumeValue, priceGroups, selectedCatalogGroupId, driverContext);
       } else {
-        renderPriceBlock($priceInner, matched);
+        renderPriceBlock($priceInner, matched || anchorOffer, driverContext);
       }
     }
 
