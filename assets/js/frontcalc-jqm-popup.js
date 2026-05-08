@@ -782,6 +782,184 @@
   }
 
 
+
+
+  function getPriceDriverType(fieldConfig, code) {
+    var type = String((fieldConfig && fieldConfig.price_driver_type) || "").trim();
+    if (!type && code === "CALC_PROP_VOLUME") return "quantity";
+    return type || "none";
+  }
+
+  function getCalcOptions(fieldConfig) {
+    return fieldConfig && fieldConfig.calc_options && typeof fieldConfig.calc_options === "object"
+      ? fieldConfig.calc_options
+      : {};
+  }
+
+  function parseCompositeNumbers(value, delimiter) {
+    return String(value || "")
+      .split(delimiter || "x")
+      .map(function (part) { return parseNumber(normalizeValueToken(part), Number.NaN); })
+      .filter(function (num) { return Number.isFinite(num); });
+  }
+
+  function getOfferPropertyRawValue(offer, code) {
+    var prop = offer && offer.properties ? offer.properties[code] : null;
+    return String((prop && (prop.xml_id || prop.value)) || "").trim();
+  }
+
+  function getOfferPropertyNumbers(offer, code, delimiter) {
+    return parseCompositeNumbers(getOfferPropertyRawValue(offer, code), delimiter);
+  }
+
+  function getOfferPropertyScalar(offer, code) {
+    var prop = offer && offer.properties ? offer.properties[code] : null;
+    var xmlNum = parseNumber(normalizeValueToken(prop && prop.xml_id), Number.NaN);
+    if (Number.isFinite(xmlNum)) return xmlNum;
+    return parseNumber(normalizeValueToken(prop && prop.value), Number.NaN);
+  }
+
+  function getDimensionArea(nums) {
+    return Array.isArray(nums) && nums.length >= 2 && nums[0] > 0 && nums[1] > 0 ? nums[0] * nums[1] : Number.NaN;
+  }
+
+  function isWithinRange(value, values, allowExtrapolation) {
+    if (allowExtrapolation) return true;
+    var finite = (Array.isArray(values) ? values : []).filter(function (num) { return Number.isFinite(num); });
+    if (!finite.length || !Number.isFinite(value)) return false;
+    var min = Math.min.apply(Math, finite);
+    var max = Math.max.apply(Math, finite);
+    return value >= min && value <= max;
+  }
+
+  function canSizeFit(customSize, offerSize, allowRotate) {
+    if (!Array.isArray(customSize) || !Array.isArray(offerSize) || customSize.length < 2 || offerSize.length < 2) return false;
+    var direct = customSize[0] <= offerSize[0] && customSize[1] <= offerSize[1];
+    var rotated = allowRotate && customSize[1] <= offerSize[0] && customSize[0] <= offerSize[1];
+    return direct || rotated;
+  }
+
+  function clonePriceWithAmount(priceObj, amount, flags) {
+    if (!priceObj || !Number.isFinite(amount)) return priceObj || null;
+    var result = Object.assign({}, priceObj);
+    result.price = amount;
+    result.formatted = formatMoneyAmount(amount, result.currency || "₽");
+    if (flags && flags.isEstimated) result.is_estimated = true;
+    if (flags && flags.drivers) result.drivers = flags.drivers;
+    return result;
+  }
+
+  function getPriceAmountForDriverOffer(offer, catalogGroupId, column) {
+    var range = getRangePriceForColumn(offer, catalogGroupId, column || "strict");
+    return parseNumber(range && range.price, Number.NaN);
+  }
+
+  function buildCustomDriverAdjustment(context) {
+    var offers = Array.isArray(context.offers) ? context.offers : [];
+    var fieldByCode = context.fieldByCode || {};
+    var selectedByProperty = context.selectedByProperty || {};
+    var customByProperty = context.customByProperty || {};
+    var referenceOffer = context.referenceOffer || context.anchorOffer || null;
+    var selectedCatalogGroupId = context.selectedCatalogGroupId;
+    var column = context.column || "strict";
+    var adjustment = { multiplier: 1, valid: true, messages: [], drivers: [] };
+
+    Object.keys(customByProperty).forEach(function (code) {
+      if (!customByProperty[code]) return;
+      var fieldConfig = fieldByCode[code] || {};
+      var type = getPriceDriverType(fieldConfig, code);
+      if (!type || type === "none" || type === "quantity") return;
+
+      var options = getCalcOptions(fieldConfig);
+      var allowExtrapolation = isTruthyFlag(options.allow_extrapolation);
+      var sensitivity = parseNumber(options.sensitivity, 1);
+      if (!Number.isFinite(sensitivity) || sensitivity <= 0) sensitivity = 1;
+      var delimiter = fieldConfig.group_delimiter || fieldConfig.split_delimiter || "x";
+      var customRaw = selectedByProperty[code];
+
+      if (type === "multiplier") {
+        var coefficient = parseNumber(options.coefficient, Number.NaN);
+        if (Number.isFinite(coefficient) && coefficient > 0) {
+          adjustment.multiplier *= coefficient;
+          adjustment.drivers.push(code + ":coefficient");
+        }
+        return;
+      }
+
+      if (type === "size_area" || type === "size_covering") {
+        var customSize = parseCompositeNumbers(customRaw, delimiter);
+        var customArea = getDimensionArea(customSize);
+        if (!Number.isFinite(customArea) || customArea <= 0) return;
+        var offerAreas = offers.map(function (offer) {
+          return getDimensionArea(getOfferPropertyNumbers(offer, code, delimiter));
+        }).filter(function (area) { return Number.isFinite(area) && area > 0; });
+        if (!isWithinRange(customArea, offerAreas, allowExtrapolation)) {
+          adjustment.valid = false;
+          adjustment.messages.push("Значение " + code + " вне рамок опорных ТП");
+          return;
+        }
+
+        if (type === "size_covering") {
+          var allowRotate = Object.prototype.hasOwnProperty.call(options, "allow_rotate") ? isTruthyFlag(options.allow_rotate) : true;
+          var covering = null;
+          offers.forEach(function (offer) {
+            var nums = getOfferPropertyNumbers(offer, code, delimiter);
+            var area = getDimensionArea(nums);
+            if (!Number.isFinite(area) || !canSizeFit(customSize, nums, allowRotate)) return;
+            if (!covering || area < covering.area) covering = { offer: offer, area: area };
+          });
+          var baseAmount = getPriceAmountForDriverOffer(referenceOffer, selectedCatalogGroupId, column);
+          var coveringAmount = getPriceAmountForDriverOffer(covering && covering.offer, selectedCatalogGroupId, column);
+          if (Number.isFinite(baseAmount) && baseAmount > 0 && Number.isFinite(coveringAmount)) {
+            adjustment.multiplier *= Math.pow(coveringAmount / baseAmount, sensitivity);
+            adjustment.drivers.push(code + ":covering");
+            return;
+          }
+        }
+
+        var referenceArea = getDimensionArea(getOfferPropertyNumbers(referenceOffer, code, delimiter));
+        if (Number.isFinite(referenceArea) && referenceArea > 0) {
+          adjustment.multiplier *= Math.pow(customArea / referenceArea, sensitivity);
+          adjustment.drivers.push(code + ":area");
+        }
+        return;
+      }
+
+      if (type === "pages") {
+        var customValue = parseNumber(normalizeValueToken(customRaw), Number.NaN);
+        if (!Number.isFinite(customValue) || customValue <= 0) return;
+        var values = offers.map(function (offer) {
+          return getOfferPropertyScalar(offer, code);
+        }).filter(function (num) { return Number.isFinite(num) && num > 0; });
+        if (!isWithinRange(customValue, values, allowExtrapolation)) {
+          adjustment.valid = false;
+          adjustment.messages.push("Значение " + code + " вне рамок опорных ТП");
+          return;
+        }
+        var referenceValue = getOfferPropertyScalar(referenceOffer, code);
+        if (Number.isFinite(referenceValue) && referenceValue > 0) {
+          adjustment.multiplier *= Math.pow(customValue / referenceValue, sensitivity);
+          adjustment.drivers.push(code + ":pages");
+        }
+      }
+    });
+
+    return adjustment;
+  }
+
+  function applyCustomPriceDrivers(priceObj, context) {
+    if (!priceObj) return null;
+    var adjustment = buildCustomDriverAdjustment(context || {});
+    if (!adjustment.valid) return null;
+    var amount = parseNumber(priceObj.price, Number.NaN);
+    if (!Number.isFinite(amount)) return priceObj;
+    if (adjustment.multiplier === 1 && !adjustment.drivers.length) return priceObj;
+    return clonePriceWithAmount(priceObj, amount * adjustment.multiplier, {
+      isEstimated: true,
+      drivers: adjustment.drivers
+    });
+  }
+
   function getVisibleQuantityPoints(offers, selectedByProperty, volumeCode, numericPresets) {
     var byQty = {};
     (Array.isArray(numericPresets) ? numericPresets : []).forEach(function (preset) {
@@ -801,7 +979,7 @@
     });
   }
 
-  function renderPriceTable($block, offers, presetsByCode, selectedByProperty, volumeCode, customVolumeValue, priceGroups, selectedCatalogGroupId) {
+  function renderPriceTable($block, offers, presetsByCode, selectedByProperty, volumeCode, customVolumeValue, priceGroups, selectedCatalogGroupId, driverContext) {
     var volumePresets = (presetsByCode[volumeCode] || []).slice();
     if (!volumePresets.length) {
       $block.html('<div class="frontcalc-price-empty">Нет значений тиража для таблицы.</div>');
@@ -875,6 +1053,12 @@
       var flexEstimate = buildQuantityEstimate(scopedQuantityPoints, qty, selectedCatalogGroupId, "flex", offer);
       var strictPrice = strictEstimate.price;
       var flex = flexEstimate.price || strictPrice;
+      var rowDriverContext = Object.assign({}, driverContext || {}, {
+        referenceOffer: offer || (driverContext && driverContext.anchorOffer) || null,
+        column: "strict"
+      });
+      strictPrice = applyCustomPriceDrivers(strictPrice, rowDriverContext);
+      flex = applyCustomPriceDrivers(flex, Object.assign({}, rowDriverContext, { column: "flex" })) || strictPrice;
       var strictNum = parseNumber(strictPrice && strictPrice.price, Number.NaN);
       var flexNum = parseNumber(flex && flex.price, strictNum);
       var weightText = formatMetric(strictEstimate.weightKg, "кг");
@@ -931,18 +1115,22 @@
     }
   }
 
-  function renderPriceBlock($block, matchedOffer) {
+  function renderPriceBlock($block, matchedOffer, driverContext) {
     if (!matchedOffer) {
-      $block.html('<div class="frontcalc-price-empty">Для произвольных значений цена пока не рассчитывается.</div>');
+      $block.html('<div class="frontcalc-price-empty">Для выбранных значений не найдено опорное ТП.</div>');
       return;
     }
 
     var primaryBuyPrice = (matchedOffer.catalog && matchedOffer.catalog.primary_buy_price) || null;
+    primaryBuyPrice = applyCustomPriceDrivers(primaryBuyPrice, Object.assign({}, driverContext || {}, {
+      referenceOffer: matchedOffer,
+      column: "strict"
+    }));
     var weightKg = parseNumber(matchedOffer.catalog && matchedOffer.catalog.weight_kg, 0).toFixed(3);
     var volumeM3 = parseNumber(matchedOffer.catalog && matchedOffer.catalog.volume_m3, 0).toFixed(3);
     var html = "<div class=\"frontcalc-price-main\">";
     html += primaryBuyPrice ? "<div class=\"frontcalc-price-value\">" + escapeHtml(primaryBuyPrice.formatted || (primaryBuyPrice.price + " " + primaryBuyPrice.currency)) + "</div>" : "<div class=\"frontcalc-price-value\">Цена не найдена</div>";
-    html += "<div class=\"frontcalc-price-meta\">Вес: " + weightKg + " кг · Объём: " + volumeM3 + " м³</div></div>";
+    html += "<div class=\"frontcalc-price-meta\">Вес: " + weightKg + " кг · Объём: " + volumeM3 + " м³" + (primaryBuyPrice && primaryBuyPrice.is_estimated ? " · предварительный расчёт" : "") + "</div></div>";
     $block.html(html);
   }
 
@@ -1389,10 +1577,18 @@
         ? String(matched.name || "")
         : buildOfferTitle(config, titleTargetMap, fieldByCode, selectedByProperty, customByProperty, offers, anchorOffer);
       $title.text(titleText);
+      var driverContext = {
+        offers: getFilteredOffers(offers, selectedByProperty, customByProperty, null),
+        fieldByCode: fieldByCode,
+        selectedByProperty: selectedByProperty,
+        customByProperty: customByProperty,
+        anchorOffer: anchorOffer,
+        selectedCatalogGroupId: selectedCatalogGroupId
+      };
       if (presetsByCode[volumeCode] && presetsByCode[volumeCode].length) {
-        renderPriceTable($priceInner, offers, presetsByCode, selectedByProperty, volumeCode, customVolumeValue, priceGroups, selectedCatalogGroupId);
+        renderPriceTable($priceInner, offers, presetsByCode, selectedByProperty, volumeCode, customVolumeValue, priceGroups, selectedCatalogGroupId, driverContext);
       } else {
-        renderPriceBlock($priceInner, matched);
+        renderPriceBlock($priceInner, matched || anchorOffer, driverContext);
       }
     }
 
