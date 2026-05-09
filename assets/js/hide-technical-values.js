@@ -17,15 +17,11 @@
   function hideNode(node) {
     var target = node.closest('.line-block__item') || node;
     target.classList.add('my-hidden-technical-value');
-    target.style.display = 'none';
-    target.setAttribute('aria-hidden', 'true');
   }
 
   function resetNode(node) {
     var target = node.closest('.line-block__item') || node;
     target.classList.remove('my-hidden-technical-value');
-    target.style.display = '';
-    target.removeAttribute('aria-hidden');
   }
 
   function applyListing(root) {
