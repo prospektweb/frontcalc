@@ -975,13 +975,32 @@
 
 
 
-  function roundProductionVolumeStep(rawStep) {
+  function roundProductionVolumeStep(rawStep, configuredStep) {
     var step = parseNumber(rawStep, Number.NaN);
     if (!Number.isFinite(step) || step <= 0) return Number.NaN;
-    if (step < 100) return Math.max(1, Math.round(step));
 
-    var magnitude = Math.pow(10, Math.floor(Math.log10(step)));
-    return Math.max(magnitude, Math.round(step / magnitude) * magnitude);
+    var baseStep = parseNumber(configuredStep, 0);
+    var allowedSteps = [5, 10, 50, 100, 500, 1000].filter(function (candidate) {
+      return candidate > baseStep;
+    });
+    if (!allowedSteps.length) return Number.NaN;
+
+    var best = allowedSteps[0];
+    var bestDiff = Math.abs(step - best);
+    for (var i = 1; i < allowedSteps.length; i++) {
+      var diff = Math.abs(step - allowedSteps[i]);
+      if (diff < bestDiff) {
+        best = allowedSteps[i];
+        bestDiff = diff;
+      }
+    }
+    return best;
+  }
+
+  function isSmartVolumeStepEnabled(fieldByCode, volumeCode) {
+    var volumeField = fieldByCode && fieldByCode[volumeCode] ? fieldByCode[volumeCode] : null;
+    if (getPriceDriverType(volumeField, volumeCode) !== "quantity") return false;
+    return isTruthyFlag(getCalcOptions(volumeField).smart_volume_step);
   }
 
   function resolveProductionSheetCapacityForSelection(offers, selectedByProperty, customByProperty, fieldByCode) {
@@ -1635,11 +1654,13 @@
 
     function getCurrentVolumeStepInfo() {
       var configuredStep = Number.isFinite(explicitVolumeStep) && explicitVolumeStep > 0 ? explicitVolumeStep : volumeStep;
-      var capacity = resolveProductionSheetCapacityForSelection(offers, selectedByProperty, customByProperty, fieldByCode);
-      if (Number.isFinite(capacity) && capacity > 0) {
-        var productionStep = roundProductionVolumeStep(configuredStep * capacity);
-        if (Number.isFinite(productionStep) && productionStep > 0) {
-          return { step: productionStep, isProduction: true };
+      if (isSmartVolumeStepEnabled(fieldByCode, volumeCode)) {
+        var capacity = resolveProductionSheetCapacityForSelection(offers, selectedByProperty, customByProperty, fieldByCode);
+        if (Number.isFinite(capacity) && capacity > 0) {
+          var productionStep = roundProductionVolumeStep(configuredStep * capacity, configuredStep);
+          if (Number.isFinite(productionStep) && productionStep > 0) {
+            return { step: productionStep, isProduction: true };
+          }
         }
       }
       return { step: configuredStep, isProduction: false };

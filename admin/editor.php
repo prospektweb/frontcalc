@@ -335,6 +335,9 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
                         </select>
                         <div class="fc-help">По умолчанию расчёт выполняется только внутри диапазона опорных ТП.</div>
                         <div class="fc-driver-options js-driver-options">
+                            <div class="fc-pills">
+                                <label class="fc-pill js-smart-volume-step-wrap"><input type="checkbox" class="js-driver-smart-volume-step"<?= !empty($calcOptions['smart_volume_step']) ? ' checked' : '' ?> title="Работает только при использовании расчёта произвольных значений через производственный лист и дельту обработки"> Использовать «умное» изменение шага</label>
+                            </div>
                             <div class="fc-row">
                                 <input class="fc-input js-driver-sensitivity" placeholder="Чувствительность, по умолчанию 1" value="<?= htmlspecialcharsbx((string)($calcOptions['sensitivity'] ?? '')) ?>">
                                 <input class="fc-input js-driver-trim" placeholder="Поля, мм" value="<?= htmlspecialcharsbx((string)($calcOptions['trim_margin_mm'] ?? '2')) ?>">
@@ -579,6 +582,9 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
             + '      </select>\n'
             + '      <div class="fc-help">По умолчанию расчёт выполняется только внутри диапазона опорных ТП.</div>\n'
             + '      <div class="fc-driver-options js-driver-options">\n'
+            + '        <div class="fc-pills">\n'
+            + '          <label class="fc-pill js-smart-volume-step-wrap"><input type="checkbox" class="js-driver-smart-volume-step" title="Работает только при использовании расчёта произвольных значений через производственный лист и дельту обработки"> Использовать «умное» изменение шага</label>\n'
+            + '        </div>\n'
             + '        <div class="fc-row">\n'
             + '          <input class="fc-input js-driver-sensitivity" placeholder="Чувствительность, по умолчанию 1">\n'
             + '          <input class="fc-input js-driver-trim" placeholder="Поля, мм" value="2">\n'
@@ -619,16 +625,22 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
         const type = card.querySelector('.js-price-driver-type')?.value || 'none';
         const panel = card.querySelector('.js-driver-options');
         if (!panel) return;
-        panel.classList.toggle('is-active', type !== 'none' && type !== 'quantity');
+        panel.classList.toggle('is-active', type !== 'none');
+
+        const smartWrap = card.querySelector('.js-smart-volume-step-wrap');
+        if (smartWrap) smartWrap.style.display = type === 'quantity' ? '' : 'none';
+
         ['sensitivity', 'trim', 'gap'].forEach(name => {
             const input = card.querySelector('.js-driver-' + name);
             if (!input) return;
-            input.style.display = type === 'production_sheet_delta' && name !== 'trim' ? 'none' : '';
+            const hiddenForQuantity = type === 'quantity';
+            const hiddenForProduction = type === 'production_sheet_delta' && name !== 'trim';
+            input.style.display = hiddenForQuantity || hiddenForProduction ? 'none' : '';
         });
         ['allow-extrapolation', 'allow-rotate'].forEach(name => {
             const input = card.querySelector('.js-driver-' + name);
             const label = input ? input.closest('.fc-pill') : null;
-            if (label) label.style.display = type === 'production_sheet_delta' ? 'none' : '';
+            if (label) label.style.display = type === 'quantity' || type === 'production_sheet_delta' ? 'none' : '';
         });
     }
 
@@ -763,7 +775,8 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
                     trim_margin_mm: card.querySelector('.js-driver-trim') ? card.querySelector('.js-driver-trim').value : '',
                     gap_mm: card.querySelector('.js-driver-gap') ? card.querySelector('.js-driver-gap').value : '',
                     allow_extrapolation: card.querySelector('.js-driver-allow-extrapolation') ? card.querySelector('.js-driver-allow-extrapolation').checked : false,
-                    allow_rotate: card.querySelector('.js-driver-allow-rotate') ? card.querySelector('.js-driver-allow-rotate').checked : true
+                    allow_rotate: card.querySelector('.js-driver-allow-rotate') ? card.querySelector('.js-driver-allow-rotate').checked : true,
+                    smart_volume_step: card.querySelector('.js-driver-smart-volume-step') ? card.querySelector('.js-driver-smart-volume-step').checked : false
                 };
 
                 fields.push({
