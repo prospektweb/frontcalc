@@ -331,14 +331,13 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
                             <option value="size_area"<?= $priceDriverType === 'size_area' ? ' selected' : '' ?>>Размер по площади</option>
                             <option value="size_covering"<?= $priceDriverType === 'size_covering' ? ' selected' : '' ?>>Размер по ближайшему большему ТП</option>
                             <option value="pages"<?= $priceDriverType === 'pages' ? ' selected' : '' ?>>Полосы / страницы / листы</option>
-                            <option value="multiplier"<?= $priceDriverType === 'multiplier' ? ' selected' : '' ?>>Коэффициент</option>
+                            <option value="production_sheet_delta"<?= $priceDriverType === 'production_sheet_delta' ? ' selected' : '' ?>>Через производственный лист и дельту обработки</option>
                         </select>
                         <div class="fc-help">По умолчанию расчёт выполняется только внутри диапазона опорных ТП.</div>
                         <div class="fc-driver-options js-driver-options">
                             <div class="fc-row">
-                                <input class="fc-input js-driver-coefficient" placeholder="Коэффициент, например 1.15" value="<?= htmlspecialcharsbx((string)($calcOptions['coefficient'] ?? '')) ?>">
                                 <input class="fc-input js-driver-sensitivity" placeholder="Чувствительность, по умолчанию 1" value="<?= htmlspecialcharsbx((string)($calcOptions['sensitivity'] ?? '')) ?>">
-                                <input class="fc-input js-driver-trim" placeholder="Поле/подрезка, мм" value="<?= htmlspecialcharsbx((string)($calcOptions['trim_margin_mm'] ?? '2')) ?>">
+                                <input class="fc-input js-driver-trim" placeholder="Поля, мм" value="<?= htmlspecialcharsbx((string)($calcOptions['trim_margin_mm'] ?? '2')) ?>">
                                 <input class="fc-input js-driver-gap" placeholder="Зазор, мм" value="<?= htmlspecialcharsbx((string)($calcOptions['gap_mm'] ?? '0')) ?>">
                             </div>
                             <div class="fc-pills">
@@ -568,6 +567,29 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
             + '    <div class="fc-pills">\n'
             + '      <label class="fc-pill"><input type="checkbox" class="js-show-presets" checked> Показывать пресеты</label>\n'
             + '    </div>\n'
+            + '    <div class="fc-subtitle">Расчёт произвольных значений</div>\n'
+            + '    <div class="fc-driver-panel">\n'
+            + '      <select class="fc-select js-price-driver-type">\n'
+            + '        <option value="none">Не влияет на цену</option>\n'
+            + '        <option value="quantity"' + (prop.CODE === requiredVolumeCode ? ' selected' : '') + '>Тираж / количество</option>\n'
+            + '        <option value="size_area">Размер по площади</option>\n'
+            + '        <option value="size_covering">Размер по ближайшему большему ТП</option>\n'
+            + '        <option value="pages">Полосы / страницы / листы</option>\n'
+            + '        <option value="production_sheet_delta">Через производственный лист и дельту обработки</option>\n'
+            + '      </select>\n'
+            + '      <div class="fc-help">По умолчанию расчёт выполняется только внутри диапазона опорных ТП.</div>\n'
+            + '      <div class="fc-driver-options js-driver-options">\n'
+            + '        <div class="fc-row">\n'
+            + '          <input class="fc-input js-driver-sensitivity" placeholder="Чувствительность, по умолчанию 1">\n'
+            + '          <input class="fc-input js-driver-trim" placeholder="Поля, мм" value="2">\n'
+            + '          <input class="fc-input js-driver-gap" placeholder="Зазор, мм" value="0">\n'
+            + '        </div>\n'
+            + '        <div class="fc-pills">\n'
+            + '          <label class="fc-pill"><input type="checkbox" class="js-driver-allow-extrapolation"> Разрешить расчёт вне рамок</label>\n'
+            + '          <label class="fc-pill"><input type="checkbox" class="js-driver-allow-rotate" checked> Учитывать поворот размера</label>\n'
+            + '        </div>\n'
+            + '      </div>\n'
+            + '    </div>\n'
             + '    <div class="fc-subtitle">Скрыть варианты (XML_ID)</div>\n'
             + '    <select class="fc-select js-hidden-presets" multiple size="5" style="height:auto; min-height:120px;">' + renderEnumOptions(prop) + '</select>\n'
             + '    <div class="fc-subtitle">Технические варианты (скрыть на фронте)</div>\n'
@@ -598,9 +620,15 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
         const panel = card.querySelector('.js-driver-options');
         if (!panel) return;
         panel.classList.toggle('is-active', type !== 'none' && type !== 'quantity');
-        ['coefficient', 'sensitivity', 'trim', 'gap'].forEach(name => {
+        ['sensitivity', 'trim', 'gap'].forEach(name => {
             const input = card.querySelector('.js-driver-' + name);
-            if (input) input.closest('div').style.display = '';
+            if (!input) return;
+            input.style.display = type === 'production_sheet_delta' && name !== 'trim' ? 'none' : '';
+        });
+        ['allow-extrapolation', 'allow-rotate'].forEach(name => {
+            const input = card.querySelector('.js-driver-' + name);
+            const label = input ? input.closest('.fc-pill') : null;
+            if (label) label.style.display = type === 'production_sheet_delta' ? 'none' : '';
         });
     }
 
@@ -731,7 +759,6 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
 
                 const priceDriverType = card.querySelector('.js-price-driver-type') ? card.querySelector('.js-price-driver-type').value : 'none';
                 const calcOptions = {
-                    coefficient: card.querySelector('.js-driver-coefficient') ? card.querySelector('.js-driver-coefficient').value : '',
                     sensitivity: card.querySelector('.js-driver-sensitivity') ? card.querySelector('.js-driver-sensitivity').value : '',
                     trim_margin_mm: card.querySelector('.js-driver-trim') ? card.querySelector('.js-driver-trim').value : '',
                     gap_mm: card.querySelector('.js-driver-gap') ? card.querySelector('.js-driver-gap').value : '',

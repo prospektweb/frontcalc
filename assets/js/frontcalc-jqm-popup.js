@@ -877,12 +877,189 @@
   }
 
 
+
+
+  function getAdjustedProductionSize(size, trimMarginMm) {
+    if (!Array.isArray(size) || size.length < 2) return [];
+    var margin = parseNumber(trimMarginMm, 2);
+    if (!Number.isFinite(margin) || margin < 0) margin = 2;
+    return [size[0] + margin * 2, size[1] + margin * 2];
+  }
+
+  function countItemsInProductionSize(productionSize, itemSize, allowRotate) {
+    if (!Array.isArray(productionSize) || !Array.isArray(itemSize) || productionSize.length < 2 || itemSize.length < 2) return 0;
+
+    function fit(containerWidth, containerHeight, itemWidth, itemHeight) {
+      if (containerWidth <= 0 || containerHeight <= 0 || itemWidth <= 0 || itemHeight <= 0) return 0;
+      return Math.max(0, Math.floor(containerWidth / itemWidth)) * Math.max(0, Math.floor(containerHeight / itemHeight));
+    }
+
+    var direct = fit(productionSize[0], productionSize[1], itemSize[0], itemSize[1]);
+    var rotated = allowRotate ? fit(productionSize[0], productionSize[1], itemSize[1], itemSize[0]) : 0;
+    return Math.max(direct, rotated);
+  }
+
+  function pickProductionSheetOffer(offers, code, delimiter) {
+    var best = null;
+    (Array.isArray(offers) ? offers : []).forEach(function (offer) {
+      var size = getOfferPropertyNumbers(offer, code, delimiter);
+      var area = getDimensionArea(size);
+      if (!Number.isFinite(area) || area <= 0) return;
+      if (!best || area > best.area) {
+        best = { offer: offer, size: size, area: area };
+      }
+    });
+    return best;
+  }
+
+  function getOfferPropertyKey(offer, code) {
+    var prop = offer && offer.properties ? offer.properties[code] : null;
+    return String((prop && (prop.xml_id || prop.value)) || "").trim();
+  }
+
+  function getQuantityPointsForReferenceOffer(allOffers, selectedByProperty, customByProperty, referenceOffer, sizeCode, volumeCode) {
+    var referenceKey = getOfferPropertyKey(referenceOffer, sizeCode);
+    if (!referenceKey) return [];
+
+    var scopedSelection = Object.assign({}, selectedByProperty || {});
+    var scopedCustom = Object.assign({}, customByProperty || {});
+    scopedSelection[sizeCode] = referenceKey;
+    scopedCustom[sizeCode] = false;
+    scopedCustom[volumeCode] = true;
+
+    return getScopedOffersForQuantity(allOffers, scopedSelection, scopedCustom, volumeCode);
+  }
+
+  function buildPriceAtQuantityForReferenceOffer(allOffers, selectedByProperty, customByProperty, referenceOffer, sizeCode, volumeCode, targetQty, catalogGroupId, column) {
+    var qty = parseNumber(targetQty, Number.NaN);
+    if (!Number.isFinite(qty) || qty <= 0) return null;
+
+    var points = getQuantityPointsForReferenceOffer(allOffers, selectedByProperty, customByProperty, referenceOffer, sizeCode, volumeCode);
+    return buildInterpolatedRangePrice(points, qty, catalogGroupId, column || "strict");
+  }
+
+  function interpolateDeltaByArea(points, targetArea) {
+    var rows = (Array.isArray(points) ? points : [])
+      .filter(function (point) {
+        return Number.isFinite(point.area) && point.area > 0 && Number.isFinite(point.delta);
+      })
+      .sort(function (a, b) { return a.area - b.area; });
+    if (!rows.length || !Number.isFinite(targetArea) || targetArea <= 0) return Number.NaN;
+    if (rows.length === 1) return rows[0].delta;
+
+    var lower = null;
+    var upper = null;
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].area <= targetArea) lower = rows[i];
+      if (rows[i].area >= targetArea) {
+        upper = rows[i];
+        break;
+      }
+    }
+    if (!lower) {
+      lower = rows[0];
+      upper = rows[1];
+    } else if (!upper) {
+      lower = rows[rows.length - 2];
+      upper = rows[rows.length - 1];
+    }
+    if (!upper || lower.area === upper.area) return lower.delta;
+
+    var start = Math.log(lower.area);
+    var end = Math.log(upper.area);
+    var target = Math.log(targetArea);
+    if (start === end) return lower.delta;
+    var ratio = (target - start) / (end - start);
+    return lower.delta + (upper.delta - lower.delta) * ratio;
+  }
+
+  function buildProductionSheetDeltaPrice(context, code, fieldConfig, customRaw, column) {
+    var allOffers = Array.isArray(context.allOffers) ? context.allOffers : [];
+    var selectedByProperty = context.selectedByProperty || {};
+    var customByProperty = context.customByProperty || {};
+    var volumeCode = context.volumeCode || "CALC_PROP_VOLUME";
+    var targetQty = parseNumber(context.targetQty, Number.NaN);
+    var catalogGroupId = context.selectedCatalogGroupId;
+    var delimiter = fieldConfig.group_delimiter || fieldConfig.split_delimiter || "x";
+    var options = getCalcOptions(fieldConfig);
+    var trimMarginMm = parseNumber(options.trim_margin_mm, 2);
+    if (!Number.isFinite(trimMarginMm) || trimMarginMm < 0) trimMarginMm = 2;
+    var allowRotate = Object.prototype.hasOwnProperty.call(options, "allow_rotate") ? isTruthyFlag(options.allow_rotate) : true;
+
+    if (!Number.isFinite(targetQty) || targetQty <= 0) return null;
+
+    var customSize = parseCompositeNumbers(customRaw, delimiter);
+    var customArea = getDimensionArea(customSize);
+    if (!Number.isFinite(customArea) || customArea <= 0) return null;
+
+    var comparableOffers = getFilteredOffers(allOffers, selectedByProperty, customByProperty, volumeCode);
+    var production = pickProductionSheetOffer(comparableOffers, code, delimiter);
+    if (!production) return null;
+
+    var productionSize = getAdjustedProductionSize(production.size, trimMarginMm);
+    var customFit = countItemsInProductionSize(productionSize, customSize, allowRotate);
+    if (customFit <= 0) return null;
+
+    var sheetQty = targetQty / customFit;
+    var basePrice = buildPriceAtQuantityForReferenceOffer(
+      allOffers,
+      selectedByProperty,
+      customByProperty,
+      production.offer,
+      code,
+      volumeCode,
+      sheetQty,
+      catalogGroupId,
+      column
+    );
+    var baseAmount = parseNumber(basePrice && basePrice.price, Number.NaN);
+    if (!Number.isFinite(baseAmount)) return null;
+
+    var bySize = {};
+    comparableOffers.forEach(function (offer) {
+      var key = getOfferPropertyKey(offer, code);
+      if (!key || bySize[key]) return;
+      var size = getOfferPropertyNumbers(offer, code, delimiter);
+      var area = getDimensionArea(size);
+      var fit = countItemsInProductionSize(productionSize, size, allowRotate);
+      if (!Number.isFinite(area) || area <= 0 || fit <= 0) return;
+      bySize[key] = { offer: offer, size: size, area: area, fit: fit };
+    });
+
+    var deltaPoints = Object.keys(bySize).map(function (key) {
+      var row = bySize[key];
+      var referenceQty = row.fit * sheetQty;
+      var referencePrice = buildPriceAtQuantityForReferenceOffer(
+        allOffers,
+        selectedByProperty,
+        customByProperty,
+        row.offer,
+        code,
+        volumeCode,
+        referenceQty,
+        catalogGroupId,
+        column
+      );
+      var amount = parseNumber(referencePrice && referencePrice.price, Number.NaN);
+      if (!Number.isFinite(amount)) return null;
+      return { area: row.area, delta: amount - baseAmount };
+    }).filter(Boolean);
+
+    var delta = interpolateDeltaByArea(deltaPoints, customArea);
+    if (!Number.isFinite(delta)) return null;
+
+    return clonePriceWithAmount(basePrice, Math.max(0, baseAmount + delta), {
+      isEstimated: true,
+      drivers: [code + ":production_sheet_delta"]
+    });
+  }
+
   function scoreOfferForCustomDriver(offer, code, fieldConfig, customRaw) {
     var type = getPriceDriverType(fieldConfig, code);
-    if (!type || type === "none" || type === "quantity" || type === "multiplier") return 0;
+    if (!type || type === "none" || type === "quantity") return 0;
 
     var delimiter = fieldConfig.group_delimiter || fieldConfig.split_delimiter || "x";
-    if (type === "size_area" || type === "size_covering") {
+    if (type === "size_area" || type === "size_covering" || type === "production_sheet_delta") {
       var customSize = parseCompositeNumbers(customRaw, delimiter);
       var offerSize = getOfferPropertyNumbers(offer, code, delimiter);
       var customArea = getDimensionArea(customSize);
@@ -970,11 +1147,11 @@
       var delimiter = fieldConfig.group_delimiter || fieldConfig.split_delimiter || "x";
       var customRaw = selectedByProperty[code];
 
-      if (type === "multiplier") {
-        var coefficient = parseNumber(options.coefficient, Number.NaN);
-        if (Number.isFinite(coefficient) && coefficient > 0) {
-          adjustment.multiplier *= coefficient;
-          adjustment.drivers.push(code + ":coefficient");
+      if (type === "production_sheet_delta") {
+        var productionPrice = buildProductionSheetDeltaPrice(context, code, fieldConfig, customRaw, column);
+        if (productionPrice) {
+          adjustment.priceOverride = productionPrice;
+          adjustment.drivers.push(code + ":production_sheet_delta");
         }
         return;
       }
@@ -1041,9 +1218,10 @@
   }
 
   function applyCustomPriceDrivers(priceObj, context) {
-    if (!priceObj) return null;
     var adjustment = buildCustomDriverAdjustment(context || {});
     if (!adjustment.valid) return null;
+    if (adjustment.priceOverride) return adjustment.priceOverride;
+    if (!priceObj) return null;
     var amount = parseNumber(priceObj.price, Number.NaN);
     if (!Number.isFinite(amount)) return priceObj;
     if (adjustment.multiplier === 1 && !adjustment.drivers.length) return priceObj;
@@ -1154,6 +1332,7 @@
       var flex = flexEstimate.price || strictPrice;
       var rowDriverContext = Object.assign({}, driverContext || {}, {
         referenceOffer: offer || (driverContext && driverContext.anchorOffer) || null,
+        targetQty: qty,
         column: "strict"
       });
       strictPrice = applyCustomPriceDrivers(strictPrice, rowDriverContext);
@@ -1678,10 +1857,13 @@
       $title.text(titleText);
       var driverContext = {
         offers: getFilteredOffers(offers, selectedByProperty, customByProperty, null),
+        allOffers: offers,
+        volumeCode: volumeCode,
         fieldByCode: fieldByCode,
         selectedByProperty: selectedByProperty,
         customByProperty: customByProperty,
         anchorOffer: anchorOffer,
+        targetQty: parseNumber(selectedByProperty[volumeCode], 1),
         selectedCatalogGroupId: selectedCatalogGroupId
       };
       if (presetsByCode[volumeCode] && presetsByCode[volumeCode].length) {
