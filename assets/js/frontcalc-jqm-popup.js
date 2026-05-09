@@ -973,6 +973,50 @@
     return lower.delta + (upper.delta - lower.delta) * ratio;
   }
 
+
+
+  function roundProductionVolumeStep(rawStep) {
+    var step = parseNumber(rawStep, Number.NaN);
+    if (!Number.isFinite(step) || step <= 0) return Number.NaN;
+    if (step < 100) return Math.max(1, Math.round(step));
+
+    var magnitude = Math.pow(10, Math.floor(Math.log10(step)));
+    return Math.max(magnitude, Math.round(step / magnitude) * magnitude);
+  }
+
+  function resolveProductionSheetCapacityForSelection(offers, selectedByProperty, customByProperty, fieldByCode) {
+    var allOffers = Array.isArray(offers) ? offers : [];
+    var fields = fieldByCode || {};
+    for (var code in fields) {
+      if (!Object.prototype.hasOwnProperty.call(fields, code)) continue;
+      var fieldConfig = fields[code] || {};
+      if (getPriceDriverType(fieldConfig, code) !== "production_sheet_delta") continue;
+
+      var selectedValue = selectedByProperty && selectedByProperty[code];
+      var delimiter = fieldConfig.group_delimiter || fieldConfig.split_delimiter || "x";
+      var customSize = parseCompositeNumbers(selectedValue, delimiter);
+      var customArea = getDimensionArea(customSize);
+      if (!Number.isFinite(customArea) || customArea <= 0) continue;
+
+      var scopedSelection = Object.assign({}, selectedByProperty || {});
+      var scopedCustom = Object.assign({}, customByProperty || {});
+      scopedCustom[code] = true;
+      var comparableOffers = getFilteredOffers(allOffers, scopedSelection, scopedCustom, "CALC_PROP_VOLUME");
+      var production = pickProductionSheetOffer(comparableOffers, code, delimiter);
+      if (!production) continue;
+
+      var options = getCalcOptions(fieldConfig);
+      var trimMarginMm = parseNumber(options.trim_margin_mm, 2);
+      if (!Number.isFinite(trimMarginMm) || trimMarginMm < 0) trimMarginMm = 2;
+      var allowRotate = Object.prototype.hasOwnProperty.call(options, "allow_rotate") ? isTruthyFlag(options.allow_rotate) : true;
+      var productionSize = getAdjustedProductionSize(production.size, trimMarginMm);
+      var fit = countItemsInProductionSize(productionSize, customSize, allowRotate);
+      if (fit > 0) return fit;
+    }
+
+    return Number.NaN;
+  }
+
   function buildProductionSheetDeltaPrice(context, code, fieldConfig, customRaw, column) {
     var allOffers = Array.isArray(context.allOffers) ? context.allOffers : [];
     var selectedByProperty = context.selectedByProperty || {};
@@ -1589,6 +1633,37 @@
     var volumeMin = parseNumber(fieldByCode[volumeCode] && fieldByCode[volumeCode].min, Number.NaN);
     var volumeMax = parseNumber(fieldByCode[volumeCode] && fieldByCode[volumeCode].max, Number.NaN);
 
+    function getCurrentVolumeStepInfo() {
+      var configuredStep = Number.isFinite(explicitVolumeStep) && explicitVolumeStep > 0 ? explicitVolumeStep : volumeStep;
+      var capacity = resolveProductionSheetCapacityForSelection(offers, selectedByProperty, customByProperty, fieldByCode);
+      if (Number.isFinite(capacity) && capacity > 0) {
+        var productionStep = roundProductionVolumeStep(configuredStep * capacity);
+        if (Number.isFinite(productionStep) && productionStep > 0) {
+          return { step: productionStep, isProduction: true };
+        }
+      }
+      return { step: configuredStep, isProduction: false };
+    }
+
+    function normalizeVolumeByStep(value, minValue, maxValue, stepInfo) {
+      var info = stepInfo || getCurrentVolumeStepInfo();
+      var base = info.isProduction ? 0 : minValue;
+      return normalizeToStep(clamp(value, minValue, maxValue), base, info.step);
+    }
+
+    function moveVolumeByStep(current, direction, minValue, maxValue, stepInfo) {
+      var info = stepInfo || getCurrentVolumeStepInfo();
+      var step = info.step;
+      if (!info.isProduction) {
+        return normalizeToStep(clamp(current + direction * step, minValue, maxValue), minValue, step);
+      }
+
+      var next = direction > 0
+        ? (Math.floor(current / step) + 1) * step
+        : (Math.ceil(current / step) - 1) * step;
+      return clamp(next, minValue, maxValue);
+    }
+
     function pickDefaultOfferBySort(offersList, codes) {
       if (!Array.isArray(offersList) || !offersList.length) return null;
       var best = null;
@@ -1917,7 +1992,8 @@
       var minV = Number.isFinite(volumeMin) ? volumeMin : list[0];
       var maxV = Number.isFinite(volumeMax) ? volumeMax : Number.POSITIVE_INFINITY;
       var current = parseNumber(selectedByProperty[volumeCode], list[0]);
-      var next = normalizeToStep(clamp(current + direction * volumeStep, minV, maxV), minV, volumeStep);
+      var currentVolumeStep = getCurrentVolumeStepInfo();
+      var next = moveVolumeByStep(current, direction, minV, maxV, currentVolumeStep);
       var nextPreset = findPresetByInputValue(presetsByCode[volumeCode] || [], String(next));
       customVolumeValue = nextPreset ? Number.NaN : next;
       selectedByProperty[volumeCode] = nextPreset ? String(nextPreset.xml_id || next) : String(next);
@@ -1939,7 +2015,8 @@
         var minV = Number.isFinite(volumeMin) ? volumeMin : presetNums[0];
         var maxV = Number.isFinite(volumeMax) ? volumeMax : Number.POSITIVE_INFINITY;
         var val = parseNumber(raw, presetNums[0]);
-        val = normalizeToStep(clamp(val, minV, maxV), minV, volumeStep);
+        var currentVolumeStep = getCurrentVolumeStepInfo();
+        val = normalizeVolumeByStep(val, minV, maxV, currentVolumeStep);
         customVolumeValue = val;
         selectedByProperty[volumeCode] = String(val);
         customByProperty[volumeCode] = true;
