@@ -1557,7 +1557,10 @@
     var mapping = node.mapping || null;
     var targetKey = String((mapping && mapping.target) || "").trim();
     if (targetKey && targetMap[targetKey]) {
-      return formatTemplateTargetValue(targetMap[targetKey], fieldByCode, selectedByProperty, customByProperty, offers, anchorOffer);
+      var target = targetMap[targetKey];
+      if (target && target.propertyCode && customByProperty[target.propertyCode]) {
+        return formatTemplateTargetValue(target, fieldByCode, selectedByProperty, customByProperty, offers, anchorOffer);
+      }
     }
     var children = Array.isArray(node.children) ? node.children : [];
     if (children.length) {
