@@ -1540,7 +1540,10 @@
     var mapping = node.mapping || null;
     var targetKey = String((mapping && mapping.target) || "").trim();
     if (targetKey && targetMap[targetKey]) {
-      return formatTemplateTargetValue(targetMap[targetKey], fieldByCode, selectedByProperty, customByProperty, offers, anchorOffer);
+      var target = targetMap[targetKey];
+      if (target && target.propertyCode && customByProperty[target.propertyCode]) {
+        return formatTemplateTargetValue(target, fieldByCode, selectedByProperty, customByProperty, offers, anchorOffer);
+      }
     }
     var children = Array.isArray(node.children) ? node.children : [];
     if (children.length) {
@@ -1656,7 +1659,7 @@
       var configuredStep = Number.isFinite(explicitVolumeStep) && explicitVolumeStep > 0 ? explicitVolumeStep : volumeStep;
       if (isSmartVolumeStepEnabled(fieldByCode, volumeCode)) {
         var capacity = resolveProductionSheetCapacityForSelection(offers, selectedByProperty, customByProperty, fieldByCode);
-        if (Number.isFinite(capacity) && capacity > 0) {
+        if (Number.isFinite(capacity) && capacity > 1) {
           var productionStep = roundProductionVolumeStep(configuredStep * capacity, configuredStep);
           if (Number.isFinite(productionStep) && productionStep > 0) {
             return { step: productionStep, isProduction: true };
