@@ -879,23 +879,33 @@
 
 
 
-  function getAdjustedProductionSize(size, trimMarginMm) {
+  function normalizeNonNegativeOption(value, fallback) {
+    var raw = typeof value === "string" ? normalizeValueToken(value) : value;
+    var num = parseNumber(raw, fallback);
+    return Number.isFinite(num) && num >= 0 ? num : fallback;
+  }
+
+  function getAdjustedItemSize(size, trimMarginMm) {
     if (!Array.isArray(size) || size.length < 2) return [];
-    var margin = parseNumber(trimMarginMm, 2);
-    if (!Number.isFinite(margin) || margin < 0) margin = 2;
+    var margin = normalizeNonNegativeOption(trimMarginMm, 2);
     return [size[0] + margin * 2, size[1] + margin * 2];
   }
 
-  function countItemsInProductionSize(productionSize, itemSize, allowRotate) {
+  function countItemsInProductionSize(productionSize, itemSize, allowRotate, trimMarginMm, gapMm) {
     if (!Array.isArray(productionSize) || !Array.isArray(itemSize) || productionSize.length < 2 || itemSize.length < 2) return 0;
+
+    var adjustedItemSize = getAdjustedItemSize(itemSize, trimMarginMm);
+    var gap = normalizeNonNegativeOption(gapMm, 0);
 
     function fit(containerWidth, containerHeight, itemWidth, itemHeight) {
       if (containerWidth <= 0 || containerHeight <= 0 || itemWidth <= 0 || itemHeight <= 0) return 0;
-      return Math.max(0, Math.floor(containerWidth / itemWidth)) * Math.max(0, Math.floor(containerHeight / itemHeight));
+      var cols = Math.floor((containerWidth + gap) / (itemWidth + gap));
+      var rows = Math.floor((containerHeight + gap) / (itemHeight + gap));
+      return Math.max(0, cols) * Math.max(0, rows);
     }
 
-    var direct = fit(productionSize[0], productionSize[1], itemSize[0], itemSize[1]);
-    var rotated = allowRotate ? fit(productionSize[0], productionSize[1], itemSize[1], itemSize[0]) : 0;
+    var direct = fit(productionSize[0], productionSize[1], adjustedItemSize[0], adjustedItemSize[1]);
+    var rotated = allowRotate ? fit(productionSize[0], productionSize[1], adjustedItemSize[1], adjustedItemSize[0]) : 0;
     return Math.max(direct, rotated);
   }
 
@@ -1025,11 +1035,10 @@
       if (!production) continue;
 
       var options = getCalcOptions(fieldConfig);
-      var trimMarginMm = parseNumber(options.trim_margin_mm, 2);
-      if (!Number.isFinite(trimMarginMm) || trimMarginMm < 0) trimMarginMm = 2;
+      var trimMarginMm = normalizeNonNegativeOption(options.trim_margin_mm, 2);
+      var gapMm = normalizeNonNegativeOption(options.gap_mm, 0);
       var allowRotate = Object.prototype.hasOwnProperty.call(options, "allow_rotate") ? isTruthyFlag(options.allow_rotate) : true;
-      var productionSize = getAdjustedProductionSize(production.size, trimMarginMm);
-      var fit = countItemsInProductionSize(productionSize, customSize, allowRotate);
+      var fit = countItemsInProductionSize(production.size, customSize, allowRotate, trimMarginMm, gapMm);
       if (fit > 0) return fit;
     }
 
@@ -1045,9 +1054,10 @@
     var catalogGroupId = context.selectedCatalogGroupId;
     var delimiter = fieldConfig.group_delimiter || fieldConfig.split_delimiter || "x";
     var options = getCalcOptions(fieldConfig);
-    var trimMarginMm = parseNumber(options.trim_margin_mm, 2);
-    if (!Number.isFinite(trimMarginMm) || trimMarginMm < 0) trimMarginMm = 2;
+    var trimMarginMm = normalizeNonNegativeOption(options.trim_margin_mm, 2);
+    var gapMm = normalizeNonNegativeOption(options.gap_mm, 0);
     var allowRotate = Object.prototype.hasOwnProperty.call(options, "allow_rotate") ? isTruthyFlag(options.allow_rotate) : true;
+    var allowExtrapolation = isTruthyFlag(options.allow_extrapolation);
 
     if (!Number.isFinite(targetQty) || targetQty <= 0) return null;
 
@@ -1059,8 +1069,15 @@
     var production = pickProductionSheetOffer(comparableOffers, code, delimiter);
     if (!production) return null;
 
-    var productionSize = getAdjustedProductionSize(production.size, trimMarginMm);
-    var customFit = countItemsInProductionSize(productionSize, customSize, allowRotate);
+    var offerAreas = comparableOffers.map(function (offer) {
+      return getDimensionArea(getOfferPropertyNumbers(offer, code, delimiter));
+    }).filter(function (area) {
+      return Number.isFinite(area) && area > 0;
+    });
+    if (!isWithinRange(customArea, offerAreas, allowExtrapolation)) return null;
+
+    var productionSize = production.size;
+    var customFit = countItemsInProductionSize(productionSize, customSize, allowRotate, trimMarginMm, gapMm);
     if (customFit <= 0) return null;
 
     var sheetQty = targetQty / customFit;
@@ -1084,7 +1101,7 @@
       if (!key || bySize[key]) return;
       var size = getOfferPropertyNumbers(offer, code, delimiter);
       var area = getDimensionArea(size);
-      var fit = countItemsInProductionSize(productionSize, size, allowRotate);
+      var fit = countItemsInProductionSize(productionSize, size, allowRotate, trimMarginMm, gapMm);
       if (!Number.isFinite(area) || area <= 0 || fit <= 0) return;
       bySize[key] = { offer: offer, size: size, area: area, fit: fit };
     });

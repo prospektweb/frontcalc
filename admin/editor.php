@@ -634,13 +634,13 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
             const input = card.querySelector('.js-driver-' + name);
             if (!input) return;
             const hiddenForQuantity = type === 'quantity';
-            const hiddenForProduction = type === 'production_sheet_delta' && name !== 'trim';
+            const hiddenForProduction = type === 'production_sheet_delta' && name === 'sensitivity';
             input.style.display = hiddenForQuantity || hiddenForProduction ? 'none' : '';
         });
         ['allow-extrapolation', 'allow-rotate'].forEach(name => {
             const input = card.querySelector('.js-driver-' + name);
             const label = input ? input.closest('.fc-pill') : null;
-            if (label) label.style.display = type === 'quantity' || type === 'production_sheet_delta' ? 'none' : '';
+            if (label) label.style.display = type === 'quantity' ? 'none' : '';
         });
     }
 
