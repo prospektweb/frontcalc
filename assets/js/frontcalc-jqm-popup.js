@@ -990,8 +990,10 @@
     if (!Number.isFinite(step) || step <= 0) return Number.NaN;
 
     var baseStep = parseNumber(configuredStep, 0);
+    if (!Number.isFinite(baseStep) || baseStep < 0) baseStep = 0;
+
     var allowedSteps = [5, 10, 50, 100, 500, 1000].filter(function (candidate) {
-      return candidate > baseStep;
+      return candidate >= baseStep;
     });
     if (!allowedSteps.length) return Number.NaN;
 
@@ -1013,7 +1015,7 @@
     return isTruthyFlag(getCalcOptions(volumeField).smart_volume_step);
   }
 
-  function resolveProductionSheetCapacityForSelection(offers, selectedByProperty, customByProperty, fieldByCode) {
+  function resolveProductionSheetCapacityForSelection(offers, selectedByProperty, customByProperty, fieldByCode, volumeCode) {
     var allOffers = Array.isArray(offers) ? offers : [];
     var fields = fieldByCode || {};
     for (var code in fields) {
@@ -1030,7 +1032,7 @@
       var scopedSelection = Object.assign({}, selectedByProperty || {});
       var scopedCustom = Object.assign({}, customByProperty || {});
       scopedCustom[code] = true;
-      var comparableOffers = getFilteredOffers(allOffers, scopedSelection, scopedCustom, "CALC_PROP_VOLUME");
+      var comparableOffers = getFilteredOffers(allOffers, scopedSelection, scopedCustom, volumeCode || "CALC_PROP_VOLUME");
       var production = pickProductionSheetOffer(comparableOffers, code, delimiter);
       if (!production) continue;
 
@@ -1714,8 +1716,8 @@
     function getCurrentVolumeStepInfo() {
       var configuredStep = Number.isFinite(explicitVolumeStep) && explicitVolumeStep > 0 ? explicitVolumeStep : volumeStep;
       if (isSmartVolumeStepEnabled(fieldByCode, volumeCode)) {
-        var capacity = resolveProductionSheetCapacityForSelection(offers, selectedByProperty, customByProperty, fieldByCode);
-        if (Number.isFinite(capacity) && capacity > 1) {
+        var capacity = resolveProductionSheetCapacityForSelection(offers, selectedByProperty, customByProperty, fieldByCode, volumeCode);
+        if (Number.isFinite(capacity) && capacity > 0) {
           var productionStep = roundProductionVolumeStep(configuredStep * capacity, configuredStep);
           if (Number.isFinite(productionStep) && productionStep > 0) {
             return { step: productionStep, isProduction: true, capacity: capacity };
@@ -1738,7 +1740,7 @@
       var minValue = Number.isFinite(volumeMin) ? volumeMin : defaultMinValue;
       var maxValue = Number.isFinite(volumeMax) ? volumeMax : defaultMaxValue;
 
-      if (info.isProduction && Number.isFinite(info.capacity) && info.capacity > 1) {
+      if (info.isProduction && Number.isFinite(info.capacity) && info.capacity > 0) {
         if (Number.isFinite(volumeMin)) {
           minValue = roundProductionVolumeBound(volumeMin * info.capacity, info.step, "min");
         }
@@ -1770,6 +1772,28 @@
         ? (Math.floor(current / step) + 1) * step
         : (Math.ceil(current / step) - 1) * step;
       return clamp(next, minValue, maxValue);
+    }
+
+    function normalizeCurrentCustomVolumeSelection() {
+      if (!customByProperty[volumeCode]) return;
+
+      var current = parseNumber(selectedByProperty[volumeCode], Number.NaN);
+      if (!Number.isFinite(current)) return;
+
+      var presetNums = (presetsByCode[volumeCode] || [])
+        .map(function (preset) { return parseNumber(preset.xml_id, Number.NaN); })
+        .filter(Number.isFinite)
+        .sort(function (a, b) { return a - b; });
+      if (!presetNums.length) return;
+
+      var stepInfo = getCurrentVolumeStepInfo();
+      var bounds = getCurrentVolumeBounds(presetNums[0], Number.POSITIVE_INFINITY, stepInfo);
+      var normalized = normalizeVolumeByStep(current, bounds.min, bounds.max, stepInfo);
+      var preset = findPresetByInputValue(presetsByCode[volumeCode] || [], String(normalized));
+
+      customVolumeValue = preset ? Number.NaN : normalized;
+      selectedByProperty[volumeCode] = preset ? String(preset.xml_id || normalized) : String(normalized);
+      customByProperty[volumeCode] = !preset;
     }
 
     function pickDefaultOfferBySort(offersList, codes) {
@@ -2029,6 +2053,8 @@
           }
         }
       });
+
+      normalizeCurrentCustomVolumeSelection();
 
       var matched = pickMatchedOffer(offers, selectedByProperty, customByProperty);
       var displayOffer = matched || pickMatchedOfferIgnoringCustom(offers, selectedByProperty, customByProperty, null) || anchorOffer;
