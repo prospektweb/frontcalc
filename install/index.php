@@ -437,7 +437,7 @@ class prospektweb_frontcalc extends CModule
 "
             . "<?php if (is_file(\$frontcalcTemplateIncludeBitrix)) { require_once \$frontcalcTemplateIncludeBitrix; } elseif (is_file(\$frontcalcTemplateIncludeLocal)) { require_once \$frontcalcTemplateIncludeLocal; } ?>
 "
-            . "<?php if (function_exists('frontcalc_render_calculate_button')) { echo frontcalc_render_calculate_button((int)(\$arConfig['ITEM_ID'] ?? 0), (int)(\$arConfig['CATALOG_IBLOCK_ID'] ?? 0), 'Рассчитать стоимость', '/local/ajax/frontcalc.php'); } ?>
+            . "<?php if (function_exists('frontcalc_render_catalog_button')) { echo frontcalc_render_catalog_button((int)(\$arConfig['ITEM_ID'] ?? 0), (int)(\$arConfig['CATALOG_IBLOCK_ID'] ?? 0), '/local/ajax/frontcalc.php'); } ?>
 "
             . "<?php /* FRONTCALC_BUTTON_END */ ?>
 ";
