@@ -336,7 +336,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
                         <div class="fc-help">По умолчанию расчёт выполняется только внутри диапазона опорных ТП.</div>
                         <div class="fc-driver-options js-driver-options">
                             <div class="fc-pills">
-                                <label class="fc-pill js-smart-volume-step-wrap"><input type="checkbox" class="js-driver-smart-volume-step"<?= !empty($calcOptions['smart_volume_step']) ? ' checked' : '' ?> title="Работает только при использовании расчёта произвольных значений через производственный лист и дельту обработки"> Использовать «умное» изменение шага</label>
+                                <label class="fc-pill js-smart-volume-step-wrap"><input type="checkbox" class="js-driver-smart-volume-step"<?= !empty($calcOptions['smart_volume_step']) ? ' checked' : '' ?> title="Работает только при использовании расчёта произвольных значений через производственный лист и дельту обработки"> Использовать «умное» изменение шага, мин. и макс. значения</label>
                             </div>
                             <div class="fc-row">
                                 <input class="fc-input js-driver-sensitivity" placeholder="Чувствительность, по умолчанию 1" value="<?= htmlspecialcharsbx((string)($calcOptions['sensitivity'] ?? '')) ?>">
@@ -583,7 +583,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
             + '      <div class="fc-help">По умолчанию расчёт выполняется только внутри диапазона опорных ТП.</div>\n'
             + '      <div class="fc-driver-options js-driver-options">\n'
             + '        <div class="fc-pills">\n'
-            + '          <label class="fc-pill js-smart-volume-step-wrap"><input type="checkbox" class="js-driver-smart-volume-step" title="Работает только при использовании расчёта произвольных значений через производственный лист и дельту обработки"> Использовать «умное» изменение шага</label>\n'
+            + '          <label class="fc-pill js-smart-volume-step-wrap"><input type="checkbox" class="js-driver-smart-volume-step" title="Работает только при использовании расчёта произвольных значений через производственный лист и дельту обработки"> Использовать «умное» изменение шага, мин. и макс. значения</label>\n'
             + '        </div>\n'
             + '        <div class="fc-row">\n'
             + '          <input class="fc-input js-driver-sensitivity" placeholder="Чувствительность, по умолчанию 1">\n'

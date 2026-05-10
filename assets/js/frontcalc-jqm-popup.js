@@ -1662,11 +1662,39 @@
         if (Number.isFinite(capacity) && capacity > 1) {
           var productionStep = roundProductionVolumeStep(configuredStep * capacity, configuredStep);
           if (Number.isFinite(productionStep) && productionStep > 0) {
-            return { step: productionStep, isProduction: true };
+            return { step: productionStep, isProduction: true, capacity: capacity };
           }
         }
       }
-      return { step: configuredStep, isProduction: false };
+      return { step: configuredStep, isProduction: false, capacity: Number.NaN };
+    }
+
+    function roundProductionVolumeBound(rawValue, step, mode) {
+      var value = parseNumber(rawValue, Number.NaN);
+      if (!Number.isFinite(value)) return value;
+      if (!Number.isFinite(step) || step <= 0) return value;
+      var ratio = value / step;
+      return mode === "max" ? Math.floor(ratio) * step : Math.ceil(ratio) * step;
+    }
+
+    function getCurrentVolumeBounds(defaultMinValue, defaultMaxValue, stepInfo) {
+      var info = stepInfo || getCurrentVolumeStepInfo();
+      var minValue = Number.isFinite(volumeMin) ? volumeMin : defaultMinValue;
+      var maxValue = Number.isFinite(volumeMax) ? volumeMax : defaultMaxValue;
+
+      if (info.isProduction && Number.isFinite(info.capacity) && info.capacity > 1) {
+        if (Number.isFinite(volumeMin)) {
+          minValue = roundProductionVolumeBound(volumeMin * info.capacity, info.step, "min");
+        }
+        if (Number.isFinite(volumeMax)) {
+          maxValue = roundProductionVolumeBound(volumeMax * info.capacity, info.step, "max");
+        }
+        if (Number.isFinite(minValue) && Number.isFinite(maxValue) && maxValue < minValue) {
+          maxValue = minValue;
+        }
+      }
+
+      return { min: minValue, max: maxValue };
     }
 
     function normalizeVolumeByStep(value, minValue, maxValue, stepInfo) {
@@ -2013,10 +2041,11 @@
       var direction = parseNumber($(this).attr('data-step'), 0);
       var list = (presetsByCode[volumeCode] || []).map(function (p) { return parseNumber(p.xml_id, Number.NaN); }).filter(Number.isFinite).sort(function(a,b){return a-b;});
       if (!list.length) return;
-      var minV = Number.isFinite(volumeMin) ? volumeMin : list[0];
-      var maxV = Number.isFinite(volumeMax) ? volumeMax : Number.POSITIVE_INFINITY;
-      var current = parseNumber(selectedByProperty[volumeCode], list[0]);
       var currentVolumeStep = getCurrentVolumeStepInfo();
+      var currentVolumeBounds = getCurrentVolumeBounds(list[0], Number.POSITIVE_INFINITY, currentVolumeStep);
+      var minV = currentVolumeBounds.min;
+      var maxV = currentVolumeBounds.max;
+      var current = parseNumber(selectedByProperty[volumeCode], minV);
       var next = moveVolumeByStep(current, direction, minV, maxV, currentVolumeStep);
       var nextPreset = findPresetByInputValue(presetsByCode[volumeCode] || [], String(next));
       customVolumeValue = nextPreset ? Number.NaN : next;
@@ -2036,10 +2065,11 @@
       } else {
         var presetNums = list.map(function (p) { return parseNumber(p.xml_id, Number.NaN); }).filter(Number.isFinite).sort(function(a,b){return a-b;});
         if (!presetNums.length) return;
-        var minV = Number.isFinite(volumeMin) ? volumeMin : presetNums[0];
-        var maxV = Number.isFinite(volumeMax) ? volumeMax : Number.POSITIVE_INFINITY;
-        var val = parseNumber(raw, presetNums[0]);
         var currentVolumeStep = getCurrentVolumeStepInfo();
+        var currentVolumeBounds = getCurrentVolumeBounds(presetNums[0], Number.POSITIVE_INFINITY, currentVolumeStep);
+        var minV = currentVolumeBounds.min;
+        var maxV = currentVolumeBounds.max;
+        var val = parseNumber(raw, minV);
         val = normalizeVolumeByStep(val, minV, maxV, currentVolumeStep);
         customVolumeValue = val;
         selectedByProperty[volumeCode] = String(val);
