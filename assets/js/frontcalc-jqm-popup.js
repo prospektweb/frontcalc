@@ -1565,6 +1565,45 @@
     return false;
   }
 
+
+  function getCustomPropertyCodes(customByProperty) {
+    return Object.keys(customByProperty || {}).filter(function (code) {
+      return Object.prototype.hasOwnProperty.call(customByProperty, code) && customByProperty[code];
+    });
+  }
+
+  function replaceAllLiteral(source, search, replacement) {
+    var needle = String(search || "");
+    if (!needle) return source;
+    return String(source).split(needle).join(String(replacement || ""));
+  }
+
+  function formatPlainQuantityValue(value) {
+    return normalizeValueToken(value);
+  }
+
+  function buildTitleFromDisplayOfferWithCustomValues(displayOffer, selectedByProperty, customByProperty, volumeCode) {
+    if (!displayOffer || !displayOffer.name) return "";
+    var title = String(displayOffer.name || "");
+    getCustomPropertyCodes(customByProperty).forEach(function (code) {
+      var prop = displayOffer && displayOffer.properties ? displayOffer.properties[code] : null;
+      if (!prop) return;
+      var selected = String(selectedByProperty[code] || "").trim();
+      if (!selected) return;
+      var replacement = code === volumeCode ? formatPlainQuantityValue(selected) : selected;
+      [prop.value, prop.xml_id].forEach(function (sourceValue) {
+        var source = String(sourceValue || "").trim();
+        if (!source || source === replacement) return;
+        title = replaceAllLiteral(title, source, replacement);
+        var normalizedSource = normalizeValueToken(source);
+        if (normalizedSource && normalizedSource !== source && normalizedSource !== replacement) {
+          title = replaceAllLiteral(title, normalizedSource, replacement);
+        }
+      });
+    });
+    return title;
+  }
+
   function buildOfferTitle(config, targetMap, fieldByCode, selectedByProperty, customByProperty, offers, anchorOffer) {
     var template = config && config.title_template;
     var root = template && template.root;
@@ -1981,7 +2020,10 @@
       }
       var titleText = matched && !hasAnyCustomValue(customByProperty)
         ? String(matched.name || "")
-        : buildOfferTitle(config, titleTargetMap, fieldByCode, selectedByProperty, customByProperty, offers, displayOffer);
+        : buildTitleFromDisplayOfferWithCustomValues(displayOffer, selectedByProperty, customByProperty, volumeCode);
+      if (!titleText) {
+        titleText = buildOfferTitle(config, titleTargetMap, fieldByCode, selectedByProperty, customByProperty, offers, displayOffer);
+      }
       $title.text(titleText);
       var driverContext = {
         offers: getFilteredOffers(offers, selectedByProperty, customByProperty, null),
