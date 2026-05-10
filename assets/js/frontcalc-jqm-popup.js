@@ -1343,6 +1343,21 @@
 
     var tooltip =
       "Примерный вес и объём тиража. Внимание! Исполнитель выполняет фасовку в соответствии с собственными соображениями оптимального хранения/логистики продукции.";
+    var volumeStepInfo = driverContext && driverContext.volumeStepInfo ? driverContext.volumeStepInfo : null;
+    var volumeBounds = driverContext && driverContext.volumeBounds ? driverContext.volumeBounds : null;
+    var productionStep = volumeStepInfo && volumeStepInfo.isProduction ? parseNumber(volumeStepInfo.step, Number.NaN) : Number.NaN;
+    var productionMin = volumeStepInfo && volumeStepInfo.isProduction && volumeBounds ? parseNumber(volumeBounds.min, Number.NaN) : Number.NaN;
+    var productionMax = volumeStepInfo && volumeStepInfo.isProduction && volumeBounds ? parseNumber(volumeBounds.max, Number.NaN) : Number.NaN;
+
+    function isAllowedProductionQuantity(qty) {
+      if (!volumeStepInfo || !volumeStepInfo.isProduction) return true;
+      if (!Number.isFinite(qty)) return false;
+      if (Number.isFinite(productionMin) && qty < productionMin) return false;
+      if (Number.isFinite(productionMax) && qty > productionMax) return false;
+      if (!Number.isFinite(productionStep) || productionStep <= 0) return true;
+      return Math.abs(qty / productionStep - Math.round(qty / productionStep)) < 0.000001;
+    }
+
     var numericPresets = volumePresets
       .map(function (preset) {
         return {
@@ -1353,7 +1368,7 @@
         };
       })
       .filter(function (row) {
-        return Number.isFinite(row.num);
+        return Number.isFinite(row.num) && isAllowedProductionQuantity(row.num);
       })
       .sort(function (a, b) {
         return a.num - b.num;
@@ -1774,26 +1789,30 @@
       return clamp(next, minValue, maxValue);
     }
 
-    function normalizeCurrentCustomVolumeSelection() {
-      if (!customByProperty[volumeCode]) return;
-
-      var current = parseNumber(selectedByProperty[volumeCode], Number.NaN);
-      if (!Number.isFinite(current)) return;
-
-      var presetNums = (presetsByCode[volumeCode] || [])
+    function getCurrentVolumePresetNumbers() {
+      return (presetsByCode[volumeCode] || [])
         .map(function (preset) { return parseNumber(preset.xml_id, Number.NaN); })
         .filter(Number.isFinite)
         .sort(function (a, b) { return a - b; });
-      if (!presetNums.length) return;
+    }
 
+    function normalizeCurrentVolumeSelection() {
       var stepInfo = getCurrentVolumeStepInfo();
+      if (!stepInfo.isProduction) return { stepInfo: stepInfo, bounds: null };
+
+      var presetNums = getCurrentVolumePresetNumbers();
+      if (!presetNums.length) return { stepInfo: stepInfo, bounds: null };
+
       var bounds = getCurrentVolumeBounds(presetNums[0], Number.POSITIVE_INFINITY, stepInfo);
+      var current = parseNumber(selectedByProperty[volumeCode], bounds.min);
       var normalized = normalizeVolumeByStep(current, bounds.min, bounds.max, stepInfo);
       var preset = findPresetByInputValue(presetsByCode[volumeCode] || [], String(normalized));
 
       customVolumeValue = preset ? Number.NaN : normalized;
       selectedByProperty[volumeCode] = preset ? String(preset.xml_id || normalized) : String(normalized);
       customByProperty[volumeCode] = !preset;
+
+      return { stepInfo: stepInfo, bounds: bounds };
     }
 
     function pickDefaultOfferBySort(offersList, codes) {
@@ -2054,7 +2073,7 @@
         }
       });
 
-      normalizeCurrentCustomVolumeSelection();
+      var normalizedVolumeState = normalizeCurrentVolumeSelection();
 
       var matched = pickMatchedOffer(offers, selectedByProperty, customByProperty);
       var displayOffer = matched || pickMatchedOfferIgnoringCustom(offers, selectedByProperty, customByProperty, null) || anchorOffer;
@@ -2077,7 +2096,9 @@
         customByProperty: customByProperty,
         anchorOffer: displayOffer,
         targetQty: parseNumber(selectedByProperty[volumeCode], 1),
-        selectedCatalogGroupId: selectedCatalogGroupId
+        selectedCatalogGroupId: selectedCatalogGroupId,
+        volumeStepInfo: normalizedVolumeState.stepInfo,
+        volumeBounds: normalizedVolumeState.bounds
       };
       if (presetsByCode[volumeCode] && presetsByCode[volumeCode].length) {
         renderPriceTable($priceInner, offers, presetsByCode, selectedByProperty, volumeCode, customVolumeValue, priceGroups, selectedCatalogGroupId, driverContext);
