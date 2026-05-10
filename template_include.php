@@ -20,17 +20,15 @@ if (!function_exists('frontcalc_render_runtime_assets')) {
     display:inline-flex;
     align-items:center;
     justify-content:center;
-    width:100%;
-    margin-top:10px;
-    min-height:52px;
-    padding:0 24px;
-    border-radius:var(--theme-button-border-radius,8px);
+    width:auto;
+    flex:0 0 auto;
+    margin:0 8px 0 0;
     border:2px solid var(--theme-base-color,#2a65d0);
     background:#fff;
     color:var(--theme-base-color,#2a65d0);
-    font-size:1rem;
     font-weight:600;
-    line-height:1.2;
+    white-space:nowrap;
+    vertical-align:top;
     cursor:pointer;
     transition:color .2s ease,background-color .2s ease,border-color .2s ease,box-shadow .2s ease;
     box-shadow:none;
@@ -223,7 +221,7 @@ if (!function_exists('frontcalc_get_light_payload')) {
 }
 
 if (!function_exists('frontcalc_render_calculate_button')) {
-    function frontcalc_render_calculate_button(int $productId, int $iblockId, string $caption = 'Рассчитать стоимость', string $ajaxUrl = ''): string
+    function frontcalc_render_calculate_button(int $productId, int $iblockId, string $caption = 'Рассчитать стоимость', string $ajaxUrl = '', string $sizeClass = 'btn-lg'): string
     {
         $payload = frontcalc_get_light_payload($productId, $iblockId, $ajaxUrl);
 
@@ -231,8 +229,14 @@ if (!function_exists('frontcalc_render_calculate_button')) {
             return '';
         }
 
+        $sizeClass = trim(preg_replace('/[^a-zA-Z0-9_-]+/', ' ', $sizeClass));
+        if ($sizeClass === '') {
+            $sizeClass = 'btn-lg';
+        }
+
         return frontcalc_render_runtime_assets() . sprintf(
-            '<button type="button" class="btn btn-default btn-transparent-bg btn-wide frontcalc-calculate-button js-frontcalc-calculate" data-frontcalc-product-id="%d" data-frontcalc-ajax-url="%s">%s</button>',
+            '<button type="button" class="btn btn-default btn-transparent-bg %s frontcalc-calculate-button js-frontcalc-calculate" data-frontcalc-product-id="%d" data-frontcalc-ajax-url="%s">%s</button>',
+            htmlspecialcharsbx($sizeClass),
             (int)$payload['product_id'],
             htmlspecialcharsbx((string)$payload['ajax_url']),
             htmlspecialcharsbx($caption)
@@ -243,13 +247,13 @@ if (!function_exists('frontcalc_render_calculate_button')) {
 if (!function_exists('frontcalc_render_catalog_button')) {
     function frontcalc_render_catalog_button(int $productId, int $iblockId, string $ajaxUrl = ''): string
     {
-        return frontcalc_render_calculate_button($productId, $iblockId, 'Рассчитать стоимость', $ajaxUrl);
+        return frontcalc_render_calculate_button($productId, $iblockId, 'Рассчитать стоимость', $ajaxUrl, 'btn-lg');
     }
 }
 
 if (!function_exists('frontcalc_render_detail_button')) {
     function frontcalc_render_detail_button(int $productId, int $iblockId, string $ajaxUrl = ''): string
     {
-        return frontcalc_render_calculate_button($productId, $iblockId, 'Рассчитать стоимость', $ajaxUrl);
+        return frontcalc_render_calculate_button($productId, $iblockId, 'Рассчитать стоимость', $ajaxUrl, 'btn-elg');
     }
 }
