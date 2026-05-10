@@ -636,21 +636,43 @@
     return Number.isFinite(minDiff) ? minDiff : 1;
   }
 
-  function resolveConfiguredStep(fieldConfig) {
+  function resolveConfiguredFieldNumber(fieldConfig, key, isAllowed) {
     if (!fieldConfig || typeof fieldConfig !== "object") return Number.NaN;
-    var direct = parseNumber(fieldConfig.step, Number.NaN);
-    if (Number.isFinite(direct) && direct > 0) return direct;
-    var keys = ["group_inputs", "inputs", "values"];
-    for (var k = 0; k < keys.length; k++) {
-      var arr = fieldConfig[keys[k]];
+
+    function parseConfiguredNumber(raw) {
+      if (typeof raw === "string" && raw.trim() === "") return Number.NaN;
+      return parseNumber(raw, Number.NaN);
+    }
+
+    function isUsable(value) {
+      return Number.isFinite(value) && (!isAllowed || isAllowed(value));
+    }
+
+    var direct = parseConfiguredNumber(fieldConfig[key]);
+    if (isUsable(direct)) return direct;
+
+    var nestedKeys = ["group_inputs", "inputs", "values"];
+    for (var k = 0; k < nestedKeys.length; k++) {
+      var arr = fieldConfig[nestedKeys[k]];
       if (!Array.isArray(arr)) continue;
       for (var i = 0; i < arr.length; i++) {
         var row = arr[i] || {};
-        var rowStep = parseNumber(row.step, Number.NaN);
-        if (Number.isFinite(rowStep) && rowStep > 0) return rowStep;
+        var nested = parseConfiguredNumber(row[key]);
+        if (isUsable(nested)) return nested;
       }
     }
+
     return Number.NaN;
+  }
+
+  function resolveConfiguredBound(fieldConfig, key) {
+    return resolveConfiguredFieldNumber(fieldConfig, key);
+  }
+
+  function resolveConfiguredStep(fieldConfig) {
+    return resolveConfiguredFieldNumber(fieldConfig, "step", function (value) {
+      return value > 0;
+    });
   }
 
 
@@ -1725,8 +1747,8 @@
     var volumeStep = Number.isFinite(explicitVolumeStep) && explicitVolumeStep > 0
       ? explicitVolumeStep
       : (Number.isFinite(derivedVolumeStep) && derivedVolumeStep > 0 ? derivedVolumeStep : 1);
-    var volumeMin = parseNumber(fieldByCode[volumeCode] && fieldByCode[volumeCode].min, Number.NaN);
-    var volumeMax = parseNumber(fieldByCode[volumeCode] && fieldByCode[volumeCode].max, Number.NaN);
+    var volumeMin = resolveConfiguredBound(fieldByCode[volumeCode], "min");
+    var volumeMax = resolveConfiguredBound(fieldByCode[volumeCode], "max");
 
     function getCurrentVolumeStepInfo() {
       var configuredStep = Number.isFinite(explicitVolumeStep) && explicitVolumeStep > 0 ? explicitVolumeStep : volumeStep;
