@@ -111,6 +111,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && check_bitrix_sessid() && $elementId
                 'group_delimiter' => 'x',
                 'hidden_preset_xml_ids' => [],
                 'technical_value_ids' => [],
+                'price_driver_type' => 'quantity',
+                'calc_options' => [],
             ]);
         }
         $schema = json_encode($postedSchema, JSON_UNESCAPED_UNICODE);
@@ -168,6 +170,8 @@ if (!$hasRequiredVolume && isset($propertyMap[$requiredVolumeCode])) {
         'group_delimiter' => 'x',
         'hidden_preset_xml_ids' => [],
         'technical_value_ids' => [],
+        'price_driver_type' => 'quantity',
+        'calc_options' => [],
     ]);
 }
 
@@ -222,6 +226,10 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
 .fc-input-block{border:1px dashed #d7e2fb;border-radius:10px;padding:8px;margin-bottom:8px;background:#fbfdff;}
 .fc-input-row-actions{display:flex;justify-content:flex-end;margin-top:6px;}
 .fc-btn-remove-input{height:30px;padding:0 10px;border:1px solid #f2c1c1;background:#fff5f5;color:#a93434;border-radius:8px;cursor:pointer;}
+.fc-driver-panel{border:1px solid #d7e2fb;border-radius:10px;background:#fbfdff;padding:10px;margin:10px 0;}
+.fc-driver-options{display:none;margin-top:8px;}
+.fc-driver-options.is-active{display:block;}
+.fc-help{font-size:12px;color:#687895;margin-top:4px;}
 .fc-btn-inline[disabled]{opacity:.45;cursor:not-allowed;}
 .fc-title-builder{margin:14px 0;border:1px solid #d9e3f8;border-radius:14px;background:#fff;padding:14px;}
 .fc-sample-title{padding:12px;border:1px dashed #b8c8ee;border-radius:10px;background:#f8fbff;line-height:1.5;user-select:text;}
@@ -273,6 +281,8 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
             ]];
             $hiddenXml = (isset($field['hidden_preset_xml_ids']) && is_array($field['hidden_preset_xml_ids'])) ? $field['hidden_preset_xml_ids'] : [];
             $technicalValueIds = (isset($field['technical_value_ids']) && is_array($field['technical_value_ids'])) ? $field['technical_value_ids'] : [];
+            $priceDriverType = (string)($field['price_driver_type'] ?? ($code === $requiredVolumeCode ? 'quantity' : 'none'));
+            $calcOptions = (isset($field['calc_options']) && is_array($field['calc_options'])) ? $field['calc_options'] : [];
             ?>
             <div class="fc-card<?= $index === 0 ? ' open' : '' ?>" data-prop-code="<?= htmlspecialcharsbx($code) ?>">
                 <button type="button" class="fc-card-head js-fc-toggle">
@@ -311,6 +321,33 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
 
                     <div class="fc-pills">
                         <label class="fc-pill"><input type="checkbox" class="js-show-presets"<?= !isset($field['show_presets']) || $field['show_presets'] ? ' checked' : '' ?>> Показывать пресеты</label>
+                    </div>
+
+                    <div class="fc-subtitle">Расчёт произвольных значений</div>
+                    <div class="fc-driver-panel">
+                        <select class="fc-select js-price-driver-type">
+                            <option value="none"<?= $priceDriverType === 'none' ? ' selected' : '' ?>>Не влияет на цену</option>
+                            <option value="quantity"<?= $priceDriverType === 'quantity' ? ' selected' : '' ?>>Тираж / количество</option>
+                            <option value="size_area"<?= $priceDriverType === 'size_area' ? ' selected' : '' ?>>Размер по площади</option>
+                            <option value="size_covering"<?= $priceDriverType === 'size_covering' ? ' selected' : '' ?>>Размер по ближайшему большему ТП</option>
+                            <option value="pages"<?= $priceDriverType === 'pages' ? ' selected' : '' ?>>Полосы / страницы / листы</option>
+                            <option value="production_sheet_delta"<?= $priceDriverType === 'production_sheet_delta' ? ' selected' : '' ?>>Через производственный лист и дельту обработки</option>
+                        </select>
+                        <div class="fc-help">По умолчанию расчёт выполняется только внутри диапазона опорных ТП.</div>
+                        <div class="fc-driver-options js-driver-options">
+                            <div class="fc-pills">
+                                <label class="fc-pill js-smart-volume-step-wrap"><input type="checkbox" class="js-driver-smart-volume-step"<?= !empty($calcOptions['smart_volume_step']) ? ' checked' : '' ?> title="Работает только при использовании расчёта произвольных значений через производственный лист и дельту обработки"> Использовать «умное» изменение шага, мин. и макс. значения</label>
+                            </div>
+                            <div class="fc-row">
+                                <input class="fc-input js-driver-sensitivity" placeholder="Чувствительность, по умолчанию 1" value="<?= htmlspecialcharsbx((string)($calcOptions['sensitivity'] ?? '')) ?>">
+                                <input class="fc-input js-driver-trim" placeholder="Поля, мм" value="<?= htmlspecialcharsbx((string)($calcOptions['trim_margin_mm'] ?? '2')) ?>">
+                                <input class="fc-input js-driver-gap" placeholder="Зазор, мм" value="<?= htmlspecialcharsbx((string)($calcOptions['gap_mm'] ?? '0')) ?>">
+                            </div>
+                            <div class="fc-pills">
+                                <label class="fc-pill"><input type="checkbox" class="js-driver-allow-extrapolation"<?= !empty($calcOptions['allow_extrapolation']) ? ' checked' : '' ?>> Разрешить расчёт вне рамок</label>
+                                <label class="fc-pill"><input type="checkbox" class="js-driver-allow-rotate"<?= array_key_exists('allow_rotate', $calcOptions) ? (!empty($calcOptions['allow_rotate']) ? ' checked' : '') : ' checked' ?>> Учитывать поворот размера</label>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="fc-subtitle">Скрыть варианты (XML_ID)</div>
@@ -533,6 +570,32 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
             + '    <div class="fc-pills">\n'
             + '      <label class="fc-pill"><input type="checkbox" class="js-show-presets" checked> Показывать пресеты</label>\n'
             + '    </div>\n'
+            + '    <div class="fc-subtitle">Расчёт произвольных значений</div>\n'
+            + '    <div class="fc-driver-panel">\n'
+            + '      <select class="fc-select js-price-driver-type">\n'
+            + '        <option value="none">Не влияет на цену</option>\n'
+            + '        <option value="quantity"' + (prop.CODE === requiredVolumeCode ? ' selected' : '') + '>Тираж / количество</option>\n'
+            + '        <option value="size_area">Размер по площади</option>\n'
+            + '        <option value="size_covering">Размер по ближайшему большему ТП</option>\n'
+            + '        <option value="pages">Полосы / страницы / листы</option>\n'
+            + '        <option value="production_sheet_delta">Через производственный лист и дельту обработки</option>\n'
+            + '      </select>\n'
+            + '      <div class="fc-help">По умолчанию расчёт выполняется только внутри диапазона опорных ТП.</div>\n'
+            + '      <div class="fc-driver-options js-driver-options">\n'
+            + '        <div class="fc-pills">\n'
+            + '          <label class="fc-pill js-smart-volume-step-wrap"><input type="checkbox" class="js-driver-smart-volume-step" title="Работает только при использовании расчёта произвольных значений через производственный лист и дельту обработки"> Использовать «умное» изменение шага, мин. и макс. значения</label>\n'
+            + '        </div>\n'
+            + '        <div class="fc-row">\n'
+            + '          <input class="fc-input js-driver-sensitivity" placeholder="Чувствительность, по умолчанию 1">\n'
+            + '          <input class="fc-input js-driver-trim" placeholder="Поля, мм" value="2">\n'
+            + '          <input class="fc-input js-driver-gap" placeholder="Зазор, мм" value="0">\n'
+            + '        </div>\n'
+            + '        <div class="fc-pills">\n'
+            + '          <label class="fc-pill"><input type="checkbox" class="js-driver-allow-extrapolation"> Разрешить расчёт вне рамок</label>\n'
+            + '          <label class="fc-pill"><input type="checkbox" class="js-driver-allow-rotate" checked> Учитывать поворот размера</label>\n'
+            + '        </div>\n'
+            + '      </div>\n'
+            + '    </div>\n'
             + '    <div class="fc-subtitle">Скрыть варианты (XML_ID)</div>\n'
             + '    <select class="fc-select js-hidden-presets" multiple size="5" style="height:auto; min-height:120px;">' + renderEnumOptions(prop) + '</select>\n'
             + '    <div class="fc-subtitle">Технические варианты (скрыть на фронте)</div>\n'
@@ -558,7 +621,40 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
         });
     }
 
+    function syncDriverOptions(card) {
+        const type = card.querySelector('.js-price-driver-type')?.value || 'none';
+        const panel = card.querySelector('.js-driver-options');
+        if (!panel) return;
+        panel.classList.toggle('is-active', type !== 'none');
+
+        const smartWrap = card.querySelector('.js-smart-volume-step-wrap');
+        if (smartWrap) smartWrap.style.display = type === 'quantity' ? '' : 'none';
+
+        ['sensitivity', 'trim', 'gap'].forEach(name => {
+            const input = card.querySelector('.js-driver-' + name);
+            if (!input) return;
+            const hiddenForQuantity = type === 'quantity';
+            const hiddenForProduction = type === 'production_sheet_delta' && name !== 'trim';
+            input.style.display = hiddenForQuantity || hiddenForProduction ? 'none' : '';
+        });
+        ['allow-extrapolation', 'allow-rotate'].forEach(name => {
+            const input = card.querySelector('.js-driver-' + name);
+            const label = input ? input.closest('.fc-pill') : null;
+            if (label) label.style.display = type === 'quantity' || type === 'production_sheet_delta' ? 'none' : '';
+        });
+    }
+
+    document.querySelectorAll('.fc-card').forEach(syncDriverOptions);
+
     if (root) {
+        root.addEventListener('change', function(event){
+            const select = event.target.closest('.js-price-driver-type');
+            if (select) {
+                const card = select.closest('.fc-card');
+                if (card) syncDriverOptions(card);
+            }
+        });
+
         root.addEventListener('click', function(event){
             const toggle = event.target.closest('.js-fc-toggle');
             if (toggle) {
@@ -617,6 +713,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
                 return;
             }
             root.appendChild(card);
+            syncDriverOptions(card);
             refreshAddSelect();
         });
     }
@@ -672,6 +769,16 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
                 const technicalSelect = card.querySelector('.js-technical-values');
                 const technicalValueIds = technicalSelect ? Array.from(technicalSelect.selectedOptions).map(opt => parseInt(opt.value, 10)).filter(Boolean) : [];
 
+                const priceDriverType = card.querySelector('.js-price-driver-type') ? card.querySelector('.js-price-driver-type').value : 'none';
+                const calcOptions = {
+                    sensitivity: card.querySelector('.js-driver-sensitivity') ? card.querySelector('.js-driver-sensitivity').value : '',
+                    trim_margin_mm: card.querySelector('.js-driver-trim') ? card.querySelector('.js-driver-trim').value : '',
+                    gap_mm: card.querySelector('.js-driver-gap') ? card.querySelector('.js-driver-gap').value : '',
+                    allow_extrapolation: card.querySelector('.js-driver-allow-extrapolation') ? card.querySelector('.js-driver-allow-extrapolation').checked : false,
+                    allow_rotate: card.querySelector('.js-driver-allow-rotate') ? card.querySelector('.js-driver-allow-rotate').checked : true,
+                    smart_volume_step: card.querySelector('.js-driver-smart-volume-step') ? card.querySelector('.js-driver-smart-volume-step').checked : false
+                };
+
                 fields.push({
                     property_code: card.dataset.propCode || '',
                     inputs: inputs,
@@ -682,7 +789,9 @@ require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog_admin_a
                     group_code: card.querySelector('.js-group-code').value || '',
                     group_delimiter: card.querySelector('.js-group-delimiter').value || 'x',
                     hidden_preset_xml_ids: hiddenPresetXmlIds,
-                    technical_value_ids: technicalValueIds
+                    technical_value_ids: technicalValueIds,
+                    price_driver_type: priceDriverType,
+                    calc_options: calcOptions
                 });
             });
 
