@@ -1975,12 +1975,13 @@
       });
 
       var matched = pickMatchedOffer(offers, selectedByProperty, customByProperty);
-      if (matched) {
-        anchorOffer = matched;
+      var displayOffer = matched || pickMatchedOfferIgnoringCustom(offers, selectedByProperty, customByProperty, null) || anchorOffer;
+      if (displayOffer) {
+        anchorOffer = displayOffer;
       }
       var titleText = matched && !hasAnyCustomValue(customByProperty)
         ? String(matched.name || "")
-        : buildOfferTitle(config, titleTargetMap, fieldByCode, selectedByProperty, customByProperty, offers, anchorOffer);
+        : buildOfferTitle(config, titleTargetMap, fieldByCode, selectedByProperty, customByProperty, offers, displayOffer);
       $title.text(titleText);
       var driverContext = {
         offers: getFilteredOffers(offers, selectedByProperty, customByProperty, null),
@@ -1989,14 +1990,14 @@
         fieldByCode: fieldByCode,
         selectedByProperty: selectedByProperty,
         customByProperty: customByProperty,
-        anchorOffer: anchorOffer,
+        anchorOffer: displayOffer,
         targetQty: parseNumber(selectedByProperty[volumeCode], 1),
         selectedCatalogGroupId: selectedCatalogGroupId
       };
       if (presetsByCode[volumeCode] && presetsByCode[volumeCode].length) {
         renderPriceTable($priceInner, offers, presetsByCode, selectedByProperty, volumeCode, customVolumeValue, priceGroups, selectedCatalogGroupId, driverContext);
       } else {
-        renderPriceBlock($priceInner, matched || anchorOffer, driverContext);
+        renderPriceBlock($priceInner, matched || displayOffer, driverContext);
       }
     }
 
