@@ -22,28 +22,51 @@
       ".frontcalc-popup-content{min-height:220px;padding:24px;}",
       ".frontcalc-layout{display:grid;grid-template-columns:minmax(0,2fr) minmax(320px,1fr);gap:20px;align-items:start;}",
       ".frontcalc-selectors{display:flex;flex-direction:column;gap:20px;}",
+      ".frontcalc-presets{display:flex;flex-wrap:wrap;gap:8px;}",
+      ".frontcalc-popup-content .frontcalc-chip{--sku-height:46px;--sku-prop-stroke:2px;display:inline-flex;align-items:center;justify-content:center;min-height:0;height:var(--sku-height);min-width:104px;padding:10px 27px;border:1px solid #d6dce6;border-radius:4px;background:#fff;color:#07142f;font-size:calc(1rem - 1px);line-height:1.2;cursor:pointer;box-sizing:border-box;transition:border-color .15s ease,box-shadow .15s ease,background .15s ease;}",
+      ".frontcalc-popup-content .frontcalc-chip:hover{border-color:#aeb7c6;background:#fff;}",
+      ".frontcalc-popup-content .frontcalc-chip.is-active{border-color:#2f3a52;box-shadow:inset 0 0 0 calc(var(--sku-prop-stroke) - 1px) #2f3a52;background:#fff;}",
+      ".frontcalc-popup-content .frontcalc-chip.is-disabled{opacity:.45;cursor:not-allowed;}",
+      ".frontcalc-input-group{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}",
+      ".frontcalc-input-control-wrap{display:inline-flex;align-items:center;gap:10px;}",
+      ".frontcalc-input-control{display:grid;grid-template-columns:44px minmax(88px,136px) 44px;height:46px;overflow:hidden;border:1px solid #d6dce6;border-radius:4px;background:#fff;}",
+      ".frontcalc-step-btn{display:flex;align-items:center;justify-content:center;width:44px;height:46px;margin:0!important;padding:0!important;border:0;background:#f7f8fa;color:#33405a;font-size:20px;line-height:1;cursor:pointer;}",
+      ".frontcalc-step-btn:hover{background:#eceff3;}",
+      ".frontcalc-num-input{width:100%;height:46px;border:0!important;background:#fff!important;box-shadow:none!important;text-align:center;color:#07142f;font-size:16px;font-weight:600;outline:none;box-sizing:border-box;}",
+      ".frontcalc-input-group-divider{display:inline-flex;align-items:center;height:46px;color:#667085;font-size:14px;line-height:1;}",
+      ".frontcalc-input-unit{color:#667085;font-size:14px;}",
       ".frontcalc-offer-title{margin:0 0 4px;font-size:24px;line-height:1.25;font-weight:700;color:#101933;}",
       ".frontcalc-price-panel__inner{position:sticky;top:12px;border:1px solid #d9dee7;border-radius:12px;background:#fafbff;padding:16px;}",
-      ".frontcalc-price-groups{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;}",
+      ".frontcalc-price-groups{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px;}",
       ".frontcalc-price-group{min-height:34px;padding:6px 12px;border:1px solid #d9dee7;border-radius:999px;background:#fff;color:#33405a;font-size:14px;line-height:1.2;cursor:pointer;}",
       ".frontcalc-price-group:hover{border-color:#2f3a52;}",
       ".frontcalc-price-group.is-active{border-color:#2f3a52;background:#101933;color:#fff;font-weight:600;}",
-      ".frontcalc-volume-input{display:flex;gap:8px;align-items:center;margin-bottom:12px;}",
-      ".frontcalc-table-input{width:120px;height:44px;border:1px solid #d9dee7;border-radius:10px;padding:0 12px;font-size:22px;font-weight:600;box-sizing:border-box;}",
-      ".frontcalc-volume-btns{display:flex;gap:6px;}",
-      ".frontcalc-volume-btn{width:40px;height:40px;border:1px solid #d9dee7;border-radius:10px;background:#f2f4f8;font-size:24px;line-height:1;cursor:pointer;}",
-      ".frontcalc-table-head{display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:8px;margin-bottom:8px;font-weight:600;color:#1a2236;}",
+      ".frontcalc-volume-input{display:flex;gap:10px;align-items:stretch;margin-bottom:24px;}",
+      ".frontcalc-volume-stepper{display:grid;grid-template-columns:56px minmax(88px,1fr) 56px;align-items:stretch;flex:1 1 220px;min-width:200px;max-width:360px;height:46px;overflow:hidden;border-radius:6px;background:#f3f4f6;}",
+      ".frontcalc-table-input{display:flex;align-items:center;width:100%;height:46px;border:0!important;border-radius:0;padding:0 12px;background:transparent!important;color:#1f2937;font-size:24px;font-weight:700;line-height:46px;text-align:center;box-sizing:border-box;outline:none;box-shadow:none!important;}",
+      ".frontcalc-table-input:focus{background:transparent!important;box-shadow:none!important;}",
+      ".frontcalc-cart-wrap{display:inline-flex;align-items:center;min-width:120px;}",
+      ".frontcalc-cart-wrap.loadings{position:relative;}",
+      ".frontcalc-cart-btn{height:46px;min-height:46px;display:inline-flex;align-items:center;justify-content:center;gap:7px;white-space:nowrap;}",
+      ".frontcalc-cart-btn.is-info-only{background:#eef2f7!important;border-color:#d9dee7!important;color:#8b93a6!important;cursor:pointer;}",
+      ".frontcalc-volume-btn{display:flex;align-items:center;justify-content:center;width:56px;height:46px;margin:0!important;padding:0!important;border:0!important;border-radius:0;background:transparent!important;color:#111827;font-size:24px;font-weight:400;line-height:1;cursor:pointer;transition:background .15s ease;box-shadow:none!important;}",
+      ".frontcalc-volume-btn:hover{background:#e1e3e8!important;}",
+      ".frontcalc-table-head{display:grid;grid-template-columns:minmax(144px,1.15fr) minmax(120px,1fr) minmax(120px,1fr);gap:8px;margin-bottom:8px;padding-right:6px;box-sizing:border-box;font-weight:600;color:#1a2236;}",
       ".frontcalc-table-head>div{display:flex;align-items:center;gap:6px;}",
-      ".frontcalc-tip svg{fill:#8591aa;}",
-      ".frontcalc-table-body{display:flex;flex-direction:column;gap:6px;max-height:320px;overflow:auto;}",
-      ".frontcalc-table-row{display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:8px;}",
-      ".frontcalc-cell{border:1px solid #d9dee7;border-radius:10px;background:#fff;min-height:52px;padding:6px 10px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;cursor:pointer;box-sizing:border-box;font:inherit;text-align:left;}",
+      ".frontcalc-tip svg{width:14px;height:14px;fill:#8591aa;}",
+      ".frontcalc-table-body{display:flex;flex-direction:column;gap:6px;max-height:320px;overflow:auto;padding-right:6px;scrollbar-width:thin;scrollbar-color:#9b9b9b transparent;}",
+      ".frontcalc-table-body::-webkit-scrollbar{width:2px;height:2px;}",
+      ".frontcalc-table-body::-webkit-scrollbar-button{display:none;width:0;height:0;}",
+      ".frontcalc-table-body::-webkit-scrollbar-track{background:transparent;}",
+      ".frontcalc-table-body::-webkit-scrollbar-thumb{border-radius:2px;background:#9b9b9b;}",
+      ".frontcalc-table-row{display:grid;grid-template-columns:minmax(144px,1.15fr) minmax(120px,1fr) minmax(120px,1fr);gap:8px;width:100%;box-sizing:border-box;}",
+      ".frontcalc-cell{width:100%;min-width:0;border:1px solid #d9dee7;border-radius:4px;background:#fff;min-height:52px;padding:6px 10px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;cursor:pointer;box-sizing:border-box;font:inherit;text-align:left;}",
       ".frontcalc-cell-main{font-size:16px;line-height:1.2;color:#212a3f;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}",
       ".frontcalc-cell-sub{font-size:12px;color:#8b93a6;margin-top:2px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}",
       ".frontcalc-table-row:hover .frontcalc-cell,.frontcalc-cell:hover{border-color:#4f7bd9;background:#f8fbff;}",
-      ".frontcalc-table-row.is-selected .frontcalc-cell{border-color:#2f3a52;box-shadow:inset 0 0 0 1px #2f3a52;}",
+      ".frontcalc-table-row.is-selected .frontcalc-cell:not(.is-picked){border-color:#d9dee7!important;box-shadow:none!important;}",
       ".frontcalc-cell.is-hover-row,.frontcalc-cell.is-hover-col{border-color:#4f7bd9;background:#f8fbff;}",
-      ".frontcalc-cell.is-picked{border-color:#2f3a52 !important;box-shadow:inset 0 0 0 1px #2f3a52;}",
+      ".frontcalc-cell.is-picked{border-color:#2f3a52!important;box-shadow:inset 0 0 0 1px #2f3a52!important;}",
       "@media (max-width: 991px){.frontcalc-layout{grid-template-columns:1fr;}.frontcalc-price-panel{order:-1;}}"
     ].join("\n");
     document.head.appendChild(style);
@@ -114,6 +137,42 @@
     xhr.send();
   }
 
+  function postData(url, data, onSuccess, onError) {
+    var body = Object.keys(data || {}).map(function (key) {
+      return encodeURIComponent(key) + "=" + encodeURIComponent(data[key] == null ? "" : String(data[key]));
+    }).join("&");
+
+    if (window.fetch) {
+      fetch(url, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          "X-Requested-With": "XMLHttpRequest",
+          "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
+        },
+        body: body
+      })
+        .then(function (response) {
+          if (!response.ok) throw new Error("HTTP " + response.status);
+          return response.json();
+        })
+        .then(onSuccess)
+        .catch(function (error) {
+          onError(error && error.message ? error.message : "fetch_failed");
+        });
+      return;
+    }
+
+    $.ajax({
+      url: url,
+      method: "POST",
+      data: data,
+      dataType: "json",
+      success: onSuccess,
+      error: function (_, __, error) { onError(error || "ajax_failed"); }
+    });
+  }
+
   function loadJqmScript(callback) {
     if ($.fn.jqm) {
       callback();
@@ -131,8 +190,24 @@
   }
 
   function parseNumber(raw, fallback) {
-    var num = Number(raw);
+    var normalized = typeof raw === "string" ? raw.replace(/\s+/g, "").replace(",", ".") : raw;
+    var num = Number(normalized);
     return Number.isFinite(num) ? num : fallback;
+  }
+
+  function formatGroupedNumber(value) {
+    var raw = normalizeValueToken(value);
+    if (!raw) return "";
+    var parts = raw.split(".");
+    var sign = parts[0].charAt(0) === "-" ? "-" : "";
+    var integer = sign ? parts[0].slice(1) : parts[0];
+    if (!/^\d+$/.test(integer)) return String(value || "");
+    var grouped = integer.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+    return sign + grouped + (parts.length > 1 && parts[1] !== "" ? "." + parts[1] : "");
+  }
+
+  function formatQuantityValue(value) {
+    return formatGroupedNumber(value) || String(value || "");
   }
 
   function clamp(value, min, max) {
@@ -347,7 +422,7 @@
     value = clamp(value, min, max);
 
     var $field = $('<div class="frontcalc-field frontcalc-field--input"></div>');
-    $field.append('<div class="frontcalc-field__title">' + escapeHtml(label) + "</div>");
+    $field.append('<div class="frontcalc-field__title sku-props__title">' + escapeHtml(label) + "</div>");
 
     var $control = $('<div class="frontcalc-input-control"></div>');
     var $minus = $('<button type="button" class="frontcalc-step-btn">−</button>');
@@ -1356,15 +1431,13 @@
     });
   }
 
-  function renderPriceTable($block, offers, presetsByCode, selectedByProperty, volumeCode, customVolumeValue, priceGroups, selectedCatalogGroupId, driverContext) {
+  function renderPriceTable($block, offers, presetsByCode, selectedByProperty, volumeCode, customVolumeValue, priceGroups, selectedCatalogGroupId, driverContext, selectedDeadlineColumn, buyCatalogGroupId) {
     var volumePresets = (presetsByCode[volumeCode] || []).slice();
     if (!volumePresets.length) {
       $block.html('<div class="frontcalc-price-empty">Нет значений тиража для таблицы.</div>');
       return;
     }
 
-    var tooltip =
-      "Примерный вес и объём тиража. Внимание! Исполнитель выполняет фасовку в соответствии с собственными соображениями оптимального хранения/логистики продукции.";
     var volumeStepInfo = driverContext && driverContext.volumeStepInfo ? driverContext.volumeStepInfo : null;
     var volumeBounds = driverContext && driverContext.volumeBounds ? driverContext.volumeBounds : null;
     var productionStep = volumeStepInfo && volumeStepInfo.isProduction ? parseNumber(volumeStepInfo.step, Number.NaN) : Number.NaN;
@@ -1403,6 +1476,10 @@
     }
     merged.sort(function (a, b) { return a.num - b.num; });
     var selectedXml = String(selectedByProperty[volumeCode] || (merged[0] && merged[0].xml_id) || "");
+    var activeDeadlineColumn = selectedDeadlineColumn === "flex" ? "flex" : "strict";
+    var activeGroupId = parseNumber(selectedCatalogGroupId, Number.NaN);
+    var buyGroupId = parseNumber(buyCatalogGroupId, Number.NaN);
+    var isBuyPriceType = Number.isFinite(activeGroupId) && Number.isFinite(buyGroupId) && activeGroupId === buyGroupId;
 
     var html = "";
     if (Array.isArray(priceGroups) && priceGroups.length) {
@@ -1420,14 +1497,17 @@
     }
     html += '<div class="frontcalc-volume-input">';
     html +=
-      '<input type="text" class="frontcalc-table-input" value="' +
-      escapeHtml(selectedXml) +
-      '" inputmode="numeric">';
+      '<div class="frontcalc-volume-stepper"><button type="button" class="frontcalc-volume-btn" data-step="-1">−</button><input type="text" class="frontcalc-table-input" value="' +
+      escapeHtml(formatQuantityValue(selectedXml)) +
+      '" inputmode="numeric"><button type="button" class="frontcalc-volume-btn" data-step="1">+</button></div>';
     html +=
-      '<div class="frontcalc-volume-btns"><button type="button" class="frontcalc-volume-btn" data-step="-1">−</button><button type="button" class="frontcalc-volume-btn" data-step="1">+</button></div>';
+      '<span class="frontcalc-cart-wrap"><button type="button" class="btn btn-default animate-load btn-elg btn-wide frontcalc-cart-btn' +
+      (isBuyPriceType ? '' : ' is-info-only') +
+      '" data-buy-enabled="' + (isBuyPriceType ? '1' : '0') + '">' +
+      '<span>В корзину</span></button></span>';
     html += "</div>";
     html +=
-      '<div class="frontcalc-table-head"><div>Тираж</div><div>Строгий <span class="frontcalc-tip" title="Отгрузка в соответствии с согласованным сроком"><svg width="17" height="16"><use xlink:href="/bitrix/templates/aspro-premier/images/svg/catalog/item_order_icons.svg?1774850114#attention-16-16"></use></svg></span></div><div>Гибкий <span class="frontcalc-tip" title="Срок отгрузки может быть изменен (не больше 10 рабочих дней)"><svg width="17" height="16"><use xlink:href="/bitrix/templates/aspro-premier/images/svg/catalog/item_order_icons.svg?1774850114#attention-16-16"></use></svg></span></div></div>';
+      '<div class="frontcalc-table-head"><div>Тираж</div><div><span class="frontcalc-tip" title="Отгрузка в соответствии с согласованным сроком"><svg width="17" height="16"><use xlink:href="/bitrix/templates/aspro-premier/images/svg/catalog/item_order_icons.svg?1774850114#attention-16-16"></use></svg></span>Строгий</div><div><span class="frontcalc-tip" title="Срок отгрузки может быть изменен (не больше 10 рабочих дней)"><svg width="17" height="16"><use xlink:href="/bitrix/templates/aspro-premier/images/svg/catalog/item_order_icons.svg?1774850114#attention-16-16"></use></svg></span>Гибкий</div></div>';
     html += '<div class="frontcalc-table-body">';
 
     var tableCustomByProperty = driverContext && driverContext.customByProperty ? driverContext.customByProperty : {};
@@ -1460,33 +1540,32 @@
       var flexNum = parseNumber(flex && flex.price, strictNum);
       var weightText = formatMetric(strictEstimate.weightKg, "кг");
       var volumeText = formatMetric(strictEstimate.volumeM3, "м³");
+      var logisticTitle = "Вес: " + weightText + ", Объём: " + volumeText;
 
       html +=
-        '<div class="frontcalc-table-row' +
-        (xml === selectedXml ? " is-selected" : "") +
-        '" data-row-index="' +
+        '<div class="frontcalc-table-row" data-row-index="' +
         index +
         '" data-xml-id="' +
         escapeHtml(xml) +
         '">';
       html +=
-        '<button type="button" class="frontcalc-cell frontcalc-cell--volume"><span class="frontcalc-cell-main" title="' + escapeHtml(String(preset.value || xml)) + '">' +
-        escapeHtml(String(preset.value || xml)) +
+        '<button type="button" class="frontcalc-cell frontcalc-cell--volume"><span class="frontcalc-cell-main" title="' + escapeHtml(formatQuantityValue(preset.value || xml)) + '">' +
+        escapeHtml(formatQuantityValue(preset.value || xml)) +
         '</span><span class="frontcalc-cell-sub" title="' +
-        escapeHtml(tooltip) +
+        escapeHtml(logisticTitle) +
         '">' +
         weightText +
         " · " +
         volumeText +
         "</span></button>";
       html +=
-        '<button type="button" class="frontcalc-cell" data-col="strict"><span class="frontcalc-cell-main">' +
+        '<button type="button" class="frontcalc-cell' + (xml === selectedXml && activeDeadlineColumn === "strict" ? ' is-picked' : '') + '" data-col="strict" data-price="' + escapeHtml(String(Number.isFinite(strictNum) ? strictNum : "")) + '" data-currency="' + escapeHtml(String((strictPrice && strictPrice.currency) || "")) + '"><span class="frontcalc-cell-main">' +
         escapeHtml(formatMoneyRow(strictPrice)) +
         '</span><span class="frontcalc-cell-sub">' +
         escapeHtml(Number.isFinite(strictNum) ? (strictNum / qty).toFixed(2) + " ₽/экз" : "—") +
         "</span></button>";
       html +=
-        '<button type="button" class="frontcalc-cell" data-col="flex"><span class="frontcalc-cell-main">' +
+        '<button type="button" class="frontcalc-cell' + (xml === selectedXml && activeDeadlineColumn === "flex" ? ' is-picked' : '') + '" data-col="flex" data-price="' + escapeHtml(String(Number.isFinite(flexNum) ? flexNum : "")) + '" data-currency="' + escapeHtml(String((flex && flex.currency) || "")) + '"><span class="frontcalc-cell-main">' +
         escapeHtml(formatMoneyRow(flex)) +
         '</span><span class="frontcalc-cell-sub">' +
         escapeHtml(Number.isFinite(flexNum) ? (flexNum / qty).toFixed(2) + " ₽/экз" : "—") +
@@ -1635,7 +1714,7 @@
   }
 
   function formatPlainQuantityValue(value) {
-    return normalizeValueToken(value);
+    return formatQuantityValue(value);
   }
 
   function buildTitleFromDisplayOfferWithCustomValues(displayOffer, selectedByProperty, customByProperty, volumeCode) {
@@ -1660,6 +1739,20 @@
     return title;
   }
 
+  function formatTitleQuantityValue(title, displayOffer, selectedByProperty, volumeCode) {
+    var selected = String(selectedByProperty[volumeCode] || "").trim();
+    var replacement = formatQuantityValue(selected);
+    if (!replacement) return String(title || "");
+    var prop = displayOffer && displayOffer.properties ? displayOffer.properties[volumeCode] : null;
+    var result = String(title || "");
+    [selected, prop && prop.value, prop && prop.xml_id, normalizeValueToken(prop && prop.value)].forEach(function (sourceValue) {
+      var source = String(sourceValue || "").trim();
+      if (!source || source === replacement) return;
+      result = replaceAllLiteral(result, source, replacement);
+    });
+    return result;
+  }
+
   function buildOfferTitle(config, targetMap, fieldByCode, selectedByProperty, customByProperty, offers, anchorOffer) {
     var template = config && config.title_template;
     var root = template && template.root;
@@ -1670,12 +1763,26 @@
     return String((anchorOffer && anchorOffer.name) || "");
   }
 
+  function getDeadlineLabel(column) {
+    return column === "flex" ? "Гибкий срок" : "Строгий срок";
+  }
+
+  function appendDeadlineToTitle(title, column) {
+    var base = String(title || "").trim();
+    var label = getDeadlineLabel(column);
+    if (!base) return label;
+    return /\|\s*(Строгий|Гибкий) срок\s*$/.test(base) ? base.replace(/\|\s*(Строгий|Гибкий) срок\s*$/, "| " + label) : base + " | " + label;
+  }
+
   function renderCalculator($content, payload) {
     var data = payload && payload.data ? payload.data : {};
     var config = data.config || {};
     var offers = Array.isArray(data.offers) ? data.offers : [];
     var priceGroups = collectAvailablePriceGroups(data.price_groups_view, offers);
     var selectedCatalogGroupId = priceGroups.length ? parseNumber(priceGroups[0].id, Number.NaN) : Number.NaN;
+    var buyCatalogGroupIds = data.price_access && Array.isArray(data.price_access.buy) ? data.price_access.buy.map(function (id) { return parseNumber(id, Number.NaN); }).filter(Number.isFinite) : [];
+    var buyCatalogGroupId = buyCatalogGroupIds.length ? buyCatalogGroupIds[0] : Number.NaN;
+    var selectedDeadlineColumn = "strict";
     var propertyMeta = Array.isArray(data.property_meta) ? data.property_meta : [];
     var priceGroupsView = Array.isArray(data.price_groups_view) ? data.price_groups_view : [];
     var propertyMetaByCode = {};
@@ -1879,6 +1986,9 @@
       var primaryGroupId = parseNumber(defaultOffer.catalog.primary_buy_price.catalog_group_id, Number.NaN);
       if (Number.isFinite(primaryGroupId) && priceGroups.some(function (group) { return parseNumber(group && group.id, Number.NaN) === primaryGroupId; })) {
         selectedCatalogGroupId = primaryGroupId;
+        if (buyCatalogGroupIds.some(function (id) { return id === primaryGroupId; })) {
+          buyCatalogGroupId = primaryGroupId;
+        }
       }
     }
     var selectorCodes = allCodes.filter(function (code) {
@@ -1922,7 +2032,7 @@
       var label = getFieldLabel(fieldConfig, propertyMetaByCode, code);
       var $section = $('<section class="frontcalc-field"></section>');
       if (label) {
-        $section.append('<div class="frontcalc-field__title">' + escapeHtml(label) + "</div>");
+        $section.append('<div class="frontcalc-field__title sku-props__title">' + escapeHtml(label) + "</div>");
       }
 
       var presets = Array.isArray(presetsByCode[code]) ? presetsByCode[code] : [];
@@ -2108,7 +2218,10 @@
       if (!titleText) {
         titleText = buildOfferTitle(config, titleTargetMap, fieldByCode, selectedByProperty, customByProperty, offers, displayOffer);
       }
+      titleText = formatTitleQuantityValue(titleText, displayOffer, selectedByProperty, volumeCode);
+      titleText = appendDeadlineToTitle(titleText, selectedDeadlineColumn);
       $title.text(titleText);
+      $title.attr("data-current-title", titleText);
       var driverContext = {
         offers: getFilteredOffers(offers, selectedByProperty, customByProperty, null),
         allOffers: offers,
@@ -2119,11 +2232,13 @@
         anchorOffer: displayOffer,
         targetQty: parseNumber(selectedByProperty[volumeCode], 1),
         selectedCatalogGroupId: selectedCatalogGroupId,
+        selectedDeadlineColumn: selectedDeadlineColumn,
+        buyCatalogGroupId: buyCatalogGroupId,
         volumeStepInfo: normalizedVolumeState.stepInfo,
         volumeBounds: normalizedVolumeState.bounds
       };
       if (presetsByCode[volumeCode] && presetsByCode[volumeCode].length) {
-        renderPriceTable($priceInner, offers, presetsByCode, selectedByProperty, volumeCode, customVolumeValue, priceGroups, selectedCatalogGroupId, driverContext);
+        renderPriceTable($priceInner, offers, presetsByCode, selectedByProperty, volumeCode, customVolumeValue, priceGroups, selectedCatalogGroupId, driverContext, selectedDeadlineColumn, buyCatalogGroupId);
       } else {
         renderPriceBlock($priceInner, matched || displayOffer, driverContext);
       }
@@ -2142,8 +2257,10 @@
       var $row = $cell.closest('.frontcalc-table-row');
       var xmlId = String($row.attr('data-xml-id') || '');
       if (!xmlId) return;
-      $price.find(".frontcalc-cell.is-picked").removeClass("is-picked");
-      $cell.addClass("is-picked");
+      var clickedColumn = String($cell.attr("data-col") || "");
+      if (clickedColumn === "strict" || clickedColumn === "flex") {
+        selectedDeadlineColumn = clickedColumn;
+      }
       selectedByProperty[volumeCode] = xmlId;
       var numericXmlId = parseNumber(xmlId, Number.NaN);
       var knownPreset = findPresetByInputValue(presetsByCode[volumeCode] || [], xmlId);
@@ -2164,6 +2281,52 @@
     });
     $price.on("mouseleave", ".frontcalc-table-row .frontcalc-cell", function () {
       $price.find(".is-hover-row,.is-hover-col").removeClass("is-hover-row is-hover-col");
+    });
+
+    $price.on("click", ".frontcalc-cart-btn", function () {
+      var $button = $(this);
+      var $wrap = $button.closest(".frontcalc-cart-wrap");
+      if ($button.attr("data-buy-enabled") !== "1") {
+        if (Number.isFinite(buyCatalogGroupId)) {
+          selectedCatalogGroupId = buyCatalogGroupId;
+          updatePrice();
+        }
+        return;
+      }
+      if ($wrap.hasClass("loadings")) return;
+
+      var $picked = $price.find(".frontcalc-cell.is-picked[data-col]").first();
+      var priceValue = parseNumber($picked.attr("data-price"), Number.NaN);
+      if (!Number.isFinite(priceValue) || priceValue <= 0) {
+        if (window.alert) window.alert("Не удалось определить цену для добавления в корзину.");
+        return;
+      }
+
+      $wrap.addClass("loadings");
+      $button.prop("disabled", true);
+      postData(payload.frontcalcAjaxUrl || "", {
+        action: "add_to_basket",
+        product_id: data.product_id || 0,
+        offer_id: anchorOffer && anchorOffer.id ? anchorOffer.id : 0,
+        name: $title.attr("data-current-title") || $title.text(),
+        calc_quantity: selectedByProperty[volumeCode] || "",
+        deadline_type: getDeadlineLabel(selectedDeadlineColumn),
+        catalog_group_id: selectedCatalogGroupId,
+        price: priceValue,
+        currency: $picked.attr("data-currency") || "RUB"
+      }, function (response) {
+        $wrap.removeClass("loadings");
+        $button.prop("disabled", false);
+        if (!response || response.success !== true) {
+          if (window.alert) window.alert(response && response.message ? response.message : "Не удалось добавить позицию в корзину.");
+          return;
+        }
+        $(document).trigger("frontcalc:basketAdded", [response]);
+      }, function (errorMessage) {
+        $wrap.removeClass("loadings");
+        $button.prop("disabled", false);
+        if (window.alert) window.alert("Ошибка добавления в корзину: " + errorMessage);
+      });
     });
 
     $price.on("click", ".frontcalc-volume-btn", function () {
@@ -2266,6 +2429,7 @@
             renderError($content, payload && payload.message ? payload.message : "Сервер вернул ошибку.");
             return;
           }
+          payload.frontcalcAjaxUrl = ajaxUrl;
           renderCalculator($content, payload);
         },
         function (errorMessage) {
