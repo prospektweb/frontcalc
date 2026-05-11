@@ -2,6 +2,8 @@
 
 use Bitrix\Main\Config\Option;
 use Bitrix\Main\Loader;
+use Bitrix\Sale\Basket;
+use Bitrix\Sale\Fuser;
 
 const STOP_STATISTICS = true;
 const NO_KEEP_STATISTIC = true;
@@ -222,6 +224,7 @@ if (!Loader::includeModule($moduleId) || !Loader::includeModule('iblock') || !Lo
     return;
 }
 
+$frontcalcAction = trim((string)($_REQUEST['action'] ?? ''));
 $productId = (int)($_REQUEST['product_id'] ?? 0);
 $requestedOfferId = (int)($_REQUEST['offer_id'] ?? $_REQUEST['oid'] ?? 0);
 if ($productId <= 0) {
@@ -229,6 +232,81 @@ if ($productId <= 0) {
     echo json_encode([
         'success' => false,
         'message' => 'Не указан product_id.',
+    ], JSON_UNESCAPED_UNICODE);
+    require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/epilog_after.php';
+    return;
+}
+
+if ($frontcalcAction === 'add_to_basket') {
+    if (!Loader::includeModule('sale')) {
+        http_response_code(500);
+        echo json_encode([
+            'success' => false,
+            'message' => 'Не удалось подключить модуль sale.',
+        ], JSON_UNESCAPED_UNICODE);
+        require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/epilog_after.php';
+        return;
+    }
+
+    $offerId = (int)($_REQUEST['offer_id'] ?? 0);
+    $catalogGroupId = (int)($_REQUEST['catalog_group_id'] ?? 0);
+    $price = (float)str_replace(' ', '', (string)($_REQUEST['price'] ?? 0));
+    $currency = trim((string)($_REQUEST['currency'] ?? 'RUB'));
+    $name = trim((string)($_REQUEST['name'] ?? ''));
+    $calcQuantity = trim((string)($_REQUEST['calc_quantity'] ?? ''));
+    $deadlineType = trim((string)($_REQUEST['deadline_type'] ?? ''));
+
+    $userGroupsForBasket = frontcalc_get_current_user_groups();
+    $priceAccessForBasket = frontcalc_get_catalog_groups_by_rights($userGroupsForBasket);
+
+    if ($offerId <= 0 || $price <= 0 || $catalogGroupId <= 0 || !in_array($catalogGroupId, $priceAccessForBasket['buy'], true)) {
+        http_response_code(400);
+        echo json_encode([
+            'success' => false,
+            'message' => 'Выбранный тип цен недоступен для покупки.',
+        ], JSON_UNESCAPED_UNICODE);
+        require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/epilog_after.php';
+        return;
+    }
+
+    if ($name === '') {
+        $element = CIBlockElement::GetByID($offerId)->Fetch();
+        $name = (string)($element['NAME'] ?? ('Товар #' . $offerId));
+    }
+
+    $basket = Basket::loadItemsForFUser(Fuser::getId(), SITE_ID);
+    $basketItem = $basket->createItem('catalog', $offerId);
+    $basketItem->setFields([
+        'QUANTITY' => 1,
+        'CURRENCY' => $currency !== '' ? $currency : 'RUB',
+        'LID' => SITE_ID,
+        'PRODUCT_PROVIDER_CLASS' => '',
+        'PRICE' => $price,
+        'CUSTOM_PRICE' => 'Y',
+        'NAME' => $name,
+    ]);
+
+    $props = [
+        ['NAME' => 'Тираж', 'CODE' => 'FRONTCALC_QUANTITY', 'VALUE' => $calcQuantity, 'SORT' => 100],
+        ['NAME' => 'Тип срока', 'CODE' => 'FRONTCALC_DEADLINE', 'VALUE' => $deadlineType, 'SORT' => 110],
+        ['NAME' => 'Тип цены', 'CODE' => 'FRONTCALC_CATALOG_GROUP_ID', 'VALUE' => (string)$catalogGroupId, 'SORT' => 120],
+    ];
+    $basketItem->getPropertyCollection()->setProperty($props);
+
+    $saveResult = $basket->save();
+    if (!$saveResult->isSuccess()) {
+        http_response_code(500);
+        echo json_encode([
+            'success' => false,
+            'message' => implode('; ', $saveResult->getErrorMessages()),
+        ], JSON_UNESCAPED_UNICODE);
+        require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/epilog_after.php';
+        return;
+    }
+
+    echo json_encode([
+        'success' => true,
+        'basket_item_id' => $basketItem->getId(),
     ], JSON_UNESCAPED_UNICODE);
     require $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/epilog_after.php';
     return;
