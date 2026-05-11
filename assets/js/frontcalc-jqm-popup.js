@@ -22,45 +22,45 @@
       ".frontcalc-popup-content{min-height:220px;padding:24px;}",
       ".frontcalc-layout{display:grid;grid-template-columns:minmax(0,2fr) minmax(320px,1fr);gap:20px;align-items:start;}",
       ".frontcalc-selectors{display:flex;flex-direction:column;gap:20px;}",
-      ".frontcalc-field__title{margin:0 0 10px;font-size:15px;line-height:1.25;color:#344054;font-weight:400;}",
       ".frontcalc-presets{display:flex;flex-wrap:wrap;gap:8px;}",
-      ".frontcalc-chip{height:46px;min-width:104px;padding:0 28px;border:1px solid #d6dce6;border-radius:4px;background:#fff;color:#07142f;font-size:16px;line-height:44px;cursor:pointer;box-sizing:border-box;transition:border-color .15s ease,box-shadow .15s ease,background .15s ease;}",
-      ".frontcalc-chip:hover{border-color:#aeb7c6;background:#fff;}",
-      ".frontcalc-chip.is-active{border-color:#2f3a52;box-shadow:inset 0 0 0 1px #2f3a52;background:#fff;}",
-      ".frontcalc-chip.is-disabled{opacity:.45;cursor:not-allowed;}",
+      ".frontcalc-popup-content .frontcalc-chip{--sku-height:46px;--sku-prop-stroke:2px;display:inline-flex;align-items:center;justify-content:center;min-height:0;height:var(--sku-height);min-width:104px;padding:10px 27px;border:1px solid #d6dce6;border-radius:4px;background:#fff;color:#07142f;font-size:calc(1rem - 1px);line-height:1.2;cursor:pointer;box-sizing:border-box;transition:border-color .15s ease,box-shadow .15s ease,background .15s ease;}",
+      ".frontcalc-popup-content .frontcalc-chip:hover{border-color:#aeb7c6;background:#fff;}",
+      ".frontcalc-popup-content .frontcalc-chip.is-active{border-color:#2f3a52;box-shadow:inset 0 0 0 calc(var(--sku-prop-stroke) - 1px) #2f3a52;background:#fff;}",
+      ".frontcalc-popup-content .frontcalc-chip.is-disabled{opacity:.45;cursor:not-allowed;}",
       ".frontcalc-input-group{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}",
       ".frontcalc-input-control-wrap{display:inline-flex;align-items:center;gap:10px;}",
       ".frontcalc-input-control{display:grid;grid-template-columns:44px minmax(88px,136px) 44px;height:46px;overflow:hidden;border:1px solid #d6dce6;border-radius:4px;background:#fff;}",
-      ".frontcalc-step-btn{width:44px;height:46px;border:0;background:#f7f8fa;color:#33405a;font-size:20px;line-height:1;cursor:pointer;}",
+      ".frontcalc-step-btn{display:flex;align-items:center;justify-content:center;width:44px;height:46px;margin:0!important;padding:0!important;border:0;background:#f7f8fa;color:#33405a;font-size:20px;line-height:1;cursor:pointer;}",
       ".frontcalc-step-btn:hover{background:#eceff3;}",
       ".frontcalc-num-input{width:100%;height:46px;border:0!important;background:#fff!important;box-shadow:none!important;text-align:center;color:#07142f;font-size:16px;font-weight:600;outline:none;box-sizing:border-box;}",
-      ".frontcalc-input-group-divider,.frontcalc-input-unit{color:#667085;font-size:14px;}",
+      ".frontcalc-input-group-divider{display:inline-flex;align-items:center;height:46px;color:#667085;font-size:14px;line-height:1;}",
+      ".frontcalc-input-unit{color:#667085;font-size:14px;}",
       ".frontcalc-offer-title{margin:0 0 4px;font-size:24px;line-height:1.25;font-weight:700;color:#101933;}",
       ".frontcalc-price-panel__inner{position:sticky;top:12px;border:1px solid #d9dee7;border-radius:12px;background:#fafbff;padding:16px;}",
-      ".frontcalc-price-groups{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;}",
+      ".frontcalc-price-groups{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px;}",
       ".frontcalc-price-group{min-height:34px;padding:6px 12px;border:1px solid #d9dee7;border-radius:999px;background:#fff;color:#33405a;font-size:14px;line-height:1.2;cursor:pointer;}",
       ".frontcalc-price-group:hover{border-color:#2f3a52;}",
       ".frontcalc-price-group.is-active{border-color:#2f3a52;background:#101933;color:#fff;font-weight:600;}",
-      ".frontcalc-volume-input{display:flex;gap:10px;align-items:stretch;margin-bottom:12px;}",
-      ".frontcalc-volume-stepper{display:grid;grid-template-columns:56px minmax(88px,1fr) 56px;align-items:stretch;flex:1 1 220px;min-width:200px;max-width:360px;height:58px;overflow:hidden;border-radius:6px;background:#f3f4f6;}",
-      ".frontcalc-table-input{width:100%;height:58px;border:0!important;border-radius:0;padding:0 12px;background:transparent!important;color:#1f2937;font-size:24px;font-weight:700;line-height:58px;text-align:center;box-sizing:border-box;outline:none;box-shadow:none!important;}",
+      ".frontcalc-volume-input{display:flex;gap:10px;align-items:stretch;margin-bottom:24px;}",
+      ".frontcalc-volume-stepper{display:grid;grid-template-columns:56px minmax(88px,1fr) 56px;align-items:stretch;flex:1 1 220px;min-width:200px;max-width:360px;height:46px;overflow:hidden;border-radius:6px;background:#f3f4f6;}",
+      ".frontcalc-table-input{display:flex;align-items:center;width:100%;height:46px;border:0!important;border-radius:0;padding:0 12px;background:transparent!important;color:#1f2937;font-size:24px;font-weight:700;line-height:46px;text-align:center;box-sizing:border-box;outline:none;box-shadow:none!important;}",
       ".frontcalc-table-input:focus{background:transparent!important;box-shadow:none!important;}",
       ".frontcalc-cart-wrap{display:inline-flex;align-items:center;min-width:120px;}",
       ".frontcalc-cart-wrap.loadings{position:relative;}",
-      ".frontcalc-cart-btn{height:58px;min-height:58px;display:inline-flex;align-items:center;justify-content:center;gap:7px;white-space:nowrap;}",
+      ".frontcalc-cart-btn{height:46px;min-height:46px;display:inline-flex;align-items:center;justify-content:center;gap:7px;white-space:nowrap;}",
       ".frontcalc-cart-btn.is-info-only{background:#eef2f7!important;border-color:#d9dee7!important;color:#8b93a6!important;cursor:pointer;}",
-      ".frontcalc-volume-btn{display:flex;align-items:center;justify-content:center;width:56px;height:58px;margin:0!important;padding:0!important;border:0!important;border-radius:0;background:transparent!important;color:#111827;font-size:28px;font-weight:400;line-height:1;cursor:pointer;transition:background .15s ease;box-shadow:none!important;}",
+      ".frontcalc-volume-btn{display:flex;align-items:center;justify-content:center;width:56px;height:46px;margin:0!important;padding:0!important;border:0!important;border-radius:0;background:transparent!important;color:#111827;font-size:24px;font-weight:400;line-height:1;cursor:pointer;transition:background .15s ease;box-shadow:none!important;}",
       ".frontcalc-volume-btn:hover{background:#e1e3e8!important;}",
       ".frontcalc-table-head{display:grid;grid-template-columns:minmax(144px,1.15fr) minmax(120px,1fr) minmax(120px,1fr);gap:8px;margin-bottom:8px;padding-right:6px;box-sizing:border-box;font-weight:600;color:#1a2236;}",
       ".frontcalc-table-head>div{display:flex;align-items:center;gap:6px;}",
-      ".frontcalc-tip svg{fill:#8591aa;}",
+      ".frontcalc-tip svg{width:14px;height:14px;fill:#8591aa;}",
       ".frontcalc-table-body{display:flex;flex-direction:column;gap:6px;max-height:320px;overflow:auto;padding-right:6px;scrollbar-width:thin;scrollbar-color:#9b9b9b transparent;}",
       ".frontcalc-table-body::-webkit-scrollbar{width:2px;height:2px;}",
       ".frontcalc-table-body::-webkit-scrollbar-button{display:none;width:0;height:0;}",
       ".frontcalc-table-body::-webkit-scrollbar-track{background:transparent;}",
       ".frontcalc-table-body::-webkit-scrollbar-thumb{border-radius:2px;background:#9b9b9b;}",
       ".frontcalc-table-row{display:grid;grid-template-columns:minmax(144px,1.15fr) minmax(120px,1fr) minmax(120px,1fr);gap:8px;width:100%;box-sizing:border-box;}",
-      ".frontcalc-cell{width:100%;min-width:0;border:1px solid #d9dee7;border-radius:6px;background:#fff;min-height:52px;padding:6px 10px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;cursor:pointer;box-sizing:border-box;font:inherit;text-align:left;}",
+      ".frontcalc-cell{width:100%;min-width:0;border:1px solid #d9dee7;border-radius:4px;background:#fff;min-height:52px;padding:6px 10px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;cursor:pointer;box-sizing:border-box;font:inherit;text-align:left;}",
       ".frontcalc-cell-main{font-size:16px;line-height:1.2;color:#212a3f;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}",
       ".frontcalc-cell-sub{font-size:12px;color:#8b93a6;margin-top:2px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}",
       ".frontcalc-table-row:hover .frontcalc-cell,.frontcalc-cell:hover{border-color:#4f7bd9;background:#f8fbff;}",
@@ -422,7 +422,7 @@
     value = clamp(value, min, max);
 
     var $field = $('<div class="frontcalc-field frontcalc-field--input"></div>');
-    $field.append('<div class="frontcalc-field__title">' + escapeHtml(label) + "</div>");
+    $field.append('<div class="frontcalc-field__title sku-props__title">' + escapeHtml(label) + "</div>");
 
     var $control = $('<div class="frontcalc-input-control"></div>');
     var $minus = $('<button type="button" class="frontcalc-step-btn">−</button>');
@@ -2032,7 +2032,7 @@
       var label = getFieldLabel(fieldConfig, propertyMetaByCode, code);
       var $section = $('<section class="frontcalc-field"></section>');
       if (label) {
-        $section.append('<div class="frontcalc-field__title">' + escapeHtml(label) + "</div>");
+        $section.append('<div class="frontcalc-field__title sku-props__title">' + escapeHtml(label) + "</div>");
       }
 
       var presets = Array.isArray(presetsByCode[code]) ? presetsByCode[code] : [];
