@@ -77,7 +77,14 @@ if (!function_exists('frontcalc_render_runtime_assets')) {
 .frontcalc-volume-input{display:flex;gap:8px;align-items:center;margin-bottom:12px;}
 .frontcalc-table-input{width:120px;height:44px;border:1px solid #d9dee7;border-radius:10px;padding:0 12px;font-size:22px;font-weight:600;}
 .frontcalc-volume-btns{display:flex;gap:6px;}
-.frontcalc-volume-btn{width:40px;height:40px;border:1px solid #d9dee7;border-radius:10px;background:#f2f4f8;font-size:24px;cursor:pointer;}
+.frontcalc-volume-btn {
+    width: 44px;
+    height: -webkit-fill-available;
+    border: none;
+    background: #f2f4f8;
+    font-size: 24px;
+    cursor: pointer;
+}
 .frontcalc-table-head{display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:8px;margin-bottom:8px;font-weight:600;color:#1a2236;}
 .frontcalc-table-head>div{display:flex;align-items:center;gap:6px;}
 .frontcalc-tip svg{fill:#8591aa;}
