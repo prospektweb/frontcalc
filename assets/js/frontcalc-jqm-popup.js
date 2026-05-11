@@ -1403,30 +1403,6 @@
     var isBuyPriceType = Number.isFinite(activeGroupId) && Number.isFinite(buyGroupId) && activeGroupId === buyGroupId;
 
     var html = "";
-    if (Array.isArray(priceGroups) && priceGroups.length) {
-      html += '<div class="frontcalc-price-groups">';
-      priceGroups.forEach(function (group) {
-        var id = parseNumber(group && group.id, Number.NaN);
-        if (!Number.isFinite(id)) return;
-        html += '<button type="button" class="frontcalc-price-group' +
-          (id === selectedCatalogGroupId ? ' is-active' : '') +
-          '" data-catalog-group-id="' + escapeHtml(String(id)) + '">' +
-          escapeHtml(group.name || ("PRICE_" + id)) +
-          '</button>';
-      });
-      html += '</div>';
-    }
-    html += '<div class="frontcalc-volume-input">';
-    html +=
-      '<div class="frontcalc-volume-stepper"><button type="button" class="frontcalc-volume-btn" data-step="-1">−</button><input type="text" class="frontcalc-table-input" value="' +
-      escapeHtml(formatQuantityValue(selectedXml)) +
-      '" inputmode="numeric"><button type="button" class="frontcalc-volume-btn" data-step="1">+</button></div>';
-    html +=
-      '<span class="frontcalc-cart-wrap"><button type="button" class="btn btn-default animate-load btn-elg btn-wide frontcalc-cart-btn' +
-      (isBuyPriceType ? '' : ' is-info-only') +
-      '" data-buy-enabled="' + (isBuyPriceType ? '1' : '0') + '">' +
-      '<span>В корзину</span></button></span>';
-    html += "</div>";
     html +=
       '<div class="frontcalc-table-head"><div>Тираж</div><div><span class="frontcalc-tip" title="Отгрузка в соответствии с согласованным сроком"><svg width="17" height="16"><use xlink:href="/bitrix/templates/aspro-premier/images/svg/catalog/item_order_icons.svg?1774850114#attention-16-16"></use></svg></span>Строгий</div><div><span class="frontcalc-tip" title="Срок отгрузки может быть изменен (не больше 10 рабочих дней)"><svg width="17" height="16"><use xlink:href="/bitrix/templates/aspro-premier/images/svg/catalog/item_order_icons.svg?1774850114#attention-16-16"></use></svg></span>Гибкий</div></div>';
     html += '<div class="frontcalc-table-body">';
@@ -1494,6 +1470,30 @@
       html += "</div>";
     });
     html += "</div>";
+    html += '<div class="frontcalc-volume-input">';
+    html +=
+      '<div class="frontcalc-volume-stepper"><button type="button" class="frontcalc-volume-btn" data-step="-1">−</button><input type="text" class="frontcalc-table-input" value="' +
+      escapeHtml(formatQuantityValue(selectedXml)) +
+      '" inputmode="numeric"><button type="button" class="frontcalc-volume-btn" data-step="1">+</button></div>';
+    html +=
+      '<span class="frontcalc-cart-wrap"><button type="button" class="btn btn-default animate-load btn-elg btn-wide frontcalc-cart-btn' +
+      (isBuyPriceType ? '' : ' is-info-only') +
+      '" data-buy-enabled="' + (isBuyPriceType ? '1' : '0') + '">' +
+      '<span>В корзину</span></button></span>';
+    html += "</div>";
+    if (Array.isArray(priceGroups) && priceGroups.length) {
+      html += '<div class="frontcalc-price-groups">';
+      priceGroups.forEach(function (group) {
+        var id = parseNumber(group && group.id, Number.NaN);
+        if (!Number.isFinite(id)) return;
+        html += '<button type="button" class="frontcalc-price-group' +
+          (id === selectedCatalogGroupId ? ' is-active' : '') +
+          '" data-catalog-group-id="' + escapeHtml(String(id)) + '">' +
+          escapeHtml(group.name || ("PRICE_" + id)) +
+          '</button>';
+      });
+      html += '</div>';
+    }
     $block.html(html);
 
     var $body = $block.find(".frontcalc-table-body");
