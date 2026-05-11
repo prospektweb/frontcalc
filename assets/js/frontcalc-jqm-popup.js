@@ -22,26 +22,43 @@
       ".frontcalc-popup-content{min-height:220px;padding:24px;}",
       ".frontcalc-layout{display:grid;grid-template-columns:minmax(0,2fr) minmax(320px,1fr);gap:20px;align-items:start;}",
       ".frontcalc-selectors{display:flex;flex-direction:column;gap:20px;}",
+      ".frontcalc-field__title{margin:0 0 10px;font-size:15px;line-height:1.25;color:#344054;font-weight:400;}",
+      ".frontcalc-presets{display:flex;flex-wrap:wrap;gap:8px;}",
+      ".frontcalc-chip{height:46px;min-width:104px;padding:0 28px;border:1px solid #d6dce6;border-radius:4px;background:#fff;color:#07142f;font-size:16px;line-height:44px;cursor:pointer;box-sizing:border-box;transition:border-color .15s ease,box-shadow .15s ease,background .15s ease;}",
+      ".frontcalc-chip:hover{border-color:#aeb7c6;background:#fff;}",
+      ".frontcalc-chip.is-active{border-color:#2f3a52;box-shadow:inset 0 0 0 1px #2f3a52;background:#fff;}",
+      ".frontcalc-chip.is-disabled{opacity:.45;cursor:not-allowed;}",
+      ".frontcalc-input-group{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}",
+      ".frontcalc-input-control-wrap{display:inline-flex;align-items:center;gap:10px;}",
+      ".frontcalc-input-control{display:grid;grid-template-columns:44px minmax(88px,136px) 44px;height:46px;overflow:hidden;border:1px solid #d6dce6;border-radius:4px;background:#fff;}",
+      ".frontcalc-step-btn{width:44px;height:46px;border:0;background:#f7f8fa;color:#33405a;font-size:20px;line-height:1;cursor:pointer;}",
+      ".frontcalc-step-btn:hover{background:#eceff3;}",
+      ".frontcalc-num-input{width:100%;height:46px;border:0!important;background:#fff!important;box-shadow:none!important;text-align:center;color:#07142f;font-size:16px;font-weight:600;outline:none;box-sizing:border-box;}",
+      ".frontcalc-input-group-divider,.frontcalc-input-unit{color:#667085;font-size:14px;}",
       ".frontcalc-offer-title{margin:0 0 4px;font-size:24px;line-height:1.25;font-weight:700;color:#101933;}",
       ".frontcalc-price-panel__inner{position:sticky;top:12px;border:1px solid #d9dee7;border-radius:12px;background:#fafbff;padding:16px;}",
       ".frontcalc-price-groups{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;}",
       ".frontcalc-price-group{min-height:34px;padding:6px 12px;border:1px solid #d9dee7;border-radius:999px;background:#fff;color:#33405a;font-size:14px;line-height:1.2;cursor:pointer;}",
       ".frontcalc-price-group:hover{border-color:#2f3a52;}",
       ".frontcalc-price-group.is-active{border-color:#2f3a52;background:#101933;color:#fff;font-weight:600;}",
-      ".frontcalc-volume-input{display:flex;gap:10px;align-items:center;margin-bottom:12px;}",
+      ".frontcalc-volume-input{display:flex;gap:10px;align-items:stretch;margin-bottom:12px;}",
       ".frontcalc-volume-stepper{display:grid;grid-template-columns:56px minmax(88px,1fr) 56px;align-items:stretch;flex:1 1 220px;min-width:200px;max-width:360px;height:58px;overflow:hidden;border-radius:6px;background:#f3f4f6;}",
-      ".frontcalc-table-input{width:100%;height:58px;border:0!important;border-radius:0;padding:0 12px;background:transparent!important;color:#1f2937;font-size:18px;font-weight:500;text-align:center;box-sizing:border-box;outline:none;box-shadow:none!important;}",
+      ".frontcalc-table-input{width:100%;height:58px;border:0!important;border-radius:0;padding:0 12px;background:transparent!important;color:#1f2937;font-size:24px;font-weight:700;line-height:58px;text-align:center;box-sizing:border-box;outline:none;box-shadow:none!important;}",
       ".frontcalc-table-input:focus{background:transparent!important;box-shadow:none!important;}",
       ".frontcalc-cart-wrap{display:inline-flex;align-items:center;min-width:120px;}",
       ".frontcalc-cart-wrap.loadings{position:relative;}",
-      ".frontcalc-cart-btn{min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:7px;white-space:nowrap;}",
+      ".frontcalc-cart-btn{height:58px;min-height:58px;display:inline-flex;align-items:center;justify-content:center;gap:7px;white-space:nowrap;}",
       ".frontcalc-cart-btn.is-info-only{background:#eef2f7!important;border-color:#d9dee7!important;color:#8b93a6!important;cursor:pointer;}",
-      ".frontcalc-volume-btn{width:56px;height:58px;border:0!important;border-radius:0;background:transparent!important;color:#111827;font-size:28px;font-weight:400;line-height:1;cursor:pointer;transition:background .15s ease;box-shadow:none!important;}",
+      ".frontcalc-volume-btn{display:flex;align-items:center;justify-content:center;width:56px;height:58px;margin:0!important;padding:0!important;border:0!important;border-radius:0;background:transparent!important;color:#111827;font-size:28px;font-weight:400;line-height:1;cursor:pointer;transition:background .15s ease;box-shadow:none!important;}",
       ".frontcalc-volume-btn:hover{background:#e1e3e8!important;}",
-      ".frontcalc-table-head{display:grid;grid-template-columns:minmax(144px,1.15fr) minmax(120px,1fr) minmax(120px,1fr);gap:8px;margin-bottom:8px;font-weight:600;color:#1a2236;}",
+      ".frontcalc-table-head{display:grid;grid-template-columns:minmax(144px,1.15fr) minmax(120px,1fr) minmax(120px,1fr);gap:8px;margin-bottom:8px;padding-right:6px;box-sizing:border-box;font-weight:600;color:#1a2236;}",
       ".frontcalc-table-head>div{display:flex;align-items:center;gap:6px;}",
       ".frontcalc-tip svg{fill:#8591aa;}",
-      ".frontcalc-table-body{display:flex;flex-direction:column;gap:6px;max-height:320px;overflow:auto;}",
+      ".frontcalc-table-body{display:flex;flex-direction:column;gap:6px;max-height:320px;overflow:auto;padding-right:6px;scrollbar-width:thin;scrollbar-color:#9b9b9b transparent;}",
+      ".frontcalc-table-body::-webkit-scrollbar{width:2px;height:2px;}",
+      ".frontcalc-table-body::-webkit-scrollbar-button{display:none;width:0;height:0;}",
+      ".frontcalc-table-body::-webkit-scrollbar-track{background:transparent;}",
+      ".frontcalc-table-body::-webkit-scrollbar-thumb{border-radius:2px;background:#9b9b9b;}",
       ".frontcalc-table-row{display:grid;grid-template-columns:minmax(144px,1.15fr) minmax(120px,1fr) minmax(120px,1fr);gap:8px;width:100%;box-sizing:border-box;}",
       ".frontcalc-cell{width:100%;min-width:0;border:1px solid #d9dee7;border-radius:6px;background:#fff;min-height:52px;padding:6px 10px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;cursor:pointer;box-sizing:border-box;font:inherit;text-align:left;}",
       ".frontcalc-cell-main{font-size:16px;line-height:1.2;color:#212a3f;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}",
@@ -1421,8 +1438,6 @@
       return;
     }
 
-    var tooltip =
-      "Примерный вес и объём тиража. Внимание! Исполнитель выполняет фасовку в соответствии с собственными соображениями оптимального хранения/логистики продукции.";
     var volumeStepInfo = driverContext && driverContext.volumeStepInfo ? driverContext.volumeStepInfo : null;
     var volumeBounds = driverContext && driverContext.volumeBounds ? driverContext.volumeBounds : null;
     var productionStep = volumeStepInfo && volumeStepInfo.isProduction ? parseNumber(volumeStepInfo.step, Number.NaN) : Number.NaN;
@@ -1492,7 +1507,7 @@
       '<span>В корзину</span></button></span>';
     html += "</div>";
     html +=
-      '<div class="frontcalc-table-head"><div>Тираж</div><div>Строгий <span class="frontcalc-tip" title="Отгрузка в соответствии с согласованным сроком"><svg width="17" height="16"><use xlink:href="/bitrix/templates/aspro-premier/images/svg/catalog/item_order_icons.svg?1774850114#attention-16-16"></use></svg></span></div><div>Гибкий <span class="frontcalc-tip" title="Срок отгрузки может быть изменен (не больше 10 рабочих дней)"><svg width="17" height="16"><use xlink:href="/bitrix/templates/aspro-premier/images/svg/catalog/item_order_icons.svg?1774850114#attention-16-16"></use></svg></span></div></div>';
+      '<div class="frontcalc-table-head"><div>Тираж</div><div><span class="frontcalc-tip" title="Отгрузка в соответствии с согласованным сроком"><svg width="17" height="16"><use xlink:href="/bitrix/templates/aspro-premier/images/svg/catalog/item_order_icons.svg?1774850114#attention-16-16"></use></svg></span>Строгий</div><div><span class="frontcalc-tip" title="Срок отгрузки может быть изменен (не больше 10 рабочих дней)"><svg width="17" height="16"><use xlink:href="/bitrix/templates/aspro-premier/images/svg/catalog/item_order_icons.svg?1774850114#attention-16-16"></use></svg></span>Гибкий</div></div>';
     html += '<div class="frontcalc-table-body">';
 
     var tableCustomByProperty = driverContext && driverContext.customByProperty ? driverContext.customByProperty : {};
@@ -1525,6 +1540,7 @@
       var flexNum = parseNumber(flex && flex.price, strictNum);
       var weightText = formatMetric(strictEstimate.weightKg, "кг");
       var volumeText = formatMetric(strictEstimate.volumeM3, "м³");
+      var logisticTitle = "Вес: " + weightText + ", Объём: " + volumeText;
 
       html +=
         '<div class="frontcalc-table-row" data-row-index="' +
@@ -1536,7 +1552,7 @@
         '<button type="button" class="frontcalc-cell frontcalc-cell--volume"><span class="frontcalc-cell-main" title="' + escapeHtml(formatQuantityValue(preset.value || xml)) + '">' +
         escapeHtml(formatQuantityValue(preset.value || xml)) +
         '</span><span class="frontcalc-cell-sub" title="' +
-        escapeHtml(tooltip) +
+        escapeHtml(logisticTitle) +
         '">' +
         weightText +
         " · " +
