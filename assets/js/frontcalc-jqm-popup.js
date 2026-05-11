@@ -28,15 +28,16 @@
       ".frontcalc-price-group{min-height:34px;padding:6px 12px;border:1px solid #d9dee7;border-radius:999px;background:#fff;color:#33405a;font-size:14px;line-height:1.2;cursor:pointer;}",
       ".frontcalc-price-group:hover{border-color:#2f3a52;}",
       ".frontcalc-price-group.is-active{border-color:#2f3a52;background:#101933;color:#fff;font-weight:600;}",
-      ".frontcalc-volume-input{display:flex;gap:8px;align-items:center;margin-bottom:12px;}",
-      ".frontcalc-table-input{width:120px;height:44px;border:1px solid #d9dee7;border-radius:10px;padding:0 12px;font-size:22px;font-weight:600;box-sizing:border-box;}",
-      ".frontcalc-volume-btns{display:flex;gap:6px;}",
-      ".frontcalc-cart-wrap{display:inline-flex;align-items:center;min-width:150px;}",
+      ".frontcalc-volume-input{display:flex;gap:10px;align-items:center;margin-bottom:12px;}",
+      ".frontcalc-volume-stepper{display:grid;grid-template-columns:56px minmax(88px,1fr) 56px;align-items:stretch;flex:1 1 220px;min-width:200px;max-width:360px;height:58px;overflow:hidden;border-radius:6px;background:#f1f2f5;}",
+      ".frontcalc-table-input{width:100%;height:58px;border:0;border-radius:0;padding:0 12px;background:#f8f9fb;color:#1f2937;font-size:18px;font-weight:500;text-align:center;box-sizing:border-box;outline:none;}",
+      ".frontcalc-table-input:focus{background:#fff;box-shadow:inset 0 0 0 1px #d9dee7;}",
+      ".frontcalc-cart-wrap{display:inline-flex;align-items:center;min-width:120px;}",
       ".frontcalc-cart-wrap.loadings{position:relative;}",
       ".frontcalc-cart-btn{min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:7px;white-space:nowrap;}",
       ".frontcalc-cart-btn.is-info-only{background:#eef2f7!important;border-color:#d9dee7!important;color:#8b93a6!important;cursor:pointer;}",
-      ".frontcalc-cart-btn svg{flex:0 0 auto;}",
-      ".frontcalc-volume-btn{width:40px;height:40px;border:1px solid #d9dee7;border-radius:10px;background:#f2f4f8;font-size:24px;line-height:1;cursor:pointer;}",
+      ".frontcalc-volume-btn{width:56px;height:58px;border:0;border-radius:0;background:#f0f1f4;color:#111827;font-size:28px;font-weight:400;line-height:1;cursor:pointer;transition:background .15s ease;}",
+      ".frontcalc-volume-btn:hover{background:#e1e3e8;}",
       ".frontcalc-table-head{display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:8px;margin-bottom:8px;font-weight:600;color:#1a2236;}",
       ".frontcalc-table-head>div{display:flex;align-items:center;gap:6px;}",
       ".frontcalc-tip svg{fill:#8591aa;}",
@@ -1481,18 +1482,13 @@
     }
     html += '<div class="frontcalc-volume-input">';
     html +=
-      '<input type="text" class="frontcalc-table-input" value="' +
+      '<div class="frontcalc-volume-stepper"><button type="button" class="frontcalc-volume-btn" data-step="-1">−</button><input type="text" class="frontcalc-table-input" value="' +
       escapeHtml(formatQuantityValue(selectedXml)) +
-      '" inputmode="numeric">';
-    html +=
-      '<div class="frontcalc-volume-btns"><button type="button" class="frontcalc-volume-btn" data-step="-1">−</button><button type="button" class="frontcalc-volume-btn" data-step="1">+</button></div>';
+      '" inputmode="numeric"><button type="button" class="frontcalc-volume-btn" data-step="1">+</button></div>';
     html +=
       '<span class="frontcalc-cart-wrap"><button type="button" class="btn btn-default animate-load btn-elg btn-wide frontcalc-cart-btn' +
       (isBuyPriceType ? '' : ' is-info-only') +
-      '" data-buy-enabled="' + (isBuyPriceType ? '1' : '0') + '" title="' +
-      (isBuyPriceType ? '' : 'Данный тип цен доступен только в информационных целях') +
-      '">' +
-      (isBuyPriceType ? '' : '<svg width="17" height="16"><use xlink:href="/bitrix/templates/aspro-premier/images/svg/catalog/item_order_icons.svg?1774850114#attention-16-16"></use></svg>') +
+      '" data-buy-enabled="' + (isBuyPriceType ? '1' : '0') + '">' +
       '<span>В корзину</span></button></span>';
     html += "</div>";
     html +=
