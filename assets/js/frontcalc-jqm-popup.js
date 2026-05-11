@@ -4,72 +4,6 @@
   }
   window.__frontcalcJqmReady = true;
 
-  ensurePopupStyles();
-
-
-  function ensurePopupStyles() {
-    if (document.getElementById("frontcalc-jqm-popup-runtime-styles")) {
-      return;
-    }
-
-    var style = document.createElement("style");
-    style.id = "frontcalc-jqm-popup-runtime-styles";
-    style.textContent = [
-      "#popup_iframe_wrapper .frontcalc_frame{width:min(1320px,calc(100vw - 32px)) !important;max-width:calc(100vw - 32px) !important;}",
-      "#popup_iframe_wrapper .frontcalc_frame .scrollbar{max-height:calc(100vh - 40px);overflow:auto;}",
-      ".frontcalc-popup-shell{width:100%;max-width:100%;box-sizing:border-box;}",
-      ".frontcalc-popup-shell.form.popup{display:block;padding:0;background:#fff;}",
-      ".frontcalc-popup-content{min-height:220px;padding:24px;}",
-      ".frontcalc-layout{display:grid;grid-template-columns:minmax(0,2fr) minmax(320px,1fr);gap:20px;align-items:start;}",
-      ".frontcalc-selectors{display:flex;flex-direction:column;gap:20px;}",
-      ".frontcalc-presets{display:flex;flex-wrap:wrap;gap:8px;}",
-      ".frontcalc-popup-content .frontcalc-chip{--sku-height:46px;--sku-prop-stroke:2px;display:inline-flex;align-items:center;justify-content:center;min-height:0;height:var(--sku-height);min-width:104px;padding:10px 27px;border:1px solid #d6dce6;border-radius:4px;background:#fff;color:#07142f;font-size:calc(1rem - 1px);line-height:1.2;cursor:pointer;box-sizing:border-box;transition:border-color .15s ease,box-shadow .15s ease,background .15s ease;}",
-      ".frontcalc-popup-content .frontcalc-chip:hover{border-color:#aeb7c6;background:#fff;}",
-      ".frontcalc-popup-content .frontcalc-chip.is-active{border-color:#2f3a52;box-shadow:inset 0 0 0 calc(var(--sku-prop-stroke) - 1px) #2f3a52;background:#fff;}",
-      ".frontcalc-popup-content .frontcalc-chip.is-disabled{opacity:.45;cursor:not-allowed;}",
-      ".frontcalc-input-group{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}",
-      ".frontcalc-input-control-wrap{display:inline-flex;align-items:center;gap:10px;}",
-      ".frontcalc-input-control{display:grid;grid-template-columns:44px minmax(88px,136px) 44px;height:46px;overflow:hidden;border:1px solid #d6dce6;border-radius:4px;background:#fff;}",
-      ".frontcalc-step-btn{display:flex;align-items:center;justify-content:center;width:44px;height:46px;margin:0!important;padding:0!important;border:0;background:#f7f8fa;color:#33405a;font-size:20px;line-height:1;cursor:pointer;}",
-      ".frontcalc-step-btn:hover{background:#eceff3;}",
-      ".frontcalc-num-input{width:100%;height:46px;border:0!important;background:#fff!important;box-shadow:none!important;text-align:center;color:#07142f;font-size:16px;font-weight:600;outline:none;box-sizing:border-box;}",
-      ".frontcalc-input-group-divider{display:inline-flex;align-items:center;height:46px;color:#667085;font-size:14px;line-height:1;}",
-      ".frontcalc-input-unit{color:#667085;font-size:14px;}",
-      ".frontcalc-offer-title{margin:0 0 4px;font-size:24px;line-height:1.25;font-weight:700;color:#101933;}",
-      ".frontcalc-price-panel__inner{position:sticky;top:12px;border:1px solid #d9dee7;border-radius:12px;background:#fafbff;padding:16px;}",
-      ".frontcalc-price-groups{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px;}",
-      ".frontcalc-price-group{min-height:34px;padding:6px 12px;border:1px solid #d9dee7;border-radius:999px;background:#fff;color:#33405a;font-size:14px;line-height:1.2;cursor:pointer;}",
-      ".frontcalc-price-group:hover{border-color:#2f3a52;}",
-      ".frontcalc-price-group.is-active{border-color:#2f3a52;background:#101933;color:#fff;font-weight:600;}",
-      ".frontcalc-volume-input{display:flex;gap:10px;align-items:stretch;margin-bottom:24px;}",
-      ".frontcalc-volume-stepper{display:flex;align-items:center;height:46px;overflow:hidden;border-radius:6px;background:#f3f4f6;justify-content:space-between;}",
-      ".frontcalc-table-input{display:flex;align-items:center;width:100%;height:46px;border:0!important;border-radius:0;padding:0 12px;background:transparent!important;color:#1f2937;font-size:24px;font-weight:700;line-height:46px;text-align:center;box-sizing:border-box;outline:none;box-shadow:none!important;}",
-      ".frontcalc-table-input:focus{background:transparent!important;box-shadow:none!important;}",
-      ".frontcalc-cart-wrap{display:inline-flex;align-items:center;min-width:120px;}",
-      ".frontcalc-cart-wrap.loadings{position:relative;}",
-      ".frontcalc-cart-btn{height:46px;min-height:46px;display:inline-flex;align-items:center;justify-content:center;gap:7px;white-space:nowrap;}",
-      ".frontcalc-cart-btn.is-info-only{background:#eef2f7!important;border-color:#d9dee7!important;color:#8b93a6!important;cursor:pointer;}",
-      ".frontcalc-table-head{display:grid;grid-template-columns:minmax(144px,1.15fr) minmax(120px,1fr) minmax(120px,1fr);gap:8px;margin-bottom:8px;padding-right:6px;box-sizing:border-box;font-weight:600;color:#1a2236;}",
-      ".frontcalc-table-head>div{display:flex;align-items:center;gap:6px;}",
-      ".frontcalc-tip svg{width:14px;height:14px;fill:#8591aa;}",
-      ".frontcalc-table-body{display:flex;flex-direction:column;gap:6px;max-height:320px;overflow:auto;padding-right:6px;scrollbar-width:thin;scrollbar-color:#9b9b9b transparent;}",
-      ".frontcalc-table-body::-webkit-scrollbar{width:2px;height:2px;}",
-      ".frontcalc-table-body::-webkit-scrollbar-button{display:none;width:0;height:0;}",
-      ".frontcalc-table-body::-webkit-scrollbar-track{background:transparent;}",
-      ".frontcalc-table-body::-webkit-scrollbar-thumb{border-radius:2px;background:#9b9b9b;}",
-      ".frontcalc-table-row{display:grid;grid-template-columns:minmax(144px,1.15fr) minmax(120px,1fr) minmax(120px,1fr);gap:8px;width:100%;box-sizing:border-box;}",
-      ".frontcalc-cell{width:100%;min-width:0;border:1px solid #d9dee7;border-radius:4px;background:#fff;min-height:52px;padding:6px 10px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;cursor:pointer;box-sizing:border-box;font:inherit;text-align:left;}",
-      ".frontcalc-cell-main{font-size:16px;line-height:1.2;color:#212a3f;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}",
-      ".frontcalc-cell-sub{font-size:12px;color:#8b93a6;margin-top:2px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}",
-      ".frontcalc-table-row:hover .frontcalc-cell,.frontcalc-cell:hover{border-color:#4f7bd9;background:#f8fbff;}",
-      ".frontcalc-table-row.is-selected .frontcalc-cell:not(.is-picked){border-color:#d9dee7!important;box-shadow:none!important;}",
-      ".frontcalc-cell.is-hover-row,.frontcalc-cell.is-hover-col{border-color:#4f7bd9;background:#f8fbff;}",
-      ".frontcalc-cell.is-picked{border-color:#2f3a52!important;box-shadow:inset 0 0 0 1px #2f3a52!important;}",
-      "@media (max-width: 991px){.frontcalc-layout{grid-template-columns:1fr;}.frontcalc-price-panel{order:-1;}}"
-    ].join("\n");
-    document.head.appendChild(style);
-  }
-
   function escapeHtml(str) {
     return String(str || "").replace(/[&<>"']/g, function (ch) {
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[ch] || ch;
@@ -533,7 +467,6 @@
     });
   }
 
-
   function pickMatchedOfferIgnoringCustom(offers, selectedByProperty, customByProperty, skipCode) {
     var filtered = getFilteredOffers(offers, selectedByProperty, customByProperty || {}, skipCode || null);
     return filtered.length ? filtered[0] : null;
@@ -593,7 +526,6 @@
     }
     return null;
   }
-
 
   function isCompleteGroupInput(values) {
     if (!Array.isArray(values) || !values.length) return false;
@@ -748,7 +680,6 @@
     });
   }
 
-
   function getOfferQuantityNumber(offer, volumeCode) {
     var prop = offer && offer.properties ? offer.properties[volumeCode] : null;
     var xmlNum = parseNumber(prop && prop.xml_id, Number.NaN);
@@ -882,9 +813,6 @@
     return Number.isFinite(num) ? num.toFixed(3) + " " + suffix : "—";
   }
 
-
-
-
   function getPriceDriverType(fieldConfig, code) {
     var type = String((fieldConfig && fieldConfig.price_driver_type) || "").trim();
     if (!type && code === "CALC_PROP_VOLUME") return "quantity";
@@ -970,9 +898,6 @@
     var range = getRangePriceForColumn(offer, catalogGroupId, column || "strict");
     return parseNumber(range && range.price, Number.NaN);
   }
-
-
-
 
   function normalizeNonNegativeOption(value, fallback) {
     var raw = typeof value === "string" ? normalizeValueToken(value) : value;
@@ -1077,8 +1002,6 @@
     var ratio = (target - start) / (end - start);
     return lower.delta + (upper.delta - lower.delta) * ratio;
   }
-
-
 
   function roundProductionVolumeStep(rawStep, configuredStep) {
     var step = parseNumber(rawStep, Number.NaN);
@@ -1608,7 +1531,6 @@
     $block.html(html);
   }
 
-
   function getInputItemsForField(field) {
     if (Array.isArray(field && field.group_inputs)) return field.group_inputs;
     if (Array.isArray(field && field.inputs)) return field.inputs;
@@ -1688,7 +1610,6 @@
     return String(node.text || "");
   }
 
-
   function hasAnyCustomValue(customByProperty) {
     for (var code in customByProperty) {
       if (Object.prototype.hasOwnProperty.call(customByProperty, code) && customByProperty[code]) {
@@ -1697,7 +1618,6 @@
     }
     return false;
   }
-
 
   function getCustomPropertyCodes(customByProperty) {
     return Object.keys(customByProperty || {}).filter(function (code) {
@@ -2241,7 +2161,6 @@
         renderPriceBlock($priceInner, matched || displayOffer, driverContext);
       }
     }
-
 
     $price.on("click", ".frontcalc-price-group", function () {
       var groupId = parseNumber($(this).attr("data-catalog-group-id"), Number.NaN);
