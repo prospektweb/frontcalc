@@ -31,6 +31,11 @@
       ".frontcalc-volume-input{display:flex;gap:8px;align-items:center;margin-bottom:12px;}",
       ".frontcalc-table-input{width:120px;height:44px;border:1px solid #d9dee7;border-radius:10px;padding:0 12px;font-size:22px;font-weight:600;box-sizing:border-box;}",
       ".frontcalc-volume-btns{display:flex;gap:6px;}",
+      ".frontcalc-cart-wrap{display:inline-flex;align-items:center;min-width:150px;}",
+      ".frontcalc-cart-wrap.loadings{position:relative;}",
+      ".frontcalc-cart-btn{min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:7px;white-space:nowrap;}",
+      ".frontcalc-cart-btn.is-info-only{background:#eef2f7!important;border-color:#d9dee7!important;color:#8b93a6!important;cursor:pointer;}",
+      ".frontcalc-cart-btn svg{flex:0 0 auto;}",
       ".frontcalc-volume-btn{width:40px;height:40px;border:1px solid #d9dee7;border-radius:10px;background:#f2f4f8;font-size:24px;line-height:1;cursor:pointer;}",
       ".frontcalc-table-head{display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:8px;margin-bottom:8px;font-weight:600;color:#1a2236;}",
       ".frontcalc-table-head>div{display:flex;align-items:center;gap:6px;}",
@@ -41,7 +46,7 @@
       ".frontcalc-cell-main{font-size:16px;line-height:1.2;color:#212a3f;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}",
       ".frontcalc-cell-sub{font-size:12px;color:#8b93a6;margin-top:2px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}",
       ".frontcalc-table-row:hover .frontcalc-cell,.frontcalc-cell:hover{border-color:#4f7bd9;background:#f8fbff;}",
-      ".frontcalc-table-row.is-selected .frontcalc-cell{border-color:#2f3a52;box-shadow:inset 0 0 0 1px #2f3a52;}",
+      ".frontcalc-table-row.is-selected .frontcalc-cell.is-picked{border-color:#2f3a52;box-shadow:inset 0 0 0 1px #2f3a52;}",
       ".frontcalc-cell.is-hover-row,.frontcalc-cell.is-hover-col{border-color:#4f7bd9;background:#f8fbff;}",
       ".frontcalc-cell.is-picked{border-color:#2f3a52 !important;box-shadow:inset 0 0 0 1px #2f3a52;}",
       "@media (max-width: 991px){.frontcalc-layout{grid-template-columns:1fr;}.frontcalc-price-panel{order:-1;}}"
@@ -114,6 +119,42 @@
     xhr.send();
   }
 
+  function postData(url, data, onSuccess, onError) {
+    var body = Object.keys(data || {}).map(function (key) {
+      return encodeURIComponent(key) + "=" + encodeURIComponent(data[key] == null ? "" : String(data[key]));
+    }).join("&");
+
+    if (window.fetch) {
+      fetch(url, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          "X-Requested-With": "XMLHttpRequest",
+          "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
+        },
+        body: body
+      })
+        .then(function (response) {
+          if (!response.ok) throw new Error("HTTP " + response.status);
+          return response.json();
+        })
+        .then(onSuccess)
+        .catch(function (error) {
+          onError(error && error.message ? error.message : "fetch_failed");
+        });
+      return;
+    }
+
+    $.ajax({
+      url: url,
+      method: "POST",
+      data: data,
+      dataType: "json",
+      success: onSuccess,
+      error: function (_, __, error) { onError(error || "ajax_failed"); }
+    });
+  }
+
   function loadJqmScript(callback) {
     if ($.fn.jqm) {
       callback();
@@ -131,8 +172,24 @@
   }
 
   function parseNumber(raw, fallback) {
-    var num = Number(raw);
+    var normalized = typeof raw === "string" ? raw.replace(/\s+/g, "").replace(",", ".") : raw;
+    var num = Number(normalized);
     return Number.isFinite(num) ? num : fallback;
+  }
+
+  function formatGroupedNumber(value) {
+    var raw = normalizeValueToken(value);
+    if (!raw) return "";
+    var parts = raw.split(".");
+    var sign = parts[0].charAt(0) === "-" ? "-" : "";
+    var integer = sign ? parts[0].slice(1) : parts[0];
+    if (!/^\d+$/.test(integer)) return String(value || "");
+    var grouped = integer.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+    return sign + grouped + (parts.length > 1 && parts[1] !== "" ? "." + parts[1] : "");
+  }
+
+  function formatQuantityValue(value) {
+    return formatGroupedNumber(value) || String(value || "");
   }
 
   function clamp(value, min, max) {
@@ -1356,7 +1413,7 @@
     });
   }
 
-  function renderPriceTable($block, offers, presetsByCode, selectedByProperty, volumeCode, customVolumeValue, priceGroups, selectedCatalogGroupId, driverContext) {
+  function renderPriceTable($block, offers, presetsByCode, selectedByProperty, volumeCode, customVolumeValue, priceGroups, selectedCatalogGroupId, driverContext, selectedDeadlineColumn, buyCatalogGroupId) {
     var volumePresets = (presetsByCode[volumeCode] || []).slice();
     if (!volumePresets.length) {
       $block.html('<div class="frontcalc-price-empty">Нет значений тиража для таблицы.</div>');
@@ -1403,6 +1460,10 @@
     }
     merged.sort(function (a, b) { return a.num - b.num; });
     var selectedXml = String(selectedByProperty[volumeCode] || (merged[0] && merged[0].xml_id) || "");
+    var activeDeadlineColumn = selectedDeadlineColumn === "flex" ? "flex" : "strict";
+    var activeGroupId = parseNumber(selectedCatalogGroupId, Number.NaN);
+    var buyGroupId = parseNumber(buyCatalogGroupId, Number.NaN);
+    var isBuyPriceType = Number.isFinite(activeGroupId) && Number.isFinite(buyGroupId) && activeGroupId === buyGroupId;
 
     var html = "";
     if (Array.isArray(priceGroups) && priceGroups.length) {
@@ -1421,10 +1482,18 @@
     html += '<div class="frontcalc-volume-input">';
     html +=
       '<input type="text" class="frontcalc-table-input" value="' +
-      escapeHtml(selectedXml) +
+      escapeHtml(formatQuantityValue(selectedXml)) +
       '" inputmode="numeric">';
     html +=
       '<div class="frontcalc-volume-btns"><button type="button" class="frontcalc-volume-btn" data-step="-1">−</button><button type="button" class="frontcalc-volume-btn" data-step="1">+</button></div>';
+    html +=
+      '<span class="frontcalc-cart-wrap"><button type="button" class="btn btn-default animate-load btn-elg btn-wide frontcalc-cart-btn' +
+      (isBuyPriceType ? '' : ' is-info-only') +
+      '" data-buy-enabled="' + (isBuyPriceType ? '1' : '0') + '" title="' +
+      (isBuyPriceType ? '' : 'Данный тип цен доступен только в информационных целях') +
+      '">' +
+      (isBuyPriceType ? '' : '<svg width="17" height="16"><use xlink:href="/bitrix/templates/aspro-premier/images/svg/catalog/item_order_icons.svg?1774850114#attention-16-16"></use></svg>') +
+      '<span>В корзину</span></button></span>';
     html += "</div>";
     html +=
       '<div class="frontcalc-table-head"><div>Тираж</div><div>Строгий <span class="frontcalc-tip" title="Отгрузка в соответствии с согласованным сроком"><svg width="17" height="16"><use xlink:href="/bitrix/templates/aspro-premier/images/svg/catalog/item_order_icons.svg?1774850114#attention-16-16"></use></svg></span></div><div>Гибкий <span class="frontcalc-tip" title="Срок отгрузки может быть изменен (не больше 10 рабочих дней)"><svg width="17" height="16"><use xlink:href="/bitrix/templates/aspro-premier/images/svg/catalog/item_order_icons.svg?1774850114#attention-16-16"></use></svg></span></div></div>';
@@ -1470,8 +1539,8 @@
         escapeHtml(xml) +
         '">';
       html +=
-        '<button type="button" class="frontcalc-cell frontcalc-cell--volume"><span class="frontcalc-cell-main" title="' + escapeHtml(String(preset.value || xml)) + '">' +
-        escapeHtml(String(preset.value || xml)) +
+        '<button type="button" class="frontcalc-cell frontcalc-cell--volume"><span class="frontcalc-cell-main" title="' + escapeHtml(formatQuantityValue(preset.value || xml)) + '">' +
+        escapeHtml(formatQuantityValue(preset.value || xml)) +
         '</span><span class="frontcalc-cell-sub" title="' +
         escapeHtml(tooltip) +
         '">' +
@@ -1480,13 +1549,13 @@
         volumeText +
         "</span></button>";
       html +=
-        '<button type="button" class="frontcalc-cell" data-col="strict"><span class="frontcalc-cell-main">' +
+        '<button type="button" class="frontcalc-cell' + (xml === selectedXml && activeDeadlineColumn === "strict" ? ' is-picked' : '') + '" data-col="strict" data-price="' + escapeHtml(String(Number.isFinite(strictNum) ? strictNum : "")) + '" data-currency="' + escapeHtml(String((strictPrice && strictPrice.currency) || "")) + '"><span class="frontcalc-cell-main">' +
         escapeHtml(formatMoneyRow(strictPrice)) +
         '</span><span class="frontcalc-cell-sub">' +
         escapeHtml(Number.isFinite(strictNum) ? (strictNum / qty).toFixed(2) + " ₽/экз" : "—") +
         "</span></button>";
       html +=
-        '<button type="button" class="frontcalc-cell" data-col="flex"><span class="frontcalc-cell-main">' +
+        '<button type="button" class="frontcalc-cell' + (xml === selectedXml && activeDeadlineColumn === "flex" ? ' is-picked' : '') + '" data-col="flex" data-price="' + escapeHtml(String(Number.isFinite(flexNum) ? flexNum : "")) + '" data-currency="' + escapeHtml(String((flex && flex.currency) || "")) + '"><span class="frontcalc-cell-main">' +
         escapeHtml(formatMoneyRow(flex)) +
         '</span><span class="frontcalc-cell-sub">' +
         escapeHtml(Number.isFinite(flexNum) ? (flexNum / qty).toFixed(2) + " ₽/экз" : "—") +
@@ -1635,7 +1704,7 @@
   }
 
   function formatPlainQuantityValue(value) {
-    return normalizeValueToken(value);
+    return formatQuantityValue(value);
   }
 
   function buildTitleFromDisplayOfferWithCustomValues(displayOffer, selectedByProperty, customByProperty, volumeCode) {
@@ -1660,6 +1729,20 @@
     return title;
   }
 
+  function formatTitleQuantityValue(title, displayOffer, selectedByProperty, volumeCode) {
+    var selected = String(selectedByProperty[volumeCode] || "").trim();
+    var replacement = formatQuantityValue(selected);
+    if (!replacement) return String(title || "");
+    var prop = displayOffer && displayOffer.properties ? displayOffer.properties[volumeCode] : null;
+    var result = String(title || "");
+    [selected, prop && prop.value, prop && prop.xml_id, normalizeValueToken(prop && prop.value)].forEach(function (sourceValue) {
+      var source = String(sourceValue || "").trim();
+      if (!source || source === replacement) return;
+      result = replaceAllLiteral(result, source, replacement);
+    });
+    return result;
+  }
+
   function buildOfferTitle(config, targetMap, fieldByCode, selectedByProperty, customByProperty, offers, anchorOffer) {
     var template = config && config.title_template;
     var root = template && template.root;
@@ -1670,12 +1753,26 @@
     return String((anchorOffer && anchorOffer.name) || "");
   }
 
+  function getDeadlineLabel(column) {
+    return column === "flex" ? "Гибкий срок" : "Строгий срок";
+  }
+
+  function appendDeadlineToTitle(title, column) {
+    var base = String(title || "").trim();
+    var label = getDeadlineLabel(column);
+    if (!base) return label;
+    return /\|\s*(Строгий|Гибкий) срок\s*$/.test(base) ? base.replace(/\|\s*(Строгий|Гибкий) срок\s*$/, "| " + label) : base + " | " + label;
+  }
+
   function renderCalculator($content, payload) {
     var data = payload && payload.data ? payload.data : {};
     var config = data.config || {};
     var offers = Array.isArray(data.offers) ? data.offers : [];
     var priceGroups = collectAvailablePriceGroups(data.price_groups_view, offers);
     var selectedCatalogGroupId = priceGroups.length ? parseNumber(priceGroups[0].id, Number.NaN) : Number.NaN;
+    var buyCatalogGroupIds = data.price_access && Array.isArray(data.price_access.buy) ? data.price_access.buy.map(function (id) { return parseNumber(id, Number.NaN); }).filter(Number.isFinite) : [];
+    var buyCatalogGroupId = buyCatalogGroupIds.length ? buyCatalogGroupIds[0] : Number.NaN;
+    var selectedDeadlineColumn = "strict";
     var propertyMeta = Array.isArray(data.property_meta) ? data.property_meta : [];
     var priceGroupsView = Array.isArray(data.price_groups_view) ? data.price_groups_view : [];
     var propertyMetaByCode = {};
@@ -1879,6 +1976,9 @@
       var primaryGroupId = parseNumber(defaultOffer.catalog.primary_buy_price.catalog_group_id, Number.NaN);
       if (Number.isFinite(primaryGroupId) && priceGroups.some(function (group) { return parseNumber(group && group.id, Number.NaN) === primaryGroupId; })) {
         selectedCatalogGroupId = primaryGroupId;
+        if (buyCatalogGroupIds.some(function (id) { return id === primaryGroupId; })) {
+          buyCatalogGroupId = primaryGroupId;
+        }
       }
     }
     var selectorCodes = allCodes.filter(function (code) {
@@ -2108,7 +2208,10 @@
       if (!titleText) {
         titleText = buildOfferTitle(config, titleTargetMap, fieldByCode, selectedByProperty, customByProperty, offers, displayOffer);
       }
+      titleText = formatTitleQuantityValue(titleText, displayOffer, selectedByProperty, volumeCode);
+      titleText = appendDeadlineToTitle(titleText, selectedDeadlineColumn);
       $title.text(titleText);
+      $title.attr("data-current-title", titleText);
       var driverContext = {
         offers: getFilteredOffers(offers, selectedByProperty, customByProperty, null),
         allOffers: offers,
@@ -2119,11 +2222,13 @@
         anchorOffer: displayOffer,
         targetQty: parseNumber(selectedByProperty[volumeCode], 1),
         selectedCatalogGroupId: selectedCatalogGroupId,
+        selectedDeadlineColumn: selectedDeadlineColumn,
+        buyCatalogGroupId: buyCatalogGroupId,
         volumeStepInfo: normalizedVolumeState.stepInfo,
         volumeBounds: normalizedVolumeState.bounds
       };
       if (presetsByCode[volumeCode] && presetsByCode[volumeCode].length) {
-        renderPriceTable($priceInner, offers, presetsByCode, selectedByProperty, volumeCode, customVolumeValue, priceGroups, selectedCatalogGroupId, driverContext);
+        renderPriceTable($priceInner, offers, presetsByCode, selectedByProperty, volumeCode, customVolumeValue, priceGroups, selectedCatalogGroupId, driverContext, selectedDeadlineColumn, buyCatalogGroupId);
       } else {
         renderPriceBlock($priceInner, matched || displayOffer, driverContext);
       }
@@ -2142,8 +2247,10 @@
       var $row = $cell.closest('.frontcalc-table-row');
       var xmlId = String($row.attr('data-xml-id') || '');
       if (!xmlId) return;
-      $price.find(".frontcalc-cell.is-picked").removeClass("is-picked");
-      $cell.addClass("is-picked");
+      var clickedColumn = String($cell.attr("data-col") || "");
+      if (clickedColumn === "strict" || clickedColumn === "flex") {
+        selectedDeadlineColumn = clickedColumn;
+      }
       selectedByProperty[volumeCode] = xmlId;
       var numericXmlId = parseNumber(xmlId, Number.NaN);
       var knownPreset = findPresetByInputValue(presetsByCode[volumeCode] || [], xmlId);
@@ -2164,6 +2271,52 @@
     });
     $price.on("mouseleave", ".frontcalc-table-row .frontcalc-cell", function () {
       $price.find(".is-hover-row,.is-hover-col").removeClass("is-hover-row is-hover-col");
+    });
+
+    $price.on("click", ".frontcalc-cart-btn", function () {
+      var $button = $(this);
+      var $wrap = $button.closest(".frontcalc-cart-wrap");
+      if ($button.attr("data-buy-enabled") !== "1") {
+        if (Number.isFinite(buyCatalogGroupId)) {
+          selectedCatalogGroupId = buyCatalogGroupId;
+          updatePrice();
+        }
+        return;
+      }
+      if ($wrap.hasClass("loadings")) return;
+
+      var $picked = $price.find(".frontcalc-cell.is-picked[data-col]").first();
+      var priceValue = parseNumber($picked.attr("data-price"), Number.NaN);
+      if (!Number.isFinite(priceValue) || priceValue <= 0) {
+        if (window.alert) window.alert("Не удалось определить цену для добавления в корзину.");
+        return;
+      }
+
+      $wrap.addClass("loadings");
+      $button.prop("disabled", true);
+      postData(payload.frontcalcAjaxUrl || "", {
+        action: "add_to_basket",
+        product_id: data.product_id || 0,
+        offer_id: anchorOffer && anchorOffer.id ? anchorOffer.id : 0,
+        name: $title.attr("data-current-title") || $title.text(),
+        calc_quantity: selectedByProperty[volumeCode] || "",
+        deadline_type: getDeadlineLabel(selectedDeadlineColumn),
+        catalog_group_id: selectedCatalogGroupId,
+        price: priceValue,
+        currency: $picked.attr("data-currency") || "RUB"
+      }, function (response) {
+        $wrap.removeClass("loadings");
+        $button.prop("disabled", false);
+        if (!response || response.success !== true) {
+          if (window.alert) window.alert(response && response.message ? response.message : "Не удалось добавить позицию в корзину.");
+          return;
+        }
+        $(document).trigger("frontcalc:basketAdded", [response]);
+      }, function (errorMessage) {
+        $wrap.removeClass("loadings");
+        $button.prop("disabled", false);
+        if (window.alert) window.alert("Ошибка добавления в корзину: " + errorMessage);
+      });
     });
 
     $price.on("click", ".frontcalc-volume-btn", function () {
@@ -2266,6 +2419,7 @@
             renderError($content, payload && payload.message ? payload.message : "Сервер вернул ошибку.");
             return;
           }
+          payload.frontcalcAjaxUrl = ajaxUrl;
           renderCalculator($content, payload);
         },
         function (errorMessage) {
