@@ -33,22 +33,22 @@
 .frontcalc-input-group .frontcalc-field__title{font-size:20px;color:#5f6a83;}
 .frontcalc-price-panel__inner{position:sticky;top:12px;border:1px solid #d9dee7;background:#fafbff;padding:48px 32px;}
 .frontcalc-price-groups{display:flex;flex-wrap:wrap;gap:4px;margin:0;}
-.frontcalc-price-group{min-height:34px;padding:6px 12px;border:1px solid #d9dee7;border-radius:999px;background:#fff;color:#33405a;font-size:14px;line-height:1.2;cursor:pointer;width:calc(50% - 4px);}
+.frontcalc-price-group{min-height:34px;padding:6px 12px;border:1px solid #d9dee7;border-radius:4px;background:none;color:#33405a;font-size:14px;line-height:1.2;cursor:pointer;width:calc(50% - 4px);}
 .frontcalc-price-group:hover{border-color:#2f3a52;}
 .frontcalc-price-group.is-active{border-color:#2f3a52;background:#101933;color:#fff;font-weight:600;}
-.frontcalc-volume-input{display:flex;align-items:center;margin:24px 0;justify-content:space-between;gap:24px;}
+.frontcalc-volume-input{display:flex;align-items:center;margin:36px 0;justify-content:space-between;gap:12px;flex-direction:column;}
 .frontcalc-volume-stepper{display:flex;align-items:center;height:46px;overflow:hidden;border-radius:6px;background:#f3f4f6;justify-content:space-between;flex:1.5;}
-.frontcalc-cart-wrap{display: inline-flex;align-items: center;min-width: 120px;flex: 1;}
+.frontcalc-cart-wrap{display:inline-flex;align-items:center;min-width:120px;flex:1;width:100%;}
 .frontcalc-table-input{display:flex;align-items:center;width:100%;height:46px;border:0!important;border-radius:0;padding:0 12px;background:transparent!important;color:#1f2937;font-size:24px;font-weight:700;line-height:46px;text-align:center;box-sizing:border-box;outline:none;box-shadow:none!important;}
 .frontcalc-volume-btn{width:64px;height:-webkit-fill-available;border:none;font-size:24px;cursor:pointer;background:#f3f4f6;color:#4B4B51;}
 .frontcalc-volume-btn:hover{background:#E8E9ED;}
 .frontcalc-volume-btns{display:flex;gap:6px;}
-.frontcalc-table-head{display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:8px;font-weight:600;color:#1a2236;}
+.frontcalc-table-head{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:12px;font-weight:600;color:#1a2236;}
 .frontcalc-table-head>div{display:flex;align-items:center;gap:6px;}
 .frontcalc-tip svg{width:14px;height:14px;fill:#8591aa;}
-.frontcalc-table-body{display:flex;flex-direction:column;gap:6px;max-height:320px;overflow:auto;padding-right:6px;scrollbar-width:thin;scrollbar-color:#9b9b9b transparent;}
+.frontcalc-table-body{display:flex;flex-direction:column;gap:6px;max-height:320px;overflow:auto;padding-right:6px;scrollbar-width:thin;scrollbar-color:#9b9b9b transparent;margin-right:-16px;}
 .frontcalc-table-row{display:grid;grid-template-columns:minmax(144px,1.15fr) minmax(120px,1fr) minmax(120px,1fr);gap:8px;width:100%;box-sizing:border-box;}
-.frontcalc-cell{width:100%;min-width:0;border:1px solid #d9dee7;border-radius:4px;background:#fff;min-height:52px;padding:6px 10px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;cursor:pointer;box-sizing:border-box;font:inherit;text-align:left;}
+.frontcalc-cell{width:100%;min-width:0;border:1px solid #d9dee7;border-radius:4px;background:none;min-height:52px;padding:6px 10px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;cursor:pointer;box-sizing:border-box;font:inherit;text-align:left;}
 .frontcalc-cell-main{font-size:16px;line-height:1.2;color:#212a3f;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .frontcalc-cell-sub{font-size:12px;color:#8b93a6;margin-top:2px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .frontcalc-table-row:hover .frontcalc-cell,.frontcalc-cell:hover{border-color:#4f7bd9;background:#f8fbff;}
