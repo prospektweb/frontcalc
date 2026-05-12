@@ -43,7 +43,7 @@
 .frontcalc-volume-btn{width:64px;height:-webkit-fill-available;border:none;font-size:24px;cursor:pointer;background:#f3f4f6;color:#4B4B51;}
 .frontcalc-volume-btn:hover{background:#E8E9ED;}
 .frontcalc-volume-btns{display:flex;gap:6px;}
-.frontcalc-table-head{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:12px;font-weight:600;color:#1a2236;}
+.frontcalc-table-head{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:12px;font-weight:600;color:#1a2236;margin-bottom:6px;}
 .frontcalc-table-head>div{display:flex;align-items:center;gap:6px;}
 .frontcalc-tip svg{width:14px;height:14px;fill:#8591aa;}
 .frontcalc-table-body{display:flex;flex-direction:column;gap:6px;max-height:320px;overflow:auto;padding-right:6px;scrollbar-width:thin;scrollbar-color:#9b9b9b transparent;margin-right:-16px;}
