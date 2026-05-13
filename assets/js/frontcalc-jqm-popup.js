@@ -2292,7 +2292,7 @@
     updatePrice();
   }
 
-  function buildRequestUrl(ajaxUrl, productId) {
+  function buildCalculatorRequestUrl(productId, ajaxUrl) {
     var divider = ajaxUrl.indexOf("?") === -1 ? "?" : "&";
     var currentOid = "";
     try {
@@ -2306,6 +2306,10 @@
     return requestUrl;
   }
 
+  function loadCalculatorPayload(productId, ajaxUrl, onSuccess, onError) {
+    requestData(buildCalculatorRequestUrl(productId, ajaxUrl), onSuccess, onError);
+  }
+
   function openPopup(button) {
     var $button = $(button);
     var productId = $button.data("frontcalc-product-id") || 0;
@@ -2316,7 +2320,6 @@
       return;
     }
 
-    var requestUrl = buildRequestUrl(ajaxUrl, productId);
     $button.prop("disabled", true);
 
     loadJqmScript(function () {
@@ -2343,8 +2346,9 @@
       var $content = $frame.find(".js-frontcalc-popup-content");
       setLoading($content);
 
-      requestData(
-        requestUrl,
+      loadCalculatorPayload(
+        productId,
+        ajaxUrl,
         function (payload) {
           $button.prop("disabled", false);
           if (!payload || payload.success !== true) {
@@ -2362,6 +2366,40 @@
     });
   }
 
+  function initInlineCalculator(container) {
+    var $container = $(container);
+    if ($container.data("frontcalc-initialized")) {
+      return;
+    }
+
+    var productId = $container.data("frontcalc-product-id") || 0;
+    var ajaxUrl = $container.data("frontcalc-ajax-url") || "";
+    $container.data("frontcalc-initialized", true);
+
+    if (!ajaxUrl) {
+      renderError($container, "Не задан URL для запроса калькулятора.");
+      return;
+    }
+
+    setLoading($container);
+
+    loadCalculatorPayload(
+      productId,
+      ajaxUrl,
+      function (payload) {
+        if (!payload || payload.success !== true) {
+          renderError($container, payload && payload.message ? payload.message : "Сервер вернул ошибку.");
+          return;
+        }
+        payload.frontcalcAjaxUrl = ajaxUrl;
+        renderCalculator($container, payload);
+      },
+      function (errorMessage) {
+        renderError($container, "Ошибка запроса: " + errorMessage);
+      }
+    );
+  }
+
   function initInlineCalculators(context) {
     var $context = context ? $(context) : $(document);
     var $targets = $context.is && $context.is(".js-frontcalc-inline")
@@ -2369,41 +2407,7 @@
       : $context.find(".js-frontcalc-inline");
 
     $targets.each(function () {
-      var container = this;
-      var $container = $(container);
-      if ($container.data("frontcalc-initialized")) {
-        return;
-      }
-      if (($container.data("frontcalc-mode") || "") !== "detail") {
-        return;
-      }
-
-      var productId = $container.data("frontcalc-product-id") || 0;
-      var ajaxUrl = $container.data("frontcalc-ajax-url") || "";
-      if (!ajaxUrl) {
-        renderError($container, "Не задан URL для запроса калькулятора.");
-        return;
-      }
-
-      $container.data("frontcalc-initialized", true);
-      setLoading($container);
-
-      requestData(
-        buildRequestUrl(ajaxUrl, productId),
-        function (payload) {
-          if (!payload || payload.success !== true) {
-            $container.removeData("frontcalc-initialized");
-            renderError($container, payload && payload.message ? payload.message : "Сервер вернул ошибку.");
-            return;
-          }
-          payload.frontcalcAjaxUrl = ajaxUrl;
-          renderCalculator($container, payload);
-        },
-        function (errorMessage) {
-          $container.removeData("frontcalc-initialized");
-          renderError($container, "Ошибка запроса: " + errorMessage);
-        }
-      );
+      initInlineCalculator(this);
     });
   }
 
