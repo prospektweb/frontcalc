@@ -2292,16 +2292,7 @@
     updatePrice();
   }
 
-  function openPopup(button) {
-    var $button = $(button);
-    var productId = $button.data("frontcalc-product-id") || 0;
-    var ajaxUrl = $button.data("frontcalc-ajax-url") || "";
-
-    if (!ajaxUrl) {
-      if (window.alert) window.alert("Не задан URL для запроса калькулятора.");
-      return;
-    }
-
+  function buildRequestUrl(ajaxUrl, productId) {
     var divider = ajaxUrl.indexOf("?") === -1 ? "?" : "&";
     var currentOid = "";
     try {
@@ -2312,6 +2303,20 @@
     if (currentOid) {
       requestUrl += "&offer_id=" + encodeURIComponent(currentOid);
     }
+    return requestUrl;
+  }
+
+  function openPopup(button) {
+    var $button = $(button);
+    var productId = $button.data("frontcalc-product-id") || 0;
+    var ajaxUrl = $button.data("frontcalc-ajax-url") || "";
+
+    if (!ajaxUrl) {
+      if (window.alert) window.alert("Не задан URL для запроса калькулятора.");
+      return;
+    }
+
+    var requestUrl = buildRequestUrl(ajaxUrl, productId);
     $button.prop("disabled", true);
 
     loadJqmScript(function () {
@@ -2357,8 +2362,58 @@
     });
   }
 
+  function initInlineCalculators(context) {
+    var $context = context ? $(context) : $(document);
+    var $targets = $context.is && $context.is(".js-frontcalc-inline")
+      ? $context
+      : $context.find(".js-frontcalc-inline");
+
+    $targets.each(function () {
+      var container = this;
+      var $container = $(container);
+      if ($container.data("frontcalc-initialized")) {
+        return;
+      }
+      if (($container.data("frontcalc-mode") || "") !== "detail") {
+        return;
+      }
+
+      var productId = $container.data("frontcalc-product-id") || 0;
+      var ajaxUrl = $container.data("frontcalc-ajax-url") || "";
+      if (!ajaxUrl) {
+        renderError($container, "Не задан URL для запроса калькулятора.");
+        return;
+      }
+
+      $container.data("frontcalc-initialized", true);
+      setLoading($container);
+
+      requestData(
+        buildRequestUrl(ajaxUrl, productId),
+        function (payload) {
+          if (!payload || payload.success !== true) {
+            $container.removeData("frontcalc-initialized");
+            renderError($container, payload && payload.message ? payload.message : "Сервер вернул ошибку.");
+            return;
+          }
+          payload.frontcalcAjaxUrl = ajaxUrl;
+          renderCalculator($container, payload);
+        },
+        function (errorMessage) {
+          $container.removeData("frontcalc-initialized");
+          renderError($container, "Ошибка запроса: " + errorMessage);
+        }
+      );
+    });
+  }
+
+  window.FrontcalcCalculator = window.FrontcalcCalculator || {};
+  window.FrontcalcCalculator.initInline = initInlineCalculators;
+
   $(document).on("click", ".js-frontcalc-calculate", function (event) {
     event.preventDefault();
     openPopup(this);
   });
+
+  $(initInlineCalculators);
 })(window, document, window.jQuery);
