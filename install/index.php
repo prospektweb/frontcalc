@@ -94,9 +94,11 @@ class prospektweb_frontcalc extends CModule
             $this->InstallFiles();
             $this->InstallDB();
             $this->patchAsproBasketFile();
+            $this->frontcalcInstallPatchCatalogElementTemplate();
             $this->frontcalcInstallReplaceAsproPricesTemplate();
         } catch (\Throwable $e) {
             $this->frontcalcInstallRestoreAsproPricesTemplate();
+            $this->frontcalcInstallRemoveCatalogElementSnippet();
             $this->frontcalcInstallRemoveBasketSnippet();
             $this->UnInstallFiles();
             ModuleManager::unRegisterModule($this->MODULE_ID);
@@ -129,6 +131,7 @@ class prospektweb_frontcalc extends CModule
         $removeData = (isset($_REQUEST['remove_data']) && $_REQUEST['remove_data'] === 'Y');
 
         $this->frontcalcInstallRestoreAsproPricesTemplate();
+        $this->frontcalcInstallRemoveCatalogElementSnippet();
         $this->frontcalcInstallRemoveBasketSnippet();
         $this->UnInstallDB($removeData);
         $this->UnInstallFiles();
@@ -443,6 +446,106 @@ class prospektweb_frontcalc extends CModule
 ";
     }
 
+
+    protected function frontcalcInstallGetCatalogElementTemplatePath(): string
+    {
+        return $_SERVER['DOCUMENT_ROOT'] . '/bitrix/templates/aspro-premier/components/bitrix/catalog.element/main/template.php';
+    }
+
+    protected function frontcalcInstallPatchCatalogElementTemplate(): void
+    {
+        $templatePath = $this->frontcalcInstallGetCatalogElementTemplatePath();
+        if (!is_file($templatePath)) {
+            throw new \RuntimeException('Не найден файл шаблона catalog.element для патча FrontCalc: ' . $templatePath);
+        }
+
+        $content = (string)file_get_contents($templatePath);
+        if ($content === '') {
+            throw new \RuntimeException('Файл шаблона catalog.element пуст или не читается: ' . $templatePath);
+        }
+
+        $startMarker = '/* FRONTCALC_FLAGS_START */';
+        if (strpos($content, $startMarker) !== false) {
+            return;
+        }
+
+        $skuEndPosition = strpos($content, '/* sku replace end */');
+        if ($skuEndPosition === false) {
+            throw new \RuntimeException('Шаблон Aspro обновился: не найден блок "/* sku replace end */" в файле ' . $templatePath);
+        }
+
+        $priceConfigPosition = strpos($content, '$arPriceConfig', $skuEndPosition);
+        $pricesPosition = strpos($content, '$prices', $skuEndPosition);
+        $firstPricePosition = false;
+        if ($priceConfigPosition !== false && $pricesPosition !== false) {
+            $firstPricePosition = min($priceConfigPosition, $pricesPosition);
+        } elseif ($priceConfigPosition !== false) {
+            $firstPricePosition = $priceConfigPosition;
+        } elseif ($pricesPosition !== false) {
+            $firstPricePosition = $pricesPosition;
+        }
+
+        if ($firstPricePosition === false) {
+            throw new \RuntimeException('Шаблон Aspro обновился: не найдены блоки $arPriceConfig или $prices после SKU в файле ' . $templatePath);
+        }
+
+        $lineEndPosition = strpos($content, "\n", $skuEndPosition);
+        $insertPosition = $lineEndPosition === false ? $skuEndPosition + strlen('/* sku replace end */') : $lineEndPosition + 1;
+        if ($insertPosition > $firstPricePosition) {
+            throw new \RuntimeException('Не удалось вставить FrontCalc-флаги до $arPriceConfig/$prices в файле ' . $templatePath);
+        }
+
+        $snippet = $this->frontcalcInstallBuildCatalogElementFlagsSnippet();
+        $updated = substr($content, 0, $insertPosition) . $snippet . substr($content, $insertPosition);
+
+        if (@file_put_contents($templatePath, $updated) === false) {
+            throw new \RuntimeException('Не удалось записать FrontCalc-флаги в файл шаблона catalog.element: ' . $templatePath);
+        }
+    }
+
+    protected function frontcalcInstallBuildCatalogElementFlagsSnippet(): string
+    {
+        return <<<'PHP'
+<?php /* FRONTCALC_FLAGS_START */ ?>
+<?php
+$frontcalcTemplateInclude = $_SERVER['DOCUMENT_ROOT'] . '/local/modules/prospektweb.frontcalc/template_include.php';
+if (is_file($frontcalcTemplateInclude)) {
+    require_once $frontcalcTemplateInclude;
+}
+
+$frontcalcCanUse = function_exists('frontcalc_can_use_config_from_result')
+    ? frontcalc_can_use_config_from_result($arResult)
+    : false;
+$frontcalcIsAuthorized = is_object($USER) && $USER->IsAuthorized();
+$frontcalcUseInline = $frontcalcCanUse && $frontcalcIsAuthorized;
+$frontcalcShowAuthButton = $frontcalcCanUse && !$frontcalcIsAuthorized;
+?>
+<?php /* FRONTCALC_FLAGS_END */ ?>
+PHP;
+    }
+
+    protected function frontcalcInstallRemoveCatalogElementSnippet(): void
+    {
+        $templatePath = $this->frontcalcInstallGetCatalogElementTemplatePath();
+        if (!is_file($templatePath)) {
+            return;
+        }
+
+        $content = (string)file_get_contents($templatePath);
+        if ($content === '') {
+            return;
+        }
+
+        $pattern = '#\s*<\?php\s*/\*\s*FRONTCALC_FLAGS_START\s*\*/\s*\?>[\s\S]*?<\?php\s*/\*\s*FRONTCALC_FLAGS_END\s*\*/\s*\?>\s*#';
+        $updated = preg_replace($pattern, "\n", $content, -1, $replaceCount);
+        if (!is_string($updated) || $replaceCount < 1) {
+            return;
+        }
+
+        if (@file_put_contents($templatePath, $updated) === false) {
+            $this->frontcalcInstallLogWarning('Не удалось удалить FrontCalc-флаги из файла: ' . $templatePath);
+        }
+    }
 
     protected function frontcalcInstallRemoveBasketSnippet(): void
     {
