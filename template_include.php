@@ -210,93 +210,6 @@ HTML
     }
 }
 
-
-if (!function_exists('frontcalc_render_auth_required_assets')) {
-    function frontcalc_render_auth_required_assets(): string
-    {
-        static $isRendered = false;
-        if ($isRendered) {
-            return '';
-        }
-        $isRendered = true;
-
-        return <<<'HTML'
-<script>
-(function(w, d){
-    if (w.__frontcalcAuthRequiredReady) { return; }
-    w.__frontcalcAuthRequiredReady = true;
-
-    function findButtonTarget(node){
-        var current = node;
-        while (current && current !== d) {
-            if (current.classList && current.classList.contains('js-frontcalc-auth-required')) {
-                return current;
-            }
-            current = current.parentNode;
-        }
-        return null;
-    }
-
-    function getBackUrl(){
-        return encodeURIComponent(w.location.pathname + w.location.search + w.location.hash);
-    }
-
-    function openAsproAuth(){
-        if (!d.querySelector) {
-            return false;
-        }
-
-        var selectors = [
-            '[data-event="jqm"][data-param-form_id="AUTH"]',
-            '[data-event="jqm"][data-name="auth"]',
-            '.animate-load[data-param-form_id="AUTH"]',
-            '.js-popup-auth',
-            '.js-auth'
-        ];
-
-        for (var i = 0; i < selectors.length; i++) {
-            var trigger = d.querySelector(selectors[i]);
-            if (trigger && typeof trigger.click === 'function') {
-                trigger.click();
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    d.addEventListener('click', function(event){
-        var button = findButtonTarget(event.target);
-        if (!button) {
-            return;
-        }
-
-        event.preventDefault();
-
-        var authEvent;
-        if (typeof w.CustomEvent === 'function') {
-            authEvent = new CustomEvent('frontcalc:authRequired', {
-                bubbles: true,
-                cancelable: true,
-                detail: { button: button }
-            });
-            if (!button.dispatchEvent(authEvent)) {
-                return;
-            }
-        }
-
-        if (openAsproAuth()) {
-            return;
-        }
-
-        w.location.href = '/auth/?backurl=' + getBackUrl();
-    }, false);
-})(window, document);
-</script>
-HTML;
-    }
-}
-
 if (!function_exists('frontcalc_get_light_payload')) {
     function frontcalc_get_light_payload(int $productId, int $iblockId, string $ajaxUrl = ''): array
     {
@@ -343,23 +256,6 @@ if (!function_exists('frontcalc_render_calculate_button')) {
             htmlspecialcharsbx($sizeClass),
             (int)$payload['product_id'],
             htmlspecialcharsbx((string)$payload['ajax_url']),
-            htmlspecialcharsbx($caption)
-        );
-    }
-}
-
-
-if (!function_exists('frontcalc_render_auth_required_button')) {
-    function frontcalc_render_auth_required_button(string $caption = 'Рассчитать стоимость', string $sizeClass = 'btn-elg btn-wide'): string
-    {
-        $sizeClass = trim(preg_replace('/[^a-zA-Z0-9_-]+/', ' ', $sizeClass));
-        if ($sizeClass === '') {
-            $sizeClass = 'btn-elg btn-wide';
-        }
-
-        return frontcalc_render_auth_required_assets() . sprintf(
-            '<button type="button" class="btn btn-default btn-transparent-bg %s frontcalc-auth-required-button js-frontcalc-auth-required">%s</button>',
-            htmlspecialcharsbx($sizeClass),
             htmlspecialcharsbx($caption)
         );
     }
