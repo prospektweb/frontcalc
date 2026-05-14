@@ -456,55 +456,41 @@ class prospektweb_frontcalc extends CModule
     {
         $templatePath = $this->frontcalcInstallGetCatalogElementTemplatePath();
         if (!is_file($templatePath)) {
-            throw new \RuntimeException('Не найден файл шаблона catalog.element для патча FrontCalc: ' . $templatePath);
+            $this->frontcalcInstallLogWarning('Не найден файл шаблона catalog.element для патча FrontCalc: ' . $templatePath);
+            return;
         }
 
         $content = (string)file_get_contents($templatePath);
         if ($content === '') {
-            throw new \RuntimeException('Файл шаблона catalog.element пуст или не читается: ' . $templatePath);
+            $this->frontcalcInstallLogWarning('Файл шаблона catalog.element пуст или не читается: ' . $templatePath);
+            return;
         }
 
-        $this->frontcalcInstallRemoveCatalogElementSnippetFromContent($content);
-        $this->frontcalcInstallInsertCatalogElementFlags($content, $templatePath);
-        $this->frontcalcInstallGuardCatalogElementSchema($content, $templatePath);
-        $this->frontcalcInstallInsertCatalogElementInlineRenderer($content, $templatePath);
-        $this->frontcalcInstallWrapCatalogElementStandardBlocks($content, $templatePath);
-        $this->frontcalcInstallEnsureCatalogElementInfoBlocksVisible($content);
+        $patchedContent = $content;
+        $this->frontcalcInstallRemoveCatalogElementSnippetFromContent($patchedContent);
 
-        if (@file_put_contents($templatePath, $content) === false) {
+        try {
+            $this->frontcalcInstallInsertCatalogElementInlineIntegration($patchedContent, $templatePath);
+            $this->frontcalcInstallGuardCatalogElementSchema($patchedContent, $templatePath);
+            $this->frontcalcInstallWrapCatalogElementStandardBlocks($patchedContent, $templatePath);
+            $this->frontcalcInstallEnsureCatalogElementInfoBlocksVisible($patchedContent);
+        } catch (\Throwable $e) {
+            $this->frontcalcInstallLogWarning($e->getMessage());
+            return;
+        }
+
+        if ($patchedContent === $content) {
+            return;
+        }
+
+        if (@file_put_contents($templatePath, $patchedContent) === false) {
             throw new \RuntimeException('Не удалось записать FrontCalc-патч в файл шаблона catalog.element: ' . $templatePath);
         }
     }
 
-    protected function frontcalcInstallInsertCatalogElementFlags(string &$content, string $templatePath): void
+    protected function frontcalcInstallInsertCatalogElementInlineIntegration(string &$content, string $templatePath): void
     {
-        $anchorPositions = [];
-        foreach ($this->frontcalcInstallGetCatalogElementTopAnchors() as $anchor) {
-            $position = strpos($content, $anchor);
-            if ($position !== false) {
-                $anchorPositions[] = $position;
-            }
-        }
-
-        if ($anchorPositions === []) {
-            throw new \RuntimeException('Шаблон Aspro обновился: не найдены верхние блоки catalog.element для вставки FrontCalc-флагов: ' . $templatePath);
-        }
-
-        $insertPosition = min($anchorPositions);
-        $lineStartPosition = strrpos(substr($content, 0, $insertPosition), "\n");
-        if ($lineStartPosition !== false) {
-            $insertPosition = $lineStartPosition + 1;
-        }
-
-        $content = substr($content, 0, $insertPosition)
-            . $this->frontcalcInstallBuildCatalogElementFlagsSnippet()
-            . substr($content, $insertPosition);
-    }
-
-    protected function frontcalcInstallInsertCatalogElementInlineRenderer(string &$content, string $templatePath): void
-    {
-        $startMarker = '/* FRONTCALC_INLINE_RENDER_START */';
-        if (strpos($content, $startMarker) !== false) {
+        if (strpos($content, '/* FRONTCALC_DETAIL_INLINE_START */') !== false) {
             return;
         }
 
@@ -517,7 +503,7 @@ class prospektweb_frontcalc extends CModule
         }
 
         if ($anchorPositions === []) {
-            throw new \RuntimeException('Шаблон Aspro обновился: не найдены верхние блоки catalog.element для вывода inline-калькулятора: ' . $templatePath);
+            throw new \RuntimeException('Шаблон Aspro обновился: не найдена сигнатура catalog.element для вставки FrontCalc inline-патча: ' . $templatePath);
         }
 
         $insertPosition = min($anchorPositions);
@@ -527,16 +513,13 @@ class prospektweb_frontcalc extends CModule
         }
 
         $content = substr($content, 0, $insertPosition)
-            . $this->frontcalcInstallBuildCatalogElementInlineRendererSnippet()
+            . $this->frontcalcInstallBuildCatalogElementInlineIntegrationSnippet()
             . substr($content, $insertPosition);
     }
 
     protected function frontcalcInstallGetCatalogElementTopAnchors(): array
     {
         return [
-            'h1.switcher-title',
-            'switcher-title',
-            'js-replace-article',
             '/* sku replace start */',
             'TSolution\\SKU\\Template::showSkuPropsHtml',
             'catalog-detail__offers',
@@ -547,10 +530,10 @@ class prospektweb_frontcalc extends CModule
         ];
     }
 
-    protected function frontcalcInstallBuildCatalogElementFlagsSnippet(): string
+    protected function frontcalcInstallBuildCatalogElementInlineIntegrationSnippet(): string
     {
         return <<<'PHP'
-<?php /* FRONTCALC_FLAGS_START */ ?>
+<?php /* FRONTCALC_DETAIL_INLINE_START */ ?>
 <?php
 $frontcalcTemplateInclude = $_SERVER['DOCUMENT_ROOT'] . '/local/modules/prospektweb.frontcalc/template_include.php';
 if (!is_file($frontcalcTemplateInclude)) {
@@ -563,22 +546,14 @@ if (is_file($frontcalcTemplateInclude)) {
 $frontcalcCanUse = function_exists('frontcalc_can_use_config_from_result')
     ? frontcalc_can_use_config_from_result($arResult)
     : false;
-$frontcalcIsAuthorized = is_object($USER) && $USER->IsAuthorized();
+$frontcalcIsAuthorized = is_object($USER) && method_exists($USER, 'IsAuthorized') && $USER->IsAuthorized();
 $frontcalcUseInline = $frontcalcCanUse && $frontcalcIsAuthorized;
 $frontcalcShowAuthButton = $frontcalcCanUse && !$frontcalcIsAuthorized;
 ?>
-<?php /* FRONTCALC_FLAGS_END */ ?>
-PHP . "\n";
-    }
-
-    protected function frontcalcInstallBuildCatalogElementInlineRendererSnippet(): string
-    {
-        return <<<'PHP'
-<?php /* FRONTCALC_INLINE_RENDER_START */ ?>
 <?php if ($frontcalcUseInline === true && function_exists('frontcalc_render_detail_inline')): ?>
     <?=frontcalc_render_detail_inline((int)$arResult['ID'], (int)$arResult['IBLOCK_ID'], '/local/ajax/frontcalc.php');?>
 <?php endif; ?>
-<?php /* FRONTCALC_INLINE_RENDER_END */ ?>
+<?php /* FRONTCALC_DETAIL_INLINE_END */ ?>
 PHP . "\n";
     }
 
@@ -683,8 +658,6 @@ PHP . "\n";
     protected function frontcalcInstallWrapCatalogElementStandardBlocks(string &$content, string $templatePath): void
     {
         $patterns = [
-            'TITLE' => '#<h1\b(?=[^>]*\bswitcher-title\b)[\s\S]*?</h1>#i',
-            'ARTICLE' => '#<(?P<tag>div|span|p)\b(?=[^>]*\bjs-replace-article\b)[\s\S]*?</(?P=tag)>#i',
             'SKU_PROPS' => '#<\?(?:php)?\s*TSolution\\\\SKU\\\\Template::showSkuPropsHtml\s*\([\s\S]*?\);\s*\?>#',
             'PRICE_OBJECT' => '#<\?(?:php)?\s*\$prices\s*=\s*new\s+TSolution\\\\Product\\\\Prices\s*\([\s\S]*?\);\s*\?>#',
             'PRICE_SHOW' => '#<\?(?:php)?\s*\$prices->show\s*\([\s\S]*?\);\s*\?>#',
@@ -700,12 +673,6 @@ PHP . "\n";
         }
 
         foreach ($patterns as $label => $pattern) {
-            $marker = '/* FRONTCALC_INLINE_SKIP_' . $label . '_START */';
-            if (strpos($content, $marker) !== false) {
-                $matchedLabels[] = $label;
-                continue;
-            }
-
             $content = preg_replace_callback(
                 $pattern,
                 function (array $matches) use ($label): string {
@@ -728,7 +695,7 @@ PHP . "\n";
             }
         }
 
-        $requiredLabels = ['TITLE', 'ARTICLE', 'PRICE_OBJECT', 'PRICE_SHOW', 'OFFERS', 'SKU_PROPS', 'BASKET_OPTIONS', 'BUY_BLOCK'];
+        $requiredLabels = ['PRICE_OBJECT', 'PRICE_SHOW', 'OFFERS', 'SKU_PROPS', 'BASKET_OPTIONS', 'BUY_BLOCK'];
         $missedLabels = array_values(array_diff($requiredLabels, array_unique($matchedLabels)));
         if ($missedLabels !== []) {
             throw new \RuntimeException(
@@ -742,32 +709,27 @@ PHP . "\n";
 
     protected function frontcalcInstallWrapCatalogElementStandardBlock(string $block, string $label): string
     {
-        return '<?php /* FRONTCALC_INLINE_SKIP_' . $label . '_START */ ?>' . "\n"
+        return '<?php /* FRONTCALC_DETAIL_INLINE_START */ ?>' . "\n"
             . '<?php if ($frontcalcUseInline === false): ?>' . "\n"
             . $block . "\n"
             . '<?php endif; ?>' . "\n"
-            . '<?php /* FRONTCALC_INLINE_SKIP_' . $label . '_END */ ?>';
+            . '<?php /* FRONTCALC_DETAIL_INLINE_END */ ?>';
     }
 
     protected function frontcalcInstallWrapCatalogElementBasketOptionsBlock(string $block): string
     {
-        return '<?php /* FRONTCALC_INLINE_SKIP_BASKET_OPTIONS_START */ ?>' . "\n"
+        return '<?php /* FRONTCALC_DETAIL_INLINE_START */ ?>' . "\n"
             . '<?php if ($frontcalcUseInline === false): ?>' . "\n"
             . $block . "\n"
-            . '<?php /* FRONTCALC_AUTH_BUTTON_START */ ?>' . "\n"
-            . "<?php if (\$frontcalcShowAuthButton === true && function_exists('frontcalc_render_auth_required_button')) { \$btnHtml .= frontcalc_render_auth_required_button('Рассчитать стоимость', 'btn-elg btn-wide'); } ?>" . "\n"
-            . '<?php /* FRONTCALC_AUTH_BUTTON_END */ ?>' . "\n"
             . '<?php endif; ?>' . "\n"
-            . '<?php /* FRONTCALC_INLINE_SKIP_BASKET_OPTIONS_END */ ?>';
+            . '<?php /* FRONTCALC_DETAIL_INLINE_END */ ?>' . "\n"
+            . '<?php /* FRONTCALC_DETAIL_INLINE_START */ ?>' . "\n"
+            . "<?php if (\$frontcalcShowAuthButton === true && function_exists('frontcalc_render_auth_required_button')) { \$btnHtml .= frontcalc_render_auth_required_button('Рассчитать стоимость', 'btn-elg btn-wide'); } ?>" . "\n"
+            . '<?php /* FRONTCALC_DETAIL_INLINE_END */ ?>';
     }
 
     protected function frontcalcInstallWrapCatalogElementDivByClass(string &$content, string $className, string $label): bool
     {
-        $marker = '/* FRONTCALC_INLINE_SKIP_' . $label . '_START */';
-        if (strpos($content, $marker) !== false) {
-            return true;
-        }
-
         $classPattern = preg_quote($className, '#');
         if (!preg_match('#<div\b(?=[^>]*\b' . $classPattern . '\b)[^>]*>#i', $content, $openingMatch, PREG_OFFSET_CAPTURE)) {
             return false;
@@ -830,6 +792,14 @@ PHP . "\n";
     {
         $this->frontcalcInstallRestoreCatalogElementSchemaGuard($content);
 
+        $detailWrapperPattern = '#\s*<\?php\s*/\*\s*FRONTCALC_DETAIL_INLINE_START\s*\*/\s*\?>\s*<\?php\s*if\s*\(\s*\$frontcalcUseInline\s*===\s*false\s*\)\s*:\s*\?>\s*([\s\S]*?)\s*<\?php\s*endif;\s*\?>\s*<\?php\s*/\*\s*FRONTCALC_DETAIL_INLINE_END\s*\*/\s*\?>#';
+        do {
+            $unwrapped = preg_replace($detailWrapperPattern, "\n$1", $content, -1, $replaceCount);
+            if (is_string($unwrapped)) {
+                $content = $unwrapped;
+            }
+        } while (is_string($unwrapped ?? null) && $replaceCount > 0);
+
         $skipPattern = '#\s*<\?php\s*/\*\s*FRONTCALC_INLINE_SKIP_([A-Z0-9_]+)_START\s*\*/\s*\?>\s*<\?php\s*if\s*\(\s*\$frontcalcUseInline\s*(?:!==\s*true|===\s*false)\s*\)\s*:\s*\?>\s*([\s\S]*?)\s*<\?php\s*endif;\s*\?>\s*<\?php\s*/\*\s*FRONTCALC_INLINE_SKIP_\1_END\s*\*/\s*\?>#';
         $unwrapped = preg_replace($skipPattern, "\n$2", $content);
         if (is_string($unwrapped)) {
@@ -837,6 +807,7 @@ PHP . "\n";
         }
 
         $removePatterns = [
+            '#\s*<\?php\s*/\*\s*FRONTCALC_DETAIL_INLINE_START\s*\*/\s*\?>[\s\S]*?<\?php\s*/\*\s*FRONTCALC_DETAIL_INLINE_END\s*\*/\s*\?>\s*#',
             '#\s*<\?php\s*/\*\s*FRONTCALC_AUTH_BUTTON_START\s*\*/\s*\?>[\s\S]*?<\?php\s*/\*\s*FRONTCALC_AUTH_BUTTON_END\s*\*/\s*\?>\s*#',
             '#\s*<\?php\s*/\*\s*FRONTCALC_INLINE_RENDER_START\s*\*/\s*\?>[\s\S]*?<\?php\s*/\*\s*FRONTCALC_INLINE_RENDER_END\s*\*/\s*\?>\s*#',
             '#\s*<\?php\s*/\*\s*FRONTCALC_FLAGS_START\s*\*/\s*\?>[\s\S]*?<\?php\s*/\*\s*FRONTCALC_FLAGS_END\s*\*/\s*\?>\s*#',
@@ -962,6 +933,8 @@ PHP . "\n";
 
     protected function frontcalcInstallLogWarning(string $message): void
     {
+        Option::set($this->MODULE_ID, 'INSTALL_WARNING', $message);
+
         if (function_exists('AddMessage2Log')) {
             AddMessage2Log($message, $this->MODULE_ID);
         }
