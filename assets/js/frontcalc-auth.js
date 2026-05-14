@@ -37,15 +37,33 @@
     }
   }
 
+  function getCurrentOriginUrl() {
+    try {
+      var url = new URL(window.location.href, window.location.origin);
+      if (url.origin !== window.location.origin) {
+        return null;
+      }
+      return url;
+    } catch (e) {
+      return null;
+    }
+  }
+
   function saveIntent() {
     if (!storageAvailable()) {
+      return;
+    }
+
+    var currentUrl = getCurrentOriginUrl();
+    if (!currentUrl) {
       return;
     }
 
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
         source: "frontcalc",
-        url: window.location.href,
+        origin: window.location.origin,
+        url: currentUrl.href,
         expiresAt: Date.now() + INTENT_TTL
       }));
     } catch (e) {}
@@ -67,12 +85,44 @@
       return null;
     }
 
+    var saved = null;
     try {
-      return JSON.parse(raw);
+      saved = JSON.parse(raw);
     } catch (e) {
       removeIntent();
       return null;
     }
+
+    if (!saved || saved.source !== "frontcalc") {
+      removeIntent();
+      return null;
+    }
+
+    var expiresAt = Number(saved.expiresAt);
+    if (!isFinite(expiresAt) || expiresAt < Date.now()) {
+      removeIntent();
+      return null;
+    }
+    saved.expiresAt = expiresAt;
+
+    if (!saved.url) {
+      removeIntent();
+      return null;
+    }
+
+    try {
+      saved.url = new URL(saved.url, window.location.origin);
+    } catch (e) {
+      removeIntent();
+      return null;
+    }
+
+    if (saved.url.origin !== window.location.origin) {
+      removeIntent();
+      return null;
+    }
+
+    return saved;
   }
 
   function removeIntent() {
@@ -209,22 +259,6 @@
     onFailed();
   }
 
-  function normalizeIntentUrl(rawUrl) {
-    if (!rawUrl) {
-      return null;
-    }
-
-    try {
-      var url = new URL(String(rawUrl), window.location.origin);
-      if (url.origin !== window.location.origin) {
-        return null;
-      }
-      return url;
-    } catch (e) {
-      return null;
-    }
-  }
-
   function processAuthIntent() {
     if (!isAuthorized()) {
       return;
@@ -235,26 +269,14 @@
       return;
     }
 
-    if (intent.source !== "frontcalc") {
-      removeIntent();
-      return;
-    }
-
-    if (!intent.expiresAt || Number(intent.expiresAt) < Date.now()) {
-      removeIntent();
-      return;
-    }
-
-    var savedUrl = normalizeIntentUrl(intent.url);
     removeIntent();
 
-    if (!savedUrl) {
+    var currentUrl = getCurrentOriginUrl();
+    if (currentUrl && intent.url.href === currentUrl.href) {
       return;
     }
 
-    if (savedUrl.href !== window.location.href) {
-      window.location.href = savedUrl.href;
-    }
+    window.location.href = intent.url.href;
   }
 
   document.addEventListener("click", function (event) {
