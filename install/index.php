@@ -468,7 +468,6 @@ class prospektweb_frontcalc extends CModule
         $this->frontcalcInstallInsertCatalogElementFlags($content, $templatePath);
         $this->frontcalcInstallInsertCatalogElementInlineRenderer($content, $templatePath);
         $this->frontcalcInstallWrapCatalogElementStandardBlocks($content, $templatePath);
-        $this->frontcalcInstallEnsureCatalogElementInfoBlocksVisible($content);
 
         if (@file_put_contents($templatePath, $content) === false) {
             throw new \RuntimeException('Не удалось записать FrontCalc-патч в файл шаблона catalog.element: ' . $templatePath);
@@ -579,48 +578,6 @@ PHP . "\n";
 <?php endif; ?>
 <?php /* FRONTCALC_INLINE_RENDER_END */ ?>
 PHP . "\n";
-    }
-
-    protected function frontcalcInstallEnsureCatalogElementInfoBlocksVisible(string &$content): void
-    {
-        $skipPattern = '#<\?php\s*/\*\s*FRONTCALC_INLINE_SKIP_([A-Z0-9_]+)_START\s*\*/\s*\?>\s*<\?php\s*if\s*\(\s*\$frontcalcUseInline\s*(?:!==\s*true|===\s*false)\s*\)\s*:\s*\?>\s*([\s\S]*?)\s*<\?php\s*endif;\s*\?>\s*<\?php\s*/\*\s*FRONTCALC_INLINE_SKIP_\1_END\s*\*/\s*\?>#';
-        $updated = preg_replace_callback(
-            $skipPattern,
-            function (array $matches): string {
-                $block = $matches[2];
-                if (!$this->frontcalcInstallCatalogElementBlockHasAlwaysVisibleInfo($block)) {
-                    return $matches[0];
-                }
-
-                return "\n" . $block . "\n";
-            },
-            $content
-        );
-
-        if (is_string($updated)) {
-            $content = $updated;
-        }
-    }
-
-    protected function frontcalcInstallCatalogElementBlockHasAlwaysVisibleInfo(string $block): bool
-    {
-        foreach ($this->frontcalcInstallGetCatalogElementAlwaysVisibleInfoAnchors() as $anchor) {
-            if (strpos($block, $anchor) !== false) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    protected function frontcalcInstallGetCatalogElementAlwaysVisibleInfoAnchors(): array
-    {
-        return [
-            'catalog-detail__previewtext',
-            '/catalog/props_in_section.php',
-            'PRODUCT_PROPS_INFO',
-            'PRODUCT_DETAIL_TEXT_INFO',
-        ];
     }
 
     protected function frontcalcInstallWrapCatalogElementStandardBlocks(string &$content, string $templatePath): void
