@@ -46,6 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && check_bitrix_sessid()) {
     Option::set($moduleId, 'PRODUCTS_IBLOCK_ID', trim((string)($_POST['PRODUCTS_IBLOCK_ID'] ?? '0')));
     Option::set($moduleId, 'OFFERS_IBLOCK_ID', trim((string)($_POST['OFFERS_IBLOCK_ID'] ?? '0')));
     Option::set($moduleId, 'HIDDEN_OFFER_VALUE_IDS', trim((string)($_POST['HIDDEN_OFFER_VALUE_IDS'] ?? '')));
+    Option::set($moduleId, 'SHOW_CATALOG_BUTTON', isset($_POST['SHOW_CATALOG_BUTTON']) && $_POST['SHOW_CATALOG_BUTTON'] === 'Y' ? 'Y' : 'N');
 
     $schema = (string)($_POST['CALC_EDITOR_SCHEMA'] ?? '');
     if ($schema !== '') {
@@ -61,6 +62,7 @@ $products = Option::get($moduleId, 'PRODUCTS_IBLOCK_ID', '0');
 $offers = Option::get($moduleId, 'OFFERS_IBLOCK_ID', '0');
 $editorSchema = Option::get($moduleId, 'CALC_EDITOR_SCHEMA', '');
 $hiddenOfferValueIds = Option::get($moduleId, 'HIDDEN_OFFER_VALUE_IDS', '');
+$showCatalogButton = Option::get($moduleId, 'SHOW_CATALOG_BUTTON', 'N');
 ?>
 <style>
     .fc-soft-wrap {
@@ -187,6 +189,13 @@ $hiddenOfferValueIds = Option::get($moduleId, 'HIDDEN_OFFER_VALUE_IDS', '');
         <div style="margin-top:12px;">
             <div class="fc-subtitle">Скрыть технические значения в списках и на детальной странице</div>
             <input class="fc-input" type="text" name="HIDDEN_OFFER_VALUE_IDS" value="<?= htmlspecialcharsbx($hiddenOfferValueIds) ?>" placeholder="ID enum-значений ТП через запятую/пробел/;">
+        </div>
+        <div style="margin-top:12px;">
+            <label class="fc-pill" style="display:inline-flex;">
+                <input type="checkbox" name="SHOW_CATALOG_BUTTON" value="Y"<?= $showCatalogButton === 'Y' ? ' checked' : '' ?>>
+                Показывать кнопку расчёта в списке каталога
+            </label>
+            <div class="fc-muted">Если опция выключена, кнопка остаётся только в детальной карточке товара.</div>
         </div>
         <p class="fc-muted">Карточный редактор настроек калькулятора (soft admin UI).</p>
     </div>

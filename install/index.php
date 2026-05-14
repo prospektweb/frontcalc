@@ -151,6 +151,7 @@ class prospektweb_frontcalc extends CModule
         Option::set($this->MODULE_ID, 'PRODUCTS_IBLOCK_ID', (string)$productsIblockId);
         Option::set($this->MODULE_ID, 'OFFERS_IBLOCK_ID', (string)$offersIblockId);
         Option::set($this->MODULE_ID, 'CALC_PROPERTY_CODE', 'FRONTCALC_CONFIG');
+        Option::set($this->MODULE_ID, 'SHOW_CATALOG_BUTTON', 'N');
 
         $this->ensureCalcConfigProperty($productsIblockId, 'FRONTCALC_CONFIG');
         $this->registerAdminHandlers();
