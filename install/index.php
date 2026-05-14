@@ -609,10 +609,6 @@ PHP . "\n";
             $content = preg_replace_callback(
                 $pattern,
                 function (array $matches) use ($label): string {
-                    if ($label === 'BASKET_OPTIONS') {
-                        return $this->frontcalcInstallWrapCatalogElementBasketOptionsBlock($matches[0]);
-                    }
-
                     return $this->frontcalcInstallWrapCatalogElementStandardBlock($matches[0], $label);
                 },
                 $content,
@@ -643,22 +639,10 @@ PHP . "\n";
     protected function frontcalcInstallWrapCatalogElementStandardBlock(string $block, string $label): string
     {
         return '<?php /* FRONTCALC_INLINE_SKIP_' . $label . '_START */ ?>' . "\n"
-            . '<?php if ($frontcalcUseInline === false): ?>' . "\n"
+            . '<?php if ($frontcalcUseInline !== true): ?>' . "\n"
             . $block . "\n"
             . '<?php endif; ?>' . "\n"
             . '<?php /* FRONTCALC_INLINE_SKIP_' . $label . '_END */ ?>';
-    }
-
-    protected function frontcalcInstallWrapCatalogElementBasketOptionsBlock(string $block): string
-    {
-        return '<?php /* FRONTCALC_INLINE_SKIP_BASKET_OPTIONS_START */ ?>' . "\n"
-            . '<?php if ($frontcalcUseInline === false): ?>' . "\n"
-            . $block . "\n"
-            . '<?php /* FRONTCALC_AUTH_BUTTON_START */ ?>' . "\n"
-            . "<?php if (\$frontcalcShowAuthButton === true && function_exists('frontcalc_render_auth_required_button')) { \$btnHtml .= frontcalc_render_auth_required_button('Рассчитать стоимость', 'btn-elg btn-wide'); } ?>" . "\n"
-            . '<?php /* FRONTCALC_AUTH_BUTTON_END */ ?>' . "\n"
-            . '<?php endif; ?>' . "\n"
-            . '<?php /* FRONTCALC_INLINE_SKIP_BASKET_OPTIONS_END */ ?>';
     }
 
     protected function frontcalcInstallWrapCatalogElementDivByClass(string &$content, string $className, string $label): bool
@@ -728,14 +712,13 @@ PHP . "\n";
 
     protected function frontcalcInstallRemoveCatalogElementSnippetFromContent(string &$content): void
     {
-        $skipPattern = '#\s*<\?php\s*/\*\s*FRONTCALC_INLINE_SKIP_([A-Z0-9_]+)_START\s*\*/\s*\?>\s*<\?php\s*if\s*\(\s*\$frontcalcUseInline\s*(?:!==\s*true|===\s*false)\s*\)\s*:\s*\?>\s*([\s\S]*?)\s*<\?php\s*endif;\s*\?>\s*<\?php\s*/\*\s*FRONTCALC_INLINE_SKIP_\1_END\s*\*/\s*\?>#';
+        $skipPattern = '#\s*<\?php\s*/\*\s*FRONTCALC_INLINE_SKIP_([A-Z0-9_]+)_START\s*\*/\s*\?>\s*<\?php\s*if\s*\(\s*\$frontcalcUseInline\s*!==\s*true\s*\)\s*:\s*\?>\s*([\s\S]*?)\s*<\?php\s*endif;\s*\?>\s*<\?php\s*/\*\s*FRONTCALC_INLINE_SKIP_\1_END\s*\*/\s*\?>#';
         $unwrapped = preg_replace($skipPattern, "\n$2", $content);
         if (is_string($unwrapped)) {
             $content = $unwrapped;
         }
 
         $removePatterns = [
-            '#\s*<\?php\s*/\*\s*FRONTCALC_AUTH_BUTTON_START\s*\*/\s*\?>[\s\S]*?<\?php\s*/\*\s*FRONTCALC_AUTH_BUTTON_END\s*\*/\s*\?>\s*#',
             '#\s*<\?php\s*/\*\s*FRONTCALC_INLINE_RENDER_START\s*\*/\s*\?>[\s\S]*?<\?php\s*/\*\s*FRONTCALC_INLINE_RENDER_END\s*\*/\s*\?>\s*#',
             '#\s*<\?php\s*/\*\s*FRONTCALC_FLAGS_START\s*\*/\s*\?>[\s\S]*?<\?php\s*/\*\s*FRONTCALC_FLAGS_END\s*\*/\s*\?>\s*#',
         ];
