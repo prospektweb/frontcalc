@@ -638,13 +638,8 @@ class prospektweb_frontcalc extends CModule
         }
 
 
-        $moduleServiceDir = $moduleRootPath . '/lib/Service';
-        if (!is_dir($moduleServiceDir) && !@mkdir($moduleServiceDir, 0775, true) && !is_dir($moduleServiceDir)) {
-            throw new \RuntimeException('Не удалось создать каталог /local/modules/.../lib/Service');
-        }
-
         $moduleConfigSource = dirname(__DIR__) . '/lib/Service/ModuleConfig.php';
-        $moduleConfigTarget = $moduleServiceDir . '/ModuleConfig.php';
+        $moduleConfigTarget = $moduleRootPath . '/lib/Service/ModuleConfig.php';
         if (!is_file($moduleConfigSource)) {
             throw new \RuntimeException('Не найден исходный файл lib/Service/ModuleConfig.php');
         }
@@ -653,7 +648,7 @@ class prospektweb_frontcalc extends CModule
         }
 
         $moduleFrontendAssetsSource = dirname(__DIR__) . '/lib/Service/FrontendAssets.php';
-        $moduleFrontendAssetsTarget = $moduleServiceDir . '/FrontendAssets.php';
+        $moduleFrontendAssetsTarget = $moduleRootPath . '/lib/Service/FrontendAssets.php';
         if (!is_file($moduleFrontendAssetsSource)) {
             throw new \RuntimeException('Не найден исходный файл lib/Service/FrontendAssets.php');
         }
