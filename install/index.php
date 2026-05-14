@@ -93,7 +93,7 @@ class prospektweb_frontcalc extends CModule
         try {
             $this->InstallFiles();
             $this->InstallDB();
-            $this->frontcalcInstallRemoveBasketSnippet();
+            $this->patchAsproBasketFile();
             $this->frontcalcInstallReplaceAsproPricesTemplate();
         } catch (\Throwable $e) {
             $this->frontcalcInstallRestoreAsproPricesTemplate();
