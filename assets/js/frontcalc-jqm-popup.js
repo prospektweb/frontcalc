@@ -10,20 +10,6 @@
     });
   }
 
-  function ensureWrapper() {
-    var $wrapper = $("#popup_iframe_wrapper");
-    if (!$wrapper.length) {
-      $wrapper = $('<div id="popup_iframe_wrapper"></div>').appendTo("body");
-    }
-    return $wrapper;
-  }
-
-  function createFrame() {
-    ensureWrapper();
-    return $(
-      '<div class="frontcalc_frame jqmWindow jqmWindow--mobile-fill popup"><span class="jqmClose top-close fill-grey-hover" title="Закрыть"><i class="svg inline inline" aria-hidden="true">×</i></span><div class="scrollbar"><div class="flexbox"><div class="form popup frontcalc-popup-shell"><div class="frontcalc-popup-content js-frontcalc-popup-content"></div></div></div></div></div>'
-    ).appendTo("#popup_iframe_wrapper");
-  }
 
   function setLoading($content) {
     $content.html(
@@ -105,21 +91,6 @@
     });
   }
 
-  function loadJqmScript(callback) {
-    if ($.fn.jqm) {
-      callback();
-      return;
-    }
-
-    var config = window.FrontcalcPopupConfig || {};
-    var src = config.jqModalPath || "/bitrix/modules/aspro.popup/install/js/jqModal.js";
-    var script = document.createElement("script");
-    script.src = src;
-    script.async = true;
-    script.onload = callback;
-    script.onerror = callback;
-    document.head.appendChild(script);
-  }
 
   function parseNumber(raw, fallback) {
     var normalized = typeof raw === "string" ? raw.replace(/\s+/g, "").replace(",", ".") : raw;
@@ -2292,73 +2263,51 @@
     updatePrice();
   }
 
-  function openPopup(button) {
-    var $button = $(button);
-    var productId = $button.data("frontcalc-product-id") || 0;
-    var ajaxUrl = $button.data("frontcalc-ajax-url") || "";
+  function renderInline(container, options) {
+    var $content = $(container);
+    if (!$content.length) {
+      return;
+    }
+
+    options = options || {};
+    var productId = options.productId || $content.data("frontcalc-product-id") || 0;
+    var ajaxUrl = options.ajaxUrl || $content.data("frontcalc-ajax-url") || "";
 
     if (!ajaxUrl) {
-      if (window.alert) window.alert("Не задан URL для запроса калькулятора.");
+      renderError($content, "Не задан URL для запроса калькулятора.");
       return;
     }
 
     var divider = ajaxUrl.indexOf("?") === -1 ? "?" : "&";
-    var currentOid = "";
+    var requestUrl = ajaxUrl + divider + "product_id=" + encodeURIComponent(productId);
+
     try {
       var currentUrl = new URL(window.location.href);
-      currentOid = currentUrl.searchParams.get("oid") || "";
+      var currentOid = currentUrl.searchParams.get("oid") || "";
+      if (currentOid) {
+        requestUrl += "&offer_id=" + encodeURIComponent(currentOid);
+      }
     } catch (e) {}
-    var requestUrl = ajaxUrl + divider + "product_id=" + encodeURIComponent(productId);
-    if (currentOid) {
-      requestUrl += "&offer_id=" + encodeURIComponent(currentOid);
-    }
-    $button.prop("disabled", true);
 
-    loadJqmScript(function () {
-      var $frame = createFrame();
-      $frame.jqm({
-        overlay: 50,
-        overlayClass: "jqmOverlay",
-        closeClass: "jqmClose",
-        onHide: function (hash) {
-          hash.w.remove();
-          hash.o && hash.o.remove();
-          var $wrapper = $("#popup_iframe_wrapper");
-          if ($wrapper.find(".jqmWindow").length === 0 && $wrapper.find(".jqmOverlay").length === 0) {
-            $wrapper.css({ "z-index": "", display: "" });
-          }
-          $("body").removeClass("jqm-initied swipeignore");
-        },
-      });
+    setLoading($content);
 
-      $frame.jqmShow(button);
-      $("body").addClass("jqm-initied swipeignore");
-      $frame.closest("#popup_iframe_wrapper").css({ "z-index": 3000, display: "flex" });
-
-      var $content = $frame.find(".js-frontcalc-popup-content");
-      setLoading($content);
-
-      requestData(
-        requestUrl,
-        function (payload) {
-          $button.prop("disabled", false);
-          if (!payload || payload.success !== true) {
-            renderError($content, payload && payload.message ? payload.message : "Сервер вернул ошибку.");
-            return;
-          }
-          payload.frontcalcAjaxUrl = ajaxUrl;
-          renderCalculator($content, payload);
-        },
-        function (errorMessage) {
-          $button.prop("disabled", false);
-          renderError($content, "Ошибка запроса: " + errorMessage);
+    requestData(
+      requestUrl,
+      function (payload) {
+        if (!payload || payload.success !== true) {
+          renderError($content, payload && payload.message ? payload.message : "Сервер вернул ошибку.");
+          return;
         }
-      );
-    });
+        payload.frontcalcAjaxUrl = ajaxUrl;
+        renderCalculator($content, payload);
+      },
+      function (errorMessage) {
+        renderError($content, "Ошибка запроса: " + errorMessage);
+      }
+    );
   }
 
-  $(document).on("click", ".js-frontcalc-calculate", function (event) {
-    event.preventDefault();
-    openPopup(this);
-  });
+  window.FrontcalcPopup = window.FrontcalcPopup || {};
+  window.FrontcalcPopup.renderInline = renderInline;
+
 })(window, document, window.jQuery);
