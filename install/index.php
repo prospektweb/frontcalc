@@ -93,7 +93,7 @@ class prospektweb_frontcalc extends CModule
         try {
             $this->InstallFiles();
             $this->InstallDB();
-            $this->frontcalcInstallRemoveBasketSnippet();
+            $this->patchAsproBasketFile();
             $this->frontcalcInstallReplaceAsproPricesTemplate();
         } catch (\Throwable $e) {
             $this->frontcalcInstallRestoreAsproPricesTemplate();
@@ -311,6 +311,138 @@ class prospektweb_frontcalc extends CModule
 
         return $message;
     }
+
+    protected function patchAsproBasketFile()
+    {
+        $basketPath = $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/aspro.premier/lib/product/basket.php';
+        if (!is_file($basketPath)) {
+            throw new \RuntimeException('Не найден файл Aspro для патча: ' . $basketPath);
+        }
+
+        $content = (string)file_get_contents($basketPath);
+        if ($content === '') {
+            throw new \RuntimeException('Файл Aspro пуст или не читается: ' . $basketPath);
+        }
+
+        $startMarker = '/* FRONTCALC_BUTTON_START */';
+        $snippet = $this->buildFrontcalcBasketSnippet();
+
+        if (strpos($content, $startMarker) !== false) {
+            $replacePattern = '#(?:<\?php\s*)?/\*\s*FRONTCALC_BUTTON_START\s*\*/(?:\s*\?>)?[\s\S]*?(?:<\?php\s*)?/\*\s*FRONTCALC_BUTTON_END\s*\*/(?:\s*\?>)?#';
+            $replaced = preg_replace($replacePattern, trim($snippet), $content, -1, $replaceCount);
+
+            if (!is_string($replaced) || $replaceCount < 1) {
+                throw new \RuntimeException('Не удалось обновить существующий блок FrontCalc в файле: ' . $basketPath);
+            }
+
+            if (@file_put_contents($basketPath, $replaced) === false) {
+                throw new \RuntimeException('Не удалось записать обновлённый патч в файл: ' . $basketPath);
+            }
+
+            return;
+        }
+
+        $anchorPattern = '#<\?(?:php)?\s*if\s*\(\s*\$arConfig\[\s*[\'"]SHOW_BASKET_LINK[\'"]\s*\]\s*===\s*[\'"]Y[\'"]\s*\)\s*:\s*\?>#i';
+        if (!preg_match_all($anchorPattern, $content, $matches, PREG_OFFSET_CAPTURE)) {
+            throw new \RuntimeException(
+                'Шаблон Aspro обновился: не найдены подходящие сигнатуры "<?if ($arConfig[\'SHOW_BASKET_LINK\'] === \'Y\'):?>" в файле ' . $basketPath
+            );
+        }
+
+        $anchorMatches = $matches[0];
+
+        $offsetShift = 0;
+        $patchCount = 0;
+
+        for ($i = 0; $i < count($anchorMatches); $i++) {
+            $matchOffset = (int)$anchorMatches[$i][1] + $offsetShift;
+            $insertPosition = $matchOffset;
+            $content = substr($content, 0, $insertPosition) . $snippet . substr($content, $insertPosition);
+
+            $offsetShift += strlen($snippet);
+            $patchCount++;
+        }
+
+        if ($patchCount < 1) {
+            throw new \RuntimeException(
+                'Шаблон Aspro обновился: не удалось вставить FrontCalc перед SHOW_BASKET_LINK в файле ' . $basketPath
+            );
+        }
+
+        if (@file_put_contents($basketPath, $content) === false) {
+            throw new \RuntimeException('Не удалось записать патч в файл: ' . $basketPath);
+        }
+    }
+
+    protected function unpatchAsproBasketFile()
+    {
+        $basketPath = $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/aspro.premier/lib/product/basket.php';
+        if (!is_file($basketPath)) {
+            return $this->addAsproBasketRestoreWarning('Не найден файл Aspro basket.php для удаления патча: ' . $basketPath);
+        }
+
+        if (!is_readable($basketPath)) {
+            return $this->addAsproBasketRestoreWarning('Файл Aspro basket.php не читается, удаление патча пропущено: ' . $basketPath);
+        }
+
+        $content = file_get_contents($basketPath);
+        if (!is_string($content) || $content === '') {
+            return $this->addAsproBasketRestoreWarning('Файл Aspro basket.php пуст или не читается, удаление патча пропущено: ' . $basketPath);
+        }
+
+        $startMarker = '/* FRONTCALC_BUTTON_START */';
+        $endMarker = '/* FRONTCALC_BUTTON_END */';
+        if (strpos($content, $startMarker) === false || strpos($content, $endMarker) === false) {
+            return $this->addAsproBasketRestoreWarning(
+                'Маркеры FrontCalc не найдены в Aspro basket.php, удаление патча пропущено: ' . $basketPath
+            );
+        }
+
+        $replacePattern = '#(?:<\?php\s*)?/\*\s*FRONTCALC_BUTTON_START\s*\*/(?:\s*\?>)?[\s\S]*?(?:<\?php\s*)?/\*\s*FRONTCALC_BUTTON_END\s*\*/(?:\s*\?>)?#';
+        $unpatchedContent = preg_replace($replacePattern, '', $content, -1, $replaceCount);
+        if (!is_string($unpatchedContent) || $replaceCount < 1) {
+            return $this->addAsproBasketRestoreWarning(
+                'Не удалось удалить блок FrontCalc по маркерам из Aspro basket.php: ' . $basketPath
+            );
+        }
+
+        if (@file_put_contents($basketPath, $unpatchedContent) === false) {
+            return $this->addAsproBasketRestoreWarning('Не удалось записать Aspro basket.php после удаления патча: ' . $basketPath);
+        }
+
+        Option::set($this->MODULE_ID, 'ASPRO_BASKET_UNPATCHED_AT', date('c'));
+
+        return '';
+    }
+
+    protected function addAsproBasketRestoreWarning($message)
+    {
+        Option::set($this->MODULE_ID, 'ASPRO_BASKET_RESTORE_WARNING', $message);
+
+        if (function_exists('AddMessage2Log')) {
+            AddMessage2Log($message, $this->MODULE_ID);
+        }
+
+        return $message;
+    }
+
+    protected function buildFrontcalcBasketSnippet()
+    {
+        return "
+<?php /* FRONTCALC_BUTTON_START */ ?>
+"
+            . "<?php \$frontcalcTemplateIncludeLocal = \$_SERVER['DOCUMENT_ROOT'] . '/local/modules/prospektweb.frontcalc/template_include.php'; ?>
+"
+            . "<?php \$frontcalcTemplateIncludeBitrix = \$_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/prospektweb.frontcalc/template_include.php'; ?>
+"
+            . "<?php if (is_file(\$frontcalcTemplateIncludeBitrix)) { require_once \$frontcalcTemplateIncludeBitrix; } elseif (is_file(\$frontcalcTemplateIncludeLocal)) { require_once \$frontcalcTemplateIncludeLocal; } ?>
+"
+            . "<?php if (function_exists('frontcalc_render_catalog_button')) { echo frontcalc_render_catalog_button((int)(\$arConfig['ITEM_ID'] ?? 0), (int)(\$arConfig['CATALOG_IBLOCK_ID'] ?? 0), '/local/ajax/frontcalc.php'); } ?>
+"
+            . "<?php /* FRONTCALC_BUTTON_END */ ?>
+";
+    }
+
 
     protected function frontcalcInstallRemoveBasketSnippet(): void
     {
@@ -576,19 +708,19 @@ class prospektweb_frontcalc extends CModule
             throw new \RuntimeException('Не удалось скопировать frontcalc-jqm-popup.js в /local/modules');
         }
 
-        $localCssTarget = $_SERVER['DOCUMENT_ROOT'] . '/local/modules/' . $this->MODULE_ID . '/assets/css/frontcalc-jqm-popup.css';
-        $localCssDir = dirname($localCssTarget);
-        if (!is_dir($localCssDir) && !@mkdir($localCssDir, 0775, true) && !is_dir($localCssDir)) {
-            throw new \RuntimeException('Не удалось создать каталог для /local/modules/.../frontcalc-jqm-popup.css');
+        $localTemplateIncludeTarget = $_SERVER['DOCUMENT_ROOT'] . '/local/modules/' . $this->MODULE_ID . '/template_include.php';
+        $localTemplateIncludeDir = dirname($localTemplateIncludeTarget);
+        if (!is_dir($localTemplateIncludeDir) && !@mkdir($localTemplateIncludeDir, 0775, true) && !is_dir($localTemplateIncludeDir)) {
+            throw new \RuntimeException('Не удалось создать каталог для /local/modules/.../template_include.php');
         }
 
-        $moduleCssSource = dirname(__DIR__) . '/assets/css/frontcalc-jqm-popup.css';
-        if (!is_file($moduleCssSource)) {
-            throw new \RuntimeException('Не найден исходный файл assets/css/frontcalc-jqm-popup.css');
+        $moduleTemplateIncludeSource = dirname(__DIR__) . '/template_include.php';
+        if (!is_file($moduleTemplateIncludeSource)) {
+            throw new \RuntimeException('Не найден исходный файл template_include.php');
         }
 
-        if (!@copy($moduleCssSource, $localCssTarget)) {
-            throw new \RuntimeException('Не удалось скопировать frontcalc-jqm-popup.css в /local/modules');
+        if (!@copy($moduleTemplateIncludeSource, $localTemplateIncludeTarget)) {
+            throw new \RuntimeException('Не удалось скопировать template_include.php в /local/modules');
         }
 
         $moduleRootPath = $_SERVER['DOCUMENT_ROOT'] . '/local/modules/' . $this->MODULE_ID;
@@ -637,6 +769,18 @@ class prospektweb_frontcalc extends CModule
             throw new \RuntimeException('Не удалось скопировать lib/Admin/ProductCardButton.php в /local/modules');
         }
 
+        $moduleCalculatorAvailabilitySource = dirname(__DIR__) . '/lib/Service/CalculatorAvailability.php';
+        $moduleCalculatorAvailabilityTarget = $moduleRootPath . '/lib/Service/CalculatorAvailability.php';
+        $moduleCalculatorAvailabilityDir = dirname($moduleCalculatorAvailabilityTarget);
+        if (!is_dir($moduleCalculatorAvailabilityDir) && !@mkdir($moduleCalculatorAvailabilityDir, 0775, true) && !is_dir($moduleCalculatorAvailabilityDir)) {
+            throw new \RuntimeException('Не удалось создать каталог /local/modules/.../lib/Service');
+        }
+        if (!is_file($moduleCalculatorAvailabilitySource)) {
+            throw new \RuntimeException('Не найден исходный файл lib/Service/CalculatorAvailability.php');
+        }
+        if (!@copy($moduleCalculatorAvailabilitySource, $moduleCalculatorAvailabilityTarget)) {
+            throw new \RuntimeException('Не удалось скопировать lib/Service/CalculatorAvailability.php в /local/modules');
+        }
 
         $moduleConfigSource = dirname(__DIR__) . '/lib/Service/ModuleConfig.php';
         $moduleConfigTarget = $moduleRootPath . '/lib/Service/ModuleConfig.php';
@@ -714,11 +858,6 @@ class prospektweb_frontcalc extends CModule
         $localJsTarget = $_SERVER['DOCUMENT_ROOT'] . '/local/modules/' . $this->MODULE_ID . '/assets/js/frontcalc-jqm-popup.js';
         if (is_file($localJsTarget)) {
             @unlink($localJsTarget);
-        }
-
-        $localCssTarget = $_SERVER['DOCUMENT_ROOT'] . '/local/modules/' . $this->MODULE_ID . '/assets/css/frontcalc-jqm-popup.css';
-        if (is_file($localCssTarget)) {
-            @unlink($localCssTarget);
         }
 
         $localTemplateIncludeTarget = $_SERVER['DOCUMENT_ROOT'] . '/local/modules/' . $this->MODULE_ID . '/template_include.php';
