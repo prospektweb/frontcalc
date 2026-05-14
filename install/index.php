@@ -822,15 +822,6 @@ class prospektweb_frontcalc extends CModule
             throw new \RuntimeException('Не удалось скопировать hide-technical-values.css в /local/modules');
         }
 
-        $moduleFrontcalcPopupCssSource = dirname(__DIR__) . '/assets/css/frontcalc-jqm-popup.css';
-        $moduleFrontcalcPopupCssTarget = $moduleRootPath . '/assets/css/frontcalc-jqm-popup.css';
-        if (!is_file($moduleFrontcalcPopupCssSource)) {
-            throw new \RuntimeException('Не найден исходный файл assets/css/frontcalc-jqm-popup.css');
-        }
-        if (!@copy($moduleFrontcalcPopupCssSource, $moduleFrontcalcPopupCssTarget)) {
-            throw new \RuntimeException('Не удалось скопировать frontcalc-jqm-popup.css в /local/modules');
-        }
-
         $modulePricesCssSource = dirname(__DIR__) . '/assets/css/prices-popup-ext.css';
         $modulePricesCssTarget = $moduleRootPath . '/assets/css/prices-popup-ext.css';
         if (!is_file($modulePricesCssSource)) {
@@ -914,10 +905,6 @@ class prospektweb_frontcalc extends CModule
         $moduleHideCssTarget = $moduleRootPath . '/assets/css/hide-technical-values.css';
         if (is_file($moduleHideCssTarget)) {
             @unlink($moduleHideCssTarget);
-        }
-        $moduleFrontcalcPopupCssTarget = $moduleRootPath . '/assets/css/frontcalc-jqm-popup.css';
-        if (is_file($moduleFrontcalcPopupCssTarget)) {
-            @unlink($moduleFrontcalcPopupCssTarget);
         }
         $modulePricesCssTarget = $moduleRootPath . '/assets/css/prices-popup-ext.css';
         if (is_file($modulePricesCssTarget)) {
