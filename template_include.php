@@ -133,19 +133,6 @@ if (!function_exists('frontcalc_render_runtime_assets')) {
         return null;
     }
 
-    function hasInlineTargets(){
-        return !!(d.querySelector && d.querySelector('.js-frontcalc-inline[data-frontcalc-mode="detail"]'));
-    }
-
-    function initInlineTargets(){
-        if (!hasInlineTargets()) { return; }
-        ensureFrontcalcModule(function(){
-            if (w.FrontcalcCalculator && typeof w.FrontcalcCalculator.initInline === 'function') {
-                w.FrontcalcCalculator.initInline();
-            }
-        });
-    }
-
     var isModuleLoaded = false;
     var isModuleLoading = false;
     var loadQueue = [];
@@ -197,12 +184,6 @@ if (!function_exists('frontcalc_render_runtime_assets')) {
             }
         });
     }, true);
-
-    if (d.readyState === 'loading') {
-        d.addEventListener('DOMContentLoaded', initInlineTargets);
-    } else {
-        initInlineTargets();
-    }
 })(window, document);
 </script>
 HTML
@@ -265,25 +246,6 @@ if (!function_exists('frontcalc_render_catalog_button')) {
     function frontcalc_render_catalog_button(int $productId, int $iblockId, string $ajaxUrl = ''): string
     {
         return frontcalc_render_calculate_button($productId, $iblockId, 'Рассчитать стоимость', $ajaxUrl, 'btn-lg');
-    }
-}
-
-if (!function_exists('frontcalc_render_detail_inline')) {
-    function frontcalc_render_detail_inline(int $productId, int $iblockId, string $ajaxUrl = ''): string
-    {
-        unset($iblockId);
-
-        $productId = max(0, $productId);
-        $ajaxUrl = trim($ajaxUrl);
-        if ($ajaxUrl === '') {
-            $ajaxUrl = '/local/ajax/frontcalc.php';
-        }
-
-        return frontcalc_render_runtime_assets() . sprintf(
-            '<div class="frontcalc-inline js-frontcalc-inline" data-frontcalc-product-id="%d" data-frontcalc-ajax-url="%s" data-frontcalc-mode="detail"></div>',
-            $productId,
-            htmlspecialcharsbx($ajaxUrl)
-        );
     }
 }
 
