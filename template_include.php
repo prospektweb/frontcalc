@@ -220,22 +220,80 @@ if (!function_exists('frontcalc_render_auth_required_assets')) {
         }
         $isRendered = true;
 
-        global $USER;
+        return <<<'HTML'
+<script>
+(function(w, d){
+    if (w.__frontcalcAuthRequiredReady) { return; }
+    w.__frontcalcAuthRequiredReady = true;
 
-        $moduleScriptPath = '/local/modules/prospektweb.frontcalc/assets/js/frontcalc-auth.js';
-        $isAuthorized = is_object($USER) && method_exists($USER, 'IsAuthorized') && $USER->IsAuthorized();
+    function findButtonTarget(node){
+        var current = node;
+        while (current && current !== d) {
+            if (current.classList && current.classList.contains('js-frontcalc-auth-required')) {
+                return current;
+            }
+            current = current.parentNode;
+        }
+        return null;
+    }
 
-        return str_replace(
-            ['{{MODULE_SCRIPT_PATH}}', '{{AUTH_CONFIG}}'],
-            [
-                $moduleScriptPath,
-                \CUtil::PhpToJSObject(['isAuthorized' => $isAuthorized], false, true, true),
-            ],
-            <<<'HTML'
-<script>window.FrontcalcAuthConfig={{AUTH_CONFIG}};</script>
-<script src="{{MODULE_SCRIPT_PATH}}"></script>
-HTML
-        );
+    function getBackUrl(){
+        return encodeURIComponent(w.location.pathname + w.location.search + w.location.hash);
+    }
+
+    function openAsproAuth(){
+        if (!d.querySelector) {
+            return false;
+        }
+
+        var selectors = [
+            '[data-event="jqm"][data-param-form_id="AUTH"]',
+            '[data-event="jqm"][data-name="auth"]',
+            '.animate-load[data-param-form_id="AUTH"]',
+            '.js-popup-auth',
+            '.js-auth'
+        ];
+
+        for (var i = 0; i < selectors.length; i++) {
+            var trigger = d.querySelector(selectors[i]);
+            if (trigger && typeof trigger.click === 'function') {
+                trigger.click();
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    d.addEventListener('click', function(event){
+        var button = findButtonTarget(event.target);
+        if (!button) {
+            return;
+        }
+
+        event.preventDefault();
+
+        var authEvent;
+        if (typeof w.CustomEvent === 'function') {
+            authEvent = new CustomEvent('frontcalc:authRequired', {
+                bubbles: true,
+                cancelable: true,
+                detail: { button: button }
+            });
+            if (!button.dispatchEvent(authEvent)) {
+                return;
+            }
+        }
+
+        if (openAsproAuth()) {
+            return;
+        }
+
+        w.location.href = '/auth/?backurl=' + getBackUrl();
+    }, false);
+})(window, document);
+</script>
+HTML;
     }
 }
 

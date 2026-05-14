@@ -809,15 +809,6 @@ class prospektweb_frontcalc extends CModule
             throw new \RuntimeException('Не удалось скопировать hide-technical-values.js в /local/modules');
         }
 
-        $moduleAuthJsSource = dirname(__DIR__) . '/assets/js/frontcalc-auth.js';
-        $moduleAuthJsTarget = $moduleRootPath . '/assets/js/frontcalc-auth.js';
-        if (!is_file($moduleAuthJsSource)) {
-            throw new \RuntimeException('Не найден исходный файл assets/js/frontcalc-auth.js');
-        }
-        if (!@copy($moduleAuthJsSource, $moduleAuthJsTarget)) {
-            throw new \RuntimeException('Не удалось скопировать frontcalc-auth.js в /local/modules');
-        }
-
         $moduleHideCssSource = dirname(__DIR__) . '/assets/css/hide-technical-values.css';
         $moduleHideCssTarget = $moduleRootPath . '/assets/css/hide-technical-values.css';
         $moduleHideCssDir = dirname($moduleHideCssTarget);
@@ -910,10 +901,6 @@ class prospektweb_frontcalc extends CModule
         $moduleHideJsTarget = $moduleRootPath . '/assets/js/hide-technical-values.js';
         if (is_file($moduleHideJsTarget)) {
             @unlink($moduleHideJsTarget);
-        }
-        $moduleAuthJsTarget = $moduleRootPath . '/assets/js/frontcalc-auth.js';
-        if (is_file($moduleAuthJsTarget)) {
-            @unlink($moduleAuthJsTarget);
         }
         $moduleHideCssTarget = $moduleRootPath . '/assets/css/hide-technical-values.css';
         if (is_file($moduleHideCssTarget)) {
