@@ -8,16 +8,6 @@
 .frontcalc-popup-shell{width:100%;max-width:100%;box-sizing:border-box;}
 .frontcalc-popup-shell.form.popup{display:block;padding:0;background:#fff;}
 .frontcalc-popup-content{min-height:220px;}
-.frontcalc-inline{display:block;width:100%;max-width:100%;min-width:0;box-sizing:border-box;container-type:inline-size;margin:0;padding:0;background:transparent;}
-.frontcalc-inline *,.frontcalc-inline *:before,.frontcalc-inline *:after{box-sizing:border-box;}
-.frontcalc-inline .frontcalc-layout{width:100%;max-width:100%;grid-template-columns:minmax(0,1.6fr) minmax(300px,.9fr);gap:16px;}
-.frontcalc-inline .frontcalc-selectors{min-width:0;padding:0;}
-.frontcalc-inline .frontcalc-price-panel{min-width:0;}
-.frontcalc-inline .frontcalc-price-panel__inner{top:0;padding:32px 24px;}
-.frontcalc-inline .frontcalc-table-body{margin-right:0;padding-right:4px;}
-.frontcalc-inline .frontcalc-chip{--sku-height:46px;--sku-prop-stroke:2px;display:inline-flex;align-items:center;justify-content:center;min-height:0;height:var(--sku-height);min-width:104px;padding:10px 27px;border-radius:4px;}
-.frontcalc-inline .frontcalc-chip:hover{border-color:#aeb7c6;background:#fff;}
-.frontcalc-inline .frontcalc-chip.is-active{border-color:#2f3a52;box-shadow:inset 0 0 0 calc(var(--sku-prop-stroke) - 1px) #2f3a52;background:#fff;}
 .frontcalc-preloader{display:flex;align-items:center;gap:12px;padding:28px 0;color:#5f6a83;}
 .frontcalc-preloader__spinner{width:28px;height:28px;border-radius:50%;border:3px solid rgba(42,101,208,.2);border-top-color:var(--theme-base-color,#2a65d0);animation:frontcalc-spin .8s linear infinite;}
 .frontcalc-empty{padding:8px 0;color:#5f6a83;}
@@ -86,28 +76,9 @@
 .frontcalc-table-row.is-selected .frontcalc-cell:not(.is-picked){border-color:#d9dee7!important;box-shadow:none!important;}
 @media (max-width: 991px){
     .frontcalc-layout{grid-template-columns:1fr;}
-    .frontcalc-inline .frontcalc-layout{grid-template-columns:1fr;}
-    .frontcalc-inline .frontcalc-price-panel__inner{position:relative;top:auto;}
     .frontcalc-price-panel{order:-1;}
     .frontcalc-field__title{font-size:15px;}
     .frontcalc-chip{font-size:13px;min-height:32px;padding:4px 10px;}
     .frontcalc-num-input{font-size:16px;}
-}
-@container (max-width: 760px){
-    .frontcalc-inline .frontcalc-layout{grid-template-columns:1fr;}
-    .frontcalc-inline .frontcalc-price-panel{order:-1;}
-    .frontcalc-inline .frontcalc-price-panel__inner{position:relative;top:auto;}
-}
-@media (max-width: 600px){
-    .frontcalc-inline .frontcalc-layout{gap:14px;}
-    .frontcalc-inline .frontcalc-price-panel__inner{padding:24px 16px;}
-    .frontcalc-inline .frontcalc-presets{gap:6px;}
-    .frontcalc-inline .frontcalc-popup-content .frontcalc-chip,.frontcalc-inline .frontcalc-chip{width:100%;min-width:0;}
-    .frontcalc-inline .frontcalc-input-control-wrap,.frontcalc-inline .frontcalc-input-group,.frontcalc-inline .frontcalc-volume-input{width:100%;}
-    .frontcalc-inline .frontcalc-input-control{grid-template-columns:44px minmax(0,1fr) 44px;width:100%;}
-    .frontcalc-inline .frontcalc-table-head{display:none;}
-    .frontcalc-inline .frontcalc-table-row{grid-template-columns:1fr;gap:6px;}
-    .frontcalc-inline .frontcalc-cell{min-height:48px;}
-    .frontcalc-inline .frontcalc-cart-btn{width:100%;}
 }
 @keyframes frontcalc-spin{to{transform:rotate(360deg);}}
