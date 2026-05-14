@@ -160,8 +160,7 @@ if (!function_exists('frontcalc_render_calculate_button')) {
 if (!function_exists('frontcalc_render_catalog_button')) {
     function frontcalc_render_catalog_button(int $productId, int $iblockId, string $ajaxUrl = ''): string
     {
-        // Кнопка расчёта не должна выводиться в списке каталога; оставляем её только в детальной карточке.
-        return '';
+        return frontcalc_render_calculate_button($productId, $iblockId, 'Рассчитать стоимость', $ajaxUrl, 'btn-lg');
     }
 }
 
