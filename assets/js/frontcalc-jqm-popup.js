@@ -1692,7 +1692,8 @@
     return /\|\s*(Строгий|Гибкий) срок\s*$/.test(base) ? base.replace(/\|\s*(Строгий|Гибкий) срок\s*$/, "| " + label) : base + " | " + label;
   }
 
-  function renderCalculator($content, payload) {
+  function renderCalculator($content, payload, options) {
+    options = options || {};
     var data = payload && payload.data ? payload.data : {};
     var config = data.config || {};
     var offers = Array.isArray(data.offers) ? data.offers : [];
@@ -1938,11 +1939,14 @@
       customByProperty[volumeCode] = false;
     }
 
-    var $layout = $('<div class="frontcalc-layout"></div>');
-    var $selectors = $('<div class="frontcalc-selectors"></div>');
+    var isInline = options.mode === "inline";
+    var $layout = isInline ? $() : $('<div class="frontcalc-layout"></div>');
+    var $selectors = options.$selectors && options.$selectors.length ? options.$selectors : $('<div class="frontcalc-selectors"></div>');
+    $selectors.empty().addClass("frontcalc-selectors");
     var $title = $('<h2 class="frontcalc-offer-title"></h2>');
     $selectors.append($title);
-    var $price = $('<aside class="frontcalc-price-panel"><div class="frontcalc-price-panel__inner"></div></aside>');
+    var $price = options.$price && options.$price.length ? options.$price : $('<aside class="frontcalc-price-panel"><div class="frontcalc-price-panel__inner"></div></aside>');
+    $price.addClass("frontcalc-price-panel").empty().append('<div class="frontcalc-price-panel__inner"></div>');
     var $priceInner = $price.find(".frontcalc-price-panel__inner");
 
     selectorCodes.forEach(function (code) {
@@ -2287,9 +2291,69 @@
       updatePrice();
     });
 
-    $layout.append($selectors, $price);
-    $content.html($layout);
+    if (isInline) {
+      $content.removeClass("is-loading").addClass("is-ready");
+    } else {
+      $layout.append($selectors, $price);
+      $content.html($layout);
+    }
     updatePrice();
+  }
+
+  function initInlineCalculator(container) {
+    var $container = $(container);
+    if ($container.data("frontcalc-inline-ready")) {
+      return;
+    }
+    $container.data("frontcalc-inline-ready", true);
+
+    var productId = $container.data("frontcalc-product-id") || 0;
+    var ajaxUrl = $container.data("frontcalc-ajax-url") || "";
+    var offerId = $container.data("frontcalc-offer-id") || "";
+    var $selectors = $container.find(".js-frontcalc-inline-selectors").first();
+    var $price = $container.find(".js-frontcalc-inline-price").first();
+
+    if (!ajaxUrl || !productId || !$selectors.length || !$price.length) {
+      renderError($selectors.length ? $selectors : $container, "Не заданы параметры inline-калькулятора.");
+      return;
+    }
+
+    var divider = ajaxUrl.indexOf("?") === -1 ? "?" : "&";
+    var requestUrl = ajaxUrl + divider + "product_id=" + encodeURIComponent(productId);
+    if (offerId) {
+      requestUrl += "&offer_id=" + encodeURIComponent(offerId);
+    }
+
+    $container.addClass("is-loading");
+    setLoading($selectors);
+    $price.empty();
+
+    requestData(
+      requestUrl,
+      function (payload) {
+        if (!payload || payload.success !== true) {
+          renderError($selectors, payload && payload.message ? payload.message : "Сервер вернул ошибку.");
+          $container.removeClass("is-loading");
+          return;
+        }
+        payload.frontcalcAjaxUrl = ajaxUrl;
+        renderCalculator($container, payload, {
+          mode: "inline",
+          $selectors: $selectors,
+          $price: $price
+        });
+      },
+      function (errorMessage) {
+        renderError($selectors, "Ошибка запроса: " + errorMessage);
+        $container.removeClass("is-loading");
+      }
+    );
+  }
+
+  function initInlineCalculators(context) {
+    $(context || document).find(".js-frontcalc-inline").each(function () {
+      initInlineCalculator(this);
+    });
   }
 
   function openPopup(button) {
@@ -2361,4 +2425,10 @@
     event.preventDefault();
     openPopup(this);
   });
+
+  $(function () {
+    initInlineCalculators(document);
+  });
+
+  window.FrontcalcInitInlineCalculators = initInlineCalculators;
 })(window, document, window.jQuery);
