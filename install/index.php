@@ -98,7 +98,7 @@ class prospektweb_frontcalc extends CModule
             $this->frontcalcInstallReplaceAsproPricesTemplate();
         } catch (\Throwable $e) {
             $this->frontcalcInstallRestoreAsproPricesTemplate();
-            $this->frontcalcInstallRestoreCatalogElementTemplate();
+            $this->frontcalcInstallRemoveCatalogElementSnippet();
             $this->frontcalcInstallRemoveBasketSnippet();
             $this->UnInstallFiles();
             ModuleManager::unRegisterModule($this->MODULE_ID);
@@ -131,7 +131,7 @@ class prospektweb_frontcalc extends CModule
         $removeData = (isset($_REQUEST['remove_data']) && $_REQUEST['remove_data'] === 'Y');
 
         $this->frontcalcInstallRestoreAsproPricesTemplate();
-        $this->frontcalcInstallRestoreCatalogElementTemplate();
+        $this->frontcalcInstallRemoveCatalogElementSnippet();
         $this->frontcalcInstallRemoveBasketSnippet();
         $this->UnInstallDB($removeData);
         $this->UnInstallFiles();
@@ -451,26 +451,7 @@ class prospektweb_frontcalc extends CModule
 
     protected function frontcalcInstallGetCatalogElementTemplatePath(): string
     {
-        foreach ($this->frontcalcInstallGetCatalogElementTemplatePathCandidates() as $templatePath) {
-            if (is_file($templatePath)) {
-                return $templatePath;
-            }
-        }
-
         return $_SERVER['DOCUMENT_ROOT'] . '/bitrix/templates/aspro-premier/components/bitrix/catalog.element/main/template.php';
-    }
-
-    protected function frontcalcInstallGetCatalogElementTemplatePathCandidates(): array
-    {
-        return [
-            $_SERVER['DOCUMENT_ROOT'] . '/local/templates/aspro-premier/components/bitrix/catalog.element/main/template.php',
-            $_SERVER['DOCUMENT_ROOT'] . '/bitrix/templates/aspro-premier/components/bitrix/catalog.element/main/template.php',
-        ];
-    }
-
-    protected function frontcalcInstallGetAsproPremierBackupDir(): string
-    {
-        return $_SERVER['DOCUMENT_ROOT'] . '/local/modules/' . $this->MODULE_ID . '/backup/aspro_premier';
     }
 
     protected function frontcalcInstallPatchCatalogElementTemplate(): void
@@ -478,10 +459,6 @@ class prospektweb_frontcalc extends CModule
         $templatePath = $this->frontcalcInstallGetCatalogElementTemplatePath();
         if (!is_file($templatePath)) {
             $this->frontcalcInstallLogWarning('Не найден файл шаблона catalog.element для патча FrontCalc: ' . $templatePath);
-            return;
-        }
-        if (!is_readable($templatePath) || !is_writable($templatePath)) {
-            $this->frontcalcInstallLogWarning('Файл шаблона catalog.element недоступен для чтения или записи: ' . $templatePath);
             return;
         }
 
@@ -505,39 +482,12 @@ class prospektweb_frontcalc extends CModule
         }
 
         if ($patchedContent === $content) {
-            Option::set($this->MODULE_ID, 'ASPRO_DETAIL_TEMPLATE_PATH', $templatePath);
-            Option::set($this->MODULE_ID, 'ASPRO_DETAIL_TEMPLATE_PATCHED_HASH', (string)hash_file('sha256', $templatePath));
             return;
-        }
-
-        $originalHash = (string)hash_file('sha256', $templatePath);
-        if ($originalHash === '') {
-            throw new \RuntimeException('Не удалось посчитать SHA-256 оригинального шаблона catalog.element: ' . $templatePath);
-        }
-
-        $backupDir = $this->frontcalcInstallGetAsproPremierBackupDir();
-        if (!is_dir($backupDir) && !@mkdir($backupDir, 0775, true) && !is_dir($backupDir)) {
-            throw new \RuntimeException('Не удалось создать каталог резервных копий шаблона catalog.element: ' . $backupDir);
-        }
-
-        $backupPath = $backupDir . '/catalog.element.main.template.php.' . date('YmdHis') . '.bak';
-        if (!@copy($templatePath, $backupPath)) {
-            throw new \RuntimeException('Не удалось создать резервную копию шаблона catalog.element: ' . $backupPath);
         }
 
         if (@file_put_contents($templatePath, $patchedContent) === false) {
             throw new \RuntimeException('Не удалось записать FrontCalc-патч в файл шаблона catalog.element: ' . $templatePath);
         }
-
-        $patchedHash = (string)hash_file('sha256', $templatePath);
-        if ($patchedHash === '') {
-            throw new \RuntimeException('Не удалось посчитать SHA-256 патченого шаблона catalog.element: ' . $templatePath);
-        }
-
-        Option::set($this->MODULE_ID, 'ASPRO_DETAIL_TEMPLATE_PATH', $templatePath);
-        Option::set($this->MODULE_ID, 'ASPRO_DETAIL_TEMPLATE_BACKUP_PATH', $backupPath);
-        Option::set($this->MODULE_ID, 'ASPRO_DETAIL_TEMPLATE_ORIGINAL_HASH', $originalHash);
-        Option::set($this->MODULE_ID, 'ASPRO_DETAIL_TEMPLATE_PATCHED_HASH', $patchedHash);
     }
 
     protected function frontcalcInstallInsertCatalogElementInlineIntegration(string &$content, string $templatePath): void
@@ -815,80 +765,6 @@ PHP . "\n";
         }
 
         return false;
-    }
-
-    protected function frontcalcInstallRestoreCatalogElementTemplate(): void
-    {
-        $targetPath = (string)Option::get($this->MODULE_ID, 'ASPRO_DETAIL_TEMPLATE_PATH', '');
-        $backupPath = (string)Option::get($this->MODULE_ID, 'ASPRO_DETAIL_TEMPLATE_BACKUP_PATH', '');
-        $patchedHash = (string)Option::get($this->MODULE_ID, 'ASPRO_DETAIL_TEMPLATE_PATCHED_HASH', '');
-
-        if ($targetPath === '' && $backupPath === '' && $patchedHash === '') {
-            return;
-        }
-        if ($targetPath === '') {
-            $targetPath = $this->frontcalcInstallGetCatalogElementTemplatePath();
-        }
-        if ($backupPath === '' || !is_file($backupPath) || !is_readable($backupPath)) {
-            $this->frontcalcInstallAddCatalogElementRestoreWarning(
-                'Backup шаблона catalog.element отсутствует или не читается, автоматическое восстановление пропущено: ' . ($backupPath ?: 'путь не сохранён')
-            );
-            return;
-        }
-        if ($patchedHash === '') {
-            $this->frontcalcInstallAddCatalogElementRestoreWarning(
-                'Не сохранён SHA-256 патченого шаблона catalog.element, автоматическое восстановление пропущено: ' . $targetPath . '. Резервная копия: ' . $backupPath
-            );
-            return;
-        }
-        if (!is_file($targetPath) || !is_readable($targetPath)) {
-            $this->frontcalcInstallAddCatalogElementRestoreWarning(
-                'Текущий шаблон catalog.element отсутствует или не читается, автоматическое восстановление пропущено: ' . $targetPath . '. Резервная копия: ' . $backupPath
-            );
-            return;
-        }
-
-        $currentHash = (string)hash_file('sha256', $targetPath);
-        if ($currentHash === '') {
-            $this->frontcalcInstallAddCatalogElementRestoreWarning(
-                'Не удалось посчитать SHA-256 текущего шаблона catalog.element, автоматическое восстановление пропущено: ' . $targetPath . '. Резервная копия: ' . $backupPath
-            );
-            return;
-        }
-
-        if (!hash_equals($patchedHash, $currentHash)) {
-            $content = (string)file_get_contents($targetPath);
-            $hasMarkers = $content !== '' && strpos($content, 'FRONTCALC_DETAIL_INLINE_START') !== false && strpos($content, 'FRONTCALC_DETAIL_INLINE_END') !== false;
-            $this->frontcalcInstallAddCatalogElementRestoreWarning(
-                'Шаблон catalog.element был изменён после установки FrontCalc, автоматическое восстановление из backup пропущено: '
-                . $targetPath
-                . '. Резервная копия: '
-                . $backupPath
-                . '. Диагностические маркеры FrontCalc '
-                . ($hasMarkers ? 'обнаружены' : 'не обнаружены')
-                . '.'
-            );
-            return;
-        }
-
-        $targetDir = dirname($targetPath);
-        if (!is_dir($targetDir) && !@mkdir($targetDir, 0775, true) && !is_dir($targetDir)) {
-            $this->frontcalcInstallAddCatalogElementRestoreWarning('Не удалось создать каталог для восстановления шаблона catalog.element: ' . $targetDir);
-            return;
-        }
-
-        if (!@copy($backupPath, $targetPath)) {
-            $this->frontcalcInstallAddCatalogElementRestoreWarning('Не удалось восстановить шаблон catalog.element из backup: ' . $backupPath);
-            return;
-        }
-
-        Option::set($this->MODULE_ID, 'ASPRO_DETAIL_TEMPLATE_RESTORED_AT', date('c'));
-    }
-
-    protected function frontcalcInstallAddCatalogElementRestoreWarning(string $message): void
-    {
-        Option::set($this->MODULE_ID, 'ASPRO_DETAIL_TEMPLATE_RESTORE_WARNING', $message);
-        $this->frontcalcInstallLogWarning($message);
     }
 
     protected function frontcalcInstallRemoveCatalogElementSnippet(): void
