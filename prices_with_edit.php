@@ -991,6 +991,147 @@ class Prices
         }
     }
 
+
+    protected function getFrontcalcProductId(): int
+    {
+        return (int)($this->item['ID'] ?? $this->params['ELEMENT_ID'] ?? $this->params['ID'] ?? 0);
+    }
+
+    protected function getFrontcalcProductIblockId(): int
+    {
+        $iblockId = (int)($this->item['IBLOCK_ID'] ?? $this->params['IBLOCK_ID'] ?? 0);
+        if ($iblockId > 0) {
+            return $iblockId;
+        }
+
+        if (class_exists('\Bitrix\Main\Config\Option')) {
+            return (int)\Bitrix\Main\Config\Option::get('prospektweb.frontcalc', 'PRODUCTS_IBLOCK_ID', '0');
+        }
+
+        return 0;
+    }
+
+    protected function getFrontcalcConfigPropertyCode(): string
+    {
+        if (class_exists('\Bitrix\Main\Config\Option')) {
+            $code = trim((string)\Bitrix\Main\Config\Option::get('prospektweb.frontcalc', 'CALC_PROPERTY_CODE', 'FRONTCALC_CONFIG'));
+            if ($code !== '') {
+                return $code;
+            }
+        }
+
+        return 'FRONTCALC_CONFIG';
+    }
+
+    protected function extractFrontcalcPropertyValue(array $property): string
+    {
+        $value = $property['DISPLAY_VALUE'] ?? $property['~VALUE'] ?? $property['VALUE'] ?? '';
+
+        if (is_array($value)) {
+            $value = $value['TEXT'] ?? reset($value) ?: '';
+        }
+
+        return trim((string)$value);
+    }
+
+    protected function getFrontcalcConfigValue(): string
+    {
+        $propertyCode = $this->getFrontcalcConfigPropertyCode();
+        $props = $this->item['PROPERTIES'] ?? $this->item['DISPLAY_PROPERTIES'] ?? [];
+
+        if (is_array($props) && isset($props[$propertyCode]) && is_array($props[$propertyCode])) {
+            $value = $this->extractFrontcalcPropertyValue($props[$propertyCode]);
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        $productId = $this->getFrontcalcProductId();
+        $iblockId = $this->getFrontcalcProductIblockId();
+
+        if ($productId <= 0 || $iblockId <= 0 || !Loader::includeModule('iblock')) {
+            return '';
+        }
+
+        $propertyRes = \CIBlockElement::GetProperty($iblockId, $productId, [], ['CODE' => $propertyCode]);
+        $property = $propertyRes ? $propertyRes->Fetch() : false;
+
+        return is_array($property) ? $this->extractFrontcalcPropertyValue($property) : '';
+    }
+
+    protected function hasFrontcalcConfig(): bool
+    {
+        $rawConfig = $this->getFrontcalcConfigValue();
+        if ($rawConfig === '') {
+            return false;
+        }
+
+        $decoded = json_decode($rawConfig, true);
+        if (!is_array($decoded) || empty($decoded['fields']) || !is_array($decoded['fields'])) {
+            return false;
+        }
+
+        foreach ($decoded['fields'] as $field) {
+            if (is_array($field) && trim((string)($field['property_code'] ?? '')) !== '') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    protected function captureFrontcalcInline(): string
+    {
+        $productId = $this->getFrontcalcProductId();
+        if ($productId <= 0) {
+            return '';
+        }
+
+        $ajaxUrl = '/local/ajax/frontcalc.php';
+        if (class_exists('\Bitrix\Main\Config\Option')) {
+            $ajaxUrl = (string)\Bitrix\Main\Config\Option::get('prospektweb.frontcalc', 'CALC_AJAX_URL', $ajaxUrl);
+        }
+
+        static $assetsRendered = false;
+        $containerId = 'frontcalc-inline-' . $productId . '-' . mt_rand(1000, 999999);
+
+        ob_start();
+        if (!$assetsRendered) {
+            $assetsRendered = true;
+            ?>
+            <link rel="stylesheet" href="/local/modules/prospektweb.frontcalc/assets/css/frontcalc-jqm-popup.css">
+            <script src="/local/modules/prospektweb.frontcalc/assets/js/frontcalc-jqm-popup.js"></script>
+            <?php
+        }
+        ?>
+        <div class="frontcalc-inline" data-frontcalc-product-id="<?=(int)$productId;?>">
+            <div id="<?=htmlspecialcharsbx($containerId);?>" class="frontcalc-popup-content js-frontcalc-inline-content"></div>
+        </div>
+        <script>
+        (function (w, d) {
+            function init() {
+                if (!w.FrontcalcPopup || typeof w.FrontcalcPopup.renderInline !== 'function') {
+                    return;
+                }
+
+                w.FrontcalcPopup.renderInline(d.getElementById('<?=\CUtil::JSEscape($containerId);?>'), {
+                    productId: <?=(int)$productId;?>,
+                    ajaxUrl: '<?=\CUtil::JSEscape($ajaxUrl);?>'
+                });
+            }
+
+            if (d.readyState === 'loading') {
+                d.addEventListener('DOMContentLoaded', init);
+            } else {
+                init();
+            }
+        })(window, document);
+        </script>
+        <?php
+
+        return (string)ob_get_clean();
+    }
+
     protected function getCalcPropVolumeValue(): ?string
     {
         $props = $this->item['PROPERTIES'] ?? $this->item['DISPLAY_PROPERTIES'] ?? [];
@@ -1055,6 +1196,10 @@ class Prices
 
         if ($this->item['PRODUCT_ANALOG']) {
             return $html;
+        }
+
+        if ($this->hasFrontcalcConfig()) {
+            return $this->captureFrontcalcInline();
         }
 
         ob_start();
