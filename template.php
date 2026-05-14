@@ -315,11 +315,43 @@ if (is_file($frontcalcInclude)) {
 ?>
 <link rel="stylesheet" href="/local/modules/prospektweb.frontcalc/assets/css/frontcalc-jqm-popup.css">
 <script>
-window.FrontcalcPopupConfig = window.FrontcalcPopupConfig || {};
-window.FrontcalcPopupConfig.modulePath = '/local/modules/prospektweb.frontcalc/assets/js/frontcalc-jqm-popup.js';
-window.FrontcalcPopupConfig.jqModalPath = window.FrontcalcPopupConfig.jqModalPath || (window.arAsproOptions && window.arAsproOptions.SITE_TEMPLATE_PATH ? window.arAsproOptions.SITE_TEMPLATE_PATH + '/js/jqModal.js' : '/bitrix/modules/aspro.popup/install/js/jqModal.js');
+(function(w, d){
+    w.FrontcalcPopupConfig = w.FrontcalcPopupConfig || {};
+    w.FrontcalcPopupConfig.modulePath = '/local/modules/prospektweb.frontcalc/assets/js/frontcalc-jqm-popup.js';
+    w.FrontcalcPopupConfig.jqModalPath = w.FrontcalcPopupConfig.jqModalPath || (w.arAsproOptions && w.arAsproOptions.SITE_TEMPLATE_PATH ? w.arAsproOptions.SITE_TEMPLATE_PATH + '/js/jqModal.js' : '/bitrix/modules/aspro.popup/install/js/jqModal.js');
+
+    function initInline() {
+        if (typeof w.FrontcalcInitInlineCalculators === 'function') {
+            w.FrontcalcInitInlineCalculators(d);
+        }
+    }
+
+    function loadWhenJqueryReady() {
+        if (!w.jQuery) {
+            w.setTimeout(loadWhenJqueryReady, 50);
+            return;
+        }
+
+        if (w.__frontcalcInlineScriptLoading) {
+            initInline();
+            return;
+        }
+
+        w.__frontcalcInlineScriptLoading = true;
+        var script = d.createElement('script');
+        script.src = w.FrontcalcPopupConfig.modulePath;
+        script.onload = initInline;
+        script.onerror = initInline;
+        d.head.appendChild(script);
+    }
+
+    if (d.readyState === 'loading') {
+        d.addEventListener('DOMContentLoaded', loadWhenJqueryReady);
+    } else {
+        loadWhenJqueryReady();
+    }
+})(window, document);
 </script>
-<script src="/local/modules/prospektweb.frontcalc/assets/js/frontcalc-jqm-popup.js" defer></script>
 
 <div class="catalog-detail__top-info flexbox flexbox--direction-row flexbox--wrap-nowrap gap gap--40">
     <?php TSolution\Product\Common::addViewed(['ITEM' => $arCurrentOffer ?: $arResult]); ?>
@@ -397,7 +429,7 @@ window.FrontcalcPopupConfig.jqModalPath = window.FrontcalcPopupConfig.jqModalPat
         <?endif; ?>
         <?$itemDiscount = ob_get_clean(); ?>
 
-        <div class="catalog-detail__main-parts line-block line-block--gap line-block--gap-40 js-frontcalc-inline"
+        <div class="catalog-detail__main-parts line-block line-block--gap line-block--gap-40 frontcalc-popup-content js-frontcalc-inline"
              data-id="<?=$arResult['ID']; ?>"
              data-item="<?=$dataItem; ?>"
              data-frontcalc-product-id="<?=$frontcalcProductId; ?>"
