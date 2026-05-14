@@ -466,7 +466,6 @@ class prospektweb_frontcalc extends CModule
 
         $this->frontcalcInstallRemoveCatalogElementSnippetFromContent($content);
         $this->frontcalcInstallInsertCatalogElementFlags($content, $templatePath);
-        $this->frontcalcInstallGuardCatalogElementSchema($content, $templatePath);
         $this->frontcalcInstallInsertCatalogElementInlineRenderer($content, $templatePath);
         $this->frontcalcInstallWrapCatalogElementStandardBlocks($content, $templatePath);
         $this->frontcalcInstallEnsureCatalogElementInfoBlocksVisible($content);
@@ -580,62 +579,6 @@ PHP . "\n";
 <?php endif; ?>
 <?php /* FRONTCALC_INLINE_RENDER_END */ ?>
 PHP . "\n";
-    }
-
-    protected function frontcalcInstallGuardCatalogElementSchema(string &$content, string $templatePath): void
-    {
-        $condition = $this->frontcalcInstallFindCatalogElementSchemaCondition($content);
-        if ($condition === null) {
-            throw new \RuntimeException('Шаблон Aspro обновился: не найден блок schema.org Product с prices в catalog.element: ' . $templatePath);
-        }
-
-        [$conditionText, $conditionPosition] = $condition;
-        if (strpos($conditionText, '$frontcalcUseInline') !== false) {
-            return;
-        }
-
-        $content = substr($content, 0, $conditionPosition)
-            . 'if ($bUseSchema && !$frontcalcUseInline) {'
-            . substr($content, $conditionPosition + strlen($conditionText));
-    }
-
-    protected function frontcalcInstallRestoreCatalogElementSchemaGuard(string &$content): void
-    {
-        $condition = $this->frontcalcInstallFindCatalogElementSchemaCondition($content);
-        if ($condition === null) {
-            return;
-        }
-
-        [$conditionText, $conditionPosition] = $condition;
-        if (strpos($conditionText, '$frontcalcUseInline') === false) {
-            return;
-        }
-
-        $content = substr($content, 0, $conditionPosition)
-            . 'if ($bUseSchema) {'
-            . substr($content, $conditionPosition + strlen($conditionText));
-    }
-
-    protected function frontcalcInstallFindCatalogElementSchemaCondition(string $content): ?array
-    {
-        $schemaPattern = '#new\s+TSolution\\Scheme\\Product\s*\([\s\S]*?prices\s*:\s*\$prices#';
-        if (!preg_match($schemaPattern, $content, $schemaMatch, PREG_OFFSET_CAPTURE)) {
-            return null;
-        }
-
-        $schemaPosition = (int)$schemaMatch[0][1];
-        $prefix = substr($content, 0, $schemaPosition);
-        $conditionPattern = '#if\s*\(\s*\$bUseSchema(?:\s*&&\s*!\s*\$frontcalcUseInline)?\s*\)\s*\{#';
-        if (!preg_match_all($conditionPattern, $prefix, $conditionMatches, PREG_OFFSET_CAPTURE)) {
-            return null;
-        }
-
-        $lastIndex = count($conditionMatches[0]) - 1;
-
-        return [
-            $conditionMatches[0][$lastIndex][0],
-            (int)$conditionMatches[0][$lastIndex][1],
-        ];
     }
 
     protected function frontcalcInstallEnsureCatalogElementInfoBlocksVisible(string &$content): void
@@ -828,8 +771,6 @@ PHP . "\n";
 
     protected function frontcalcInstallRemoveCatalogElementSnippetFromContent(string &$content): void
     {
-        $this->frontcalcInstallRestoreCatalogElementSchemaGuard($content);
-
         $skipPattern = '#\s*<\?php\s*/\*\s*FRONTCALC_INLINE_SKIP_([A-Z0-9_]+)_START\s*\*/\s*\?>\s*<\?php\s*if\s*\(\s*\$frontcalcUseInline\s*(?:!==\s*true|===\s*false)\s*\)\s*:\s*\?>\s*([\s\S]*?)\s*<\?php\s*endif;\s*\?>\s*<\?php\s*/\*\s*FRONTCALC_INLINE_SKIP_\1_END\s*\*/\s*\?>#';
         $unwrapped = preg_replace($skipPattern, "\n$2", $content);
         if (is_string($unwrapped)) {
