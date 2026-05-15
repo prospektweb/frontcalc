@@ -1386,7 +1386,8 @@ class Prices
                             </svg>
                         </button>
                         <style>
-                            .frontcalc_but__openpopup {width:64px;background: none;border: none;fill: #555558;text-align: left;display: flex;align-items: center;padding: 0;}
+                            .frontcalc_but__openpopup{width:64px;background:none;border:none;fill:#555558;text-align:left;display:flex;align-items:center;padding:0;}
+                            .frontcalc_but__openpopup:hover{fill:var(--theme-base-color);}
                             .prices--with-popup-table{gap:20px;display:flex;flex-direction:row;align-items:center;}
                             .price__row {gap: 0px 8px;}
                             .mt {margin-top: 0px;}
