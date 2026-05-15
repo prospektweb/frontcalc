@@ -55,19 +55,74 @@
     $button.removeData("frontcalc-disabled-was");
   }
 
-  function getCurrentOfferId() {
-    try {
-      var currentUrl = new URL(window.location.href);
-      return currentUrl.searchParams.get("oid") || "";
-    } catch (e) {
+  function normalizePositiveId(value) {
+    var id = String(value == null ? "" : value).trim();
+    return parseNumber(id, 0) > 0 ? id : "";
+  }
+
+  function getCartButtonOfferId($button) {
+    if (!$button || !$button.length) {
       return "";
     }
+
+    var cartSelector = '[data-action="basket"][data-id]';
+    var catalogWrapperSelector = ".catalog-table__wrapper, .catalog-list__wrapper, .catalog-block__wrapper";
+
+    function readCartId($scope) {
+      if (!$scope || !$scope.length) {
+        return "";
+      }
+
+      var $cartButton = $scope.is(cartSelector) ? $scope : $scope.find(cartSelector).first();
+      return normalizePositiveId($cartButton.attr("data-id"));
+    }
+
+    var explicitOfferId = normalizePositiveId($button.attr("data-frontcalc-offer-id"));
+    if (explicitOfferId) {
+      return explicitOfferId;
+    }
+
+    var $parent = $button.parent();
+    var parentOfferId = readCartId($parent);
+    if (parentOfferId) {
+      return parentOfferId;
+    }
+
+    var $catalogWrapper = $button.closest(catalogWrapperSelector);
+    var catalogOfferId = readCartId($catalogWrapper);
+    if (catalogOfferId) {
+      return catalogOfferId;
+    }
+
+    var buttonNode = $button.get(0);
+    var node = buttonNode ? buttonNode.parentElement : null;
+    while (node && node !== document.body && node !== document.documentElement) {
+      var nestedOfferId = readCartId($(node));
+      if (nestedOfferId) {
+        return nestedOfferId;
+      }
+      node = node.parentElement;
+    }
+
+    return "";
+  }
+
+  function getCurrentOfferId($button) {
+    try {
+      var currentUrl = new URL(window.location.href);
+      var urlOfferId = normalizePositiveId(currentUrl.searchParams.get("oid"));
+      if (urlOfferId) {
+        return urlOfferId;
+      }
+    } catch (e) {}
+
+    return getCartButtonOfferId($button);
   }
 
   function buildRequestInfo($button) {
     var productId = $button.data("frontcalc-product-id") || 0;
     var ajaxUrl = $button.data("frontcalc-ajax-url") || "";
-    var offerId = getCurrentOfferId();
+    var offerId = getCurrentOfferId($button);
     var divider = ajaxUrl.indexOf("?") === -1 ? "?" : "&";
     var requestUrl = ajaxUrl + divider + "product_id=" + encodeURIComponent(productId);
 
