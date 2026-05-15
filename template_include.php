@@ -114,6 +114,18 @@ HTML
     }
 }
 
+
+if (!function_exists('frontcalc_get_popup_form_id')) {
+    function frontcalc_get_popup_form_id(): int
+    {
+        if (class_exists('\Bitrix\Main\Config\Option')) {
+            return (int)\Bitrix\Main\Config\Option::get('prospektweb.frontcalc', 'POPUP_FORM_ID', '0');
+        }
+
+        return 0;
+    }
+}
+
 if (!function_exists('frontcalc_get_light_payload')) {
     function frontcalc_get_light_payload(int $productId, int $iblockId, string $ajaxUrl = ''): array
     {
