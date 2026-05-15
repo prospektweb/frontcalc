@@ -2504,18 +2504,34 @@
       return $();
     }
 
-    var $popup = $form.closest(".jqmWindow, .popup, #popup_iframe_wrapper");
-    if ($popup.length) {
-      $popup.addClass("frontcalc-standard-popup");
+    var markerSelector = '[name="' + STANDARD_POPUP_NAME + '"]';
+    var $marker = $form.is(markerSelector) ? $form : $form.find(markerSelector).first();
+    if (!$marker.length) {
+      $marker = $form;
     }
 
-    var $container = $form.siblings(".js-frontcalc-popup-standard-container").first();
+    var $jqmWindow = $marker.closest(".jqmWindow");
+    if ($jqmWindow.length) {
+      $jqmWindow.addClass("frontcalc-jqm-window frontcalc-standard-popup");
+    } else {
+      var $popup = $marker.closest(".popup, #popup_iframe_wrapper");
+      if ($popup.length) {
+        $popup.addClass("frontcalc-standard-popup");
+      }
+    }
+
+    var $insertTarget = $marker.is("form") ? $marker : $marker.closest("form");
+    if (!$insertTarget.length) {
+      $insertTarget = $marker;
+    }
+
+    var $container = $insertTarget.siblings(".js-frontcalc-popup-standard-container").first();
     if (!$container.length) {
       $container = $('<div class="frontcalc-popup-shell frontcalc-popup-standard-container js-frontcalc-popup-standard-container"><div class="frontcalc-popup-content js-frontcalc-popup-content"></div></div>');
-      $container.insertAfter($form);
+      $container.insertAfter($insertTarget);
     }
 
-    $form.data("frontcalc-hidden-by-popup", "Y").attr("aria-hidden", "true").hide();
+    $form.data("frontcalc-hidden-by-popup", "Y").attr("aria-hidden", "true");
     $container.show();
     return $container.find(".js-frontcalc-popup-content").first();
   }
