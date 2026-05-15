@@ -2357,7 +2357,7 @@
     });
   }
 
-  $(document).on("click", ".js-frontcalc-calculate", function (event) {
+  $(document).on("click", ".js-frontcalc-calculate, .frontcalc_but__openpopup[data-frontcalc-product-id]", function (event) {
     event.preventDefault();
     openPopup(this);
   });

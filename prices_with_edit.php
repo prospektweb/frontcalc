@@ -3,6 +3,7 @@
 namespace Aspro\Premier\Product;
 
 use Aspro\Premier\Vendor\Include;
+use Bitrix\Main\Config\Option;
 use Bitrix\Main\Loader;
 use Bitrix\Main\Localization\Loc;
 use CPremier as Solution;
@@ -21,6 +22,8 @@ class Prices
     protected $propsPrices;
 
     protected bool $isPopupTemplateCaptured = false;
+
+    protected ?array $frontcalcLightPayload = null;
 
     public function __construct(?array $item = null, ?array $params = null, ?array $options = null)
     {
@@ -826,6 +829,60 @@ class Prices
         <?php
     }
 
+    protected function getFrontcalcLightPayload(): array
+    {
+        if ($this->frontcalcLightPayload !== null) {
+            return $this->frontcalcLightPayload;
+        }
+
+        $productId = (int)($this->item['ID'] ?? 0);
+        $iblockId = (int)($this->item['IBLOCK_ID'] ?? $this->params['IBLOCK_ID'] ?? $this->params['CATALOG_IBLOCK_ID'] ?? 0);
+
+        if ($iblockId <= 0) {
+            $iblockId = (int)Option::get('prospektweb.frontcalc', 'PRODUCTS_IBLOCK_ID', '0');
+        }
+
+        $serviceClass = '\Prospektweb\Frontcalc\Service\CalculatorAvailability';
+        if (!class_exists($serviceClass)) {
+            Loader::includeModule('prospektweb.frontcalc');
+        }
+
+        if (!class_exists($serviceClass)) {
+            return $this->frontcalcLightPayload = [
+                'is_available' => false,
+                'product_id' => $productId,
+                'ajax_url' => '/local/ajax/frontcalc.php',
+            ];
+        }
+
+        $service = new $serviceClass();
+
+        return $this->frontcalcLightPayload = $service->getLightPayload($productId, $iblockId, '/local/ajax/frontcalc.php');
+    }
+
+    protected function isFrontcalcAvailable(): bool
+    {
+        $payload = $this->getFrontcalcLightPayload();
+
+        return !empty($payload['is_available']);
+    }
+
+    protected function renderFrontcalcRuntimeAssets(): string
+    {
+        if (!function_exists('frontcalc_render_runtime_assets')) {
+            $templateIncludeLocal = $_SERVER['DOCUMENT_ROOT'] . '/local/modules/prospektweb.frontcalc/template_include.php';
+            $templateIncludeBitrix = $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/prospektweb.frontcalc/template_include.php';
+
+            if (is_file($templateIncludeLocal)) {
+                require_once $templateIncludeLocal;
+            } elseif (is_file($templateIncludeBitrix)) {
+                require_once $templateIncludeBitrix;
+            }
+        }
+
+        return function_exists('frontcalc_render_runtime_assets') ? frontcalc_render_runtime_assets() : '';
+    }
+
     public function showRow(?array $row, ?bool $bWithPopup = false)
     {
         if ($row && is_array($row)) {
@@ -868,7 +925,7 @@ class Prices
                         <?php
                         $pricesTablePopover = new \Aspro\Premier\Popover\PricesTable($this);
                         ?>
-                        <?if ($frontCalcSettings):?>
+                        <?if ($this->isFrontcalcAvailable()):?>
                         <button
                             type="button"
                             class="price__popup-toggle xpopover-toggle secondary-color rounded-4"
@@ -1335,8 +1392,19 @@ class Prices
                         <?$this->showVat();?>
                     <?endif;?>
                 <?else:?>
-                    <?if (!$frontCalcSettings):?>
-                        <button class="frontcalc_but__openpopup" title="Расширенный режим расчёта стоимости" alt="Расширенный режим расчёта стоимости дайте возможность указать произвольный тираж, определить тип сроков и другие параметры">
+                    <?if ($this->isFrontcalcAvailable()):?>
+                        <?php
+                        $frontcalcPayload = $this->getFrontcalcLightPayload();
+                        echo $this->renderFrontcalcRuntimeAssets();
+                        ?>
+                        <button
+                            type="button"
+                            class="frontcalc_but__openpopup js-frontcalc-calculate"
+                            title="Расширенный режим расчёта стоимости"
+                            aria-label="Расширенный режим расчёта стоимости"
+                            data-frontcalc-product-id="<?= (int)$frontcalcPayload['product_id']; ?>"
+                            data-frontcalc-ajax-url="<?= htmlspecialcharsbx((string)$frontcalcPayload['ajax_url']); ?>"
+                        >
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="130 0 950 1180">
                             <path fill-rule="evenodd" d="
                                 M230 38H970A92 92 0 0 1 1062 130V1070A92 92 0 0 1 970 1162H230A92 92 0 0 1 138 1070V130A92 92 0 0 1 230 38Z
@@ -1386,8 +1454,9 @@ class Prices
                             </svg>
                         </button>
                         <style>
-                            .frontcalc_but__openpopup{width:<?= $this->isDetailPage() ? '64px' : '24px'; ?>;;background:none;border:none;fill:#555558;text-align:left;display:flex;align-items:center;padding:0;}
+                            .frontcalc_but__openpopup{width:<?= $this->isDetailPage() ? '64px' : '24px'; ?>;background:none;border:none;fill:#555558;text-align:left;display:flex;align-items:center;padding:0;cursor:pointer;}
                             .frontcalc_but__openpopup:hover{fill:var(--theme-base-color);}
+                            .frontcalc_but__openpopup:disabled{opacity:.65;cursor:wait;}
                             .prices--with-popup-table{gap:<?= $this->isDetailPage() ? '20px' : '10px'; ?>;display:flex;flex-direction:row;align-items:center;}
                             .price__row {gap: 0px 8px;}
                             .mt {margin-top: 0px;}
