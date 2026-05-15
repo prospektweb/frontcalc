@@ -708,6 +708,21 @@ class prospektweb_frontcalc extends CModule
             throw new \RuntimeException('Не удалось скопировать frontcalc-jqm-popup.js в /local/modules');
         }
 
+        $localCssTarget = $_SERVER['DOCUMENT_ROOT'] . '/local/modules/' . $this->MODULE_ID . '/assets/css/frontcalc-jqm-popup.css';
+        $localCssDir = dirname($localCssTarget);
+        if (!is_dir($localCssDir) && !@mkdir($localCssDir, 0775, true) && !is_dir($localCssDir)) {
+            throw new \RuntimeException('Не удалось создать каталог для /local/modules/.../frontcalc-jqm-popup.css');
+        }
+
+        $moduleCssSource = dirname(__DIR__) . '/assets/css/frontcalc-jqm-popup.css';
+        if (!is_file($moduleCssSource)) {
+            throw new \RuntimeException('Не найден исходный файл assets/css/frontcalc-jqm-popup.css');
+        }
+
+        if (!@copy($moduleCssSource, $localCssTarget)) {
+            throw new \RuntimeException('Не удалось скопировать frontcalc-jqm-popup.css в /local/modules');
+        }
+
         $localTemplateIncludeTarget = $_SERVER['DOCUMENT_ROOT'] . '/local/modules/' . $this->MODULE_ID . '/template_include.php';
         $localTemplateIncludeDir = dirname($localTemplateIncludeTarget);
         if (!is_dir($localTemplateIncludeDir) && !@mkdir($localTemplateIncludeDir, 0775, true) && !is_dir($localTemplateIncludeDir)) {
@@ -858,6 +873,11 @@ class prospektweb_frontcalc extends CModule
         $localJsTarget = $_SERVER['DOCUMENT_ROOT'] . '/local/modules/' . $this->MODULE_ID . '/assets/js/frontcalc-jqm-popup.js';
         if (is_file($localJsTarget)) {
             @unlink($localJsTarget);
+        }
+
+        $localCssTarget = $_SERVER['DOCUMENT_ROOT'] . '/local/modules/' . $this->MODULE_ID . '/assets/css/frontcalc-jqm-popup.css';
+        if (is_file($localCssTarget)) {
+            @unlink($localCssTarget);
         }
 
         $localTemplateIncludeTarget = $_SERVER['DOCUMENT_ROOT'] . '/local/modules/' . $this->MODULE_ID . '/template_include.php';
