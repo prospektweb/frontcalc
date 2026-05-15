@@ -835,12 +835,7 @@ class Prices
             return $this->frontcalcLightPayload;
         }
 
-        $productId = (int)($this->item['ID'] ?? 0);
-        $iblockId = (int)($this->item['IBLOCK_ID'] ?? $this->params['IBLOCK_ID'] ?? $this->params['CATALOG_IBLOCK_ID'] ?? 0);
-
-        if ($iblockId <= 0) {
-            $iblockId = (int)Option::get('prospektweb.frontcalc', 'PRODUCTS_IBLOCK_ID', '0');
-        }
+        [$productId, $iblockId] = $this->resolveFrontcalcProductContext();
 
         $serviceClass = '\Prospektweb\Frontcalc\Service\CalculatorAvailability';
         if (!class_exists($serviceClass)) {
@@ -858,6 +853,57 @@ class Prices
         $service = new $serviceClass();
 
         return $this->frontcalcLightPayload = $service->getLightPayload($productId, $iblockId, '/local/ajax/frontcalc.php');
+    }
+
+    protected function resolveFrontcalcProductContext(): array
+    {
+        $productId = (int)($this->item['ID'] ?? 0);
+        $iblockId = (int)($this->item['IBLOCK_ID'] ?? $this->params['IBLOCK_ID'] ?? $this->params['CATALOG_IBLOCK_ID'] ?? 0);
+        $productsIblockId = (int)Option::get('prospektweb.frontcalc', 'PRODUCTS_IBLOCK_ID', '0');
+        $offersIblockId = (int)Option::get('prospektweb.frontcalc', 'OFFERS_IBLOCK_ID', '0');
+
+        if ($productId > 0 && $productsIblockId > 0 && $iblockId === $productsIblockId) {
+            return [$productId, $productsIblockId];
+        }
+
+        if ($productId > 0 && $offersIblockId > 0 && $iblockId === $offersIblockId) {
+            $parentProduct = $this->getFrontcalcParentProduct($productId, $offersIblockId);
+            if ($parentProduct) {
+                return $parentProduct;
+            }
+        }
+
+        $detailProductId = (int)($this->params['ELEMENT_ID'] ?? 0);
+        if ($detailProductId > 0 && $productsIblockId > 0) {
+            return [$detailProductId, $productsIblockId];
+        }
+
+        if ($productId > 0 && $productsIblockId > 0 && $iblockId <= 0) {
+            return [$productId, $productsIblockId];
+        }
+
+        if ($productId > 0 && $iblockId > 0) {
+            return [$productId, $iblockId];
+        }
+
+        return [$productId, $productsIblockId];
+    }
+
+    protected function getFrontcalcParentProduct(int $offerId, int $offersIblockId): ?array
+    {
+        if ($offerId <= 0 || $offersIblockId <= 0 || !Loader::includeModule('catalog') || !class_exists('\CCatalogSku')) {
+            return null;
+        }
+
+        $parentProduct = \CCatalogSku::GetProductInfo($offerId, $offersIblockId);
+        if (!is_array($parentProduct)) {
+            return null;
+        }
+
+        $productId = (int)($parentProduct['ID'] ?? 0);
+        $iblockId = (int)($parentProduct['IBLOCK_ID'] ?? 0);
+
+        return $productId > 0 && $iblockId > 0 ? [$productId, $iblockId] : null;
     }
 
     protected function isFrontcalcAvailable(): bool
