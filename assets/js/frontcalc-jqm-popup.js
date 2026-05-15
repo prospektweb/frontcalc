@@ -4,6 +4,31 @@
   }
   window.__frontcalcJqmReady = true;
 
+  var STANDARD_POPUP_NAME = "frontcalc_popup";
+  var STANDARD_POPUP_WAIT_MS = 2500;
+  var STANDARD_POPUP_POLL_MS = 60;
+
+  function prepareStandardPopupTrigger(button) {
+    var $button = $(button);
+    if (!$button.length) {
+      return;
+    }
+
+    $button.addClass("jqm");
+    if (!$button.attr("data-name")) {
+      $button.attr("data-name", STANDARD_POPUP_NAME);
+    }
+    if (!$button.attr("data-param-id")) {
+      $button.attr("data-param-id", STANDARD_POPUP_NAME);
+    }
+  }
+
+  function prepareStandardPopupTriggers($scope) {
+    ($scope || $(document)).find(".js-frontcalc-calculate, .frontcalc_but__openpopup[data-frontcalc-product-id]").each(function () {
+      prepareStandardPopupTrigger(this);
+    });
+  }
+
   function escapeHtml(str) {
     return String(str || "").replace(/[&<>"']/g, function (ch) {
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[ch] || ch;
@@ -2424,15 +2449,125 @@
     });
   }
 
+  function getStandardPopupCandidates() {
+    var directSelector = [
+      'form[name="' + STANDARD_POPUP_NAME + '"]',
+      'form[data-name="' + STANDARD_POPUP_NAME + '"]',
+      'form[data-param-id="' + STANDARD_POPUP_NAME + '"]',
+      '[name="' + STANDARD_POPUP_NAME + '"]',
+      '[data-name="' + STANDARD_POPUP_NAME + '"]',
+      '[data-param-id="' + STANDARD_POPUP_NAME + '"]'
+    ].join(",");
+
+    var $direct = $(directSelector);
+    if ($direct.length) {
+      return $direct;
+    }
+
+    return $("form[data-param-id], .jqmWindow[data-param-id], .popup[data-param-id]").filter(function () {
+      var value = String($(this).attr("data-param-id") || "").toLowerCase();
+      return !value || value.indexOf("frontcalc") !== -1;
+    });
+  }
+
+  function getOpenedStandardPopupForm() {
+    var $candidates = getStandardPopupCandidates();
+    var $best = $();
+
+    $candidates.each(function () {
+      var $node = $(this);
+      var $popup = $node.closest(".jqmWindow, .popup, #popup_iframe_wrapper");
+      if (!$popup.length) {
+        return;
+      }
+      if (!$popup.is(":visible") && !$popup.hasClass("show") && !$popup.hasClass("opened")) {
+        return;
+      }
+
+      if ($node.is("form")) {
+        $best = $node;
+        return false;
+      }
+
+      var $form = $node.find('form[name="' + STANDARD_POPUP_NAME + '"], form[data-name="' + STANDARD_POPUP_NAME + '"], form[data-param-id]').first();
+      if ($form.length) {
+        $best = $form;
+        return false;
+      }
+    });
+
+    return $best;
+  }
+
+  function mountIntoStandardPopup($form) {
+    if (!$form || !$form.length) {
+      return $();
+    }
+
+    var $popup = $form.closest(".jqmWindow, .popup, #popup_iframe_wrapper");
+    if ($popup.length) {
+      $popup.addClass("frontcalc-standard-popup");
+    }
+
+    var $container = $form.siblings(".js-frontcalc-popup-standard-container").first();
+    if (!$container.length) {
+      $container = $('<div class="frontcalc-popup-shell frontcalc-popup-standard-container js-frontcalc-popup-standard-container"><div class="frontcalc-popup-content js-frontcalc-popup-content"></div></div>');
+      $container.insertAfter($form);
+    }
+
+    $form.data("frontcalc-hidden-by-popup", "Y").attr("aria-hidden", "true").hide();
+    $container.show();
+    return $container.find(".js-frontcalc-popup-content").first();
+  }
+
+  function openStandardPopup(button, renderCallback, fallbackCallback) {
+    prepareStandardPopupTrigger(button);
+
+    var startedAt = Date.now();
+    var timer = null;
+
+    function tryMount() {
+      var $form = getOpenedStandardPopupForm();
+      var $content = mountIntoStandardPopup($form);
+      if ($content.length) {
+        renderCallback($content);
+        return;
+      }
+
+      if (Date.now() - startedAt >= STANDARD_POPUP_WAIT_MS) {
+        fallbackCallback();
+        return;
+      }
+
+      timer = window.setTimeout(tryMount, STANDARD_POPUP_POLL_MS);
+    }
+
+    tryMount();
+
+    return function () {
+      if (timer) {
+        window.clearTimeout(timer);
+      }
+    };
+  }
+
   function openCalculatorPopup(button, payload, offerId) {
-    openFrame(button, function ($content) {
+    openStandardPopup(button, function ($content) {
       renderCalculator($content, payload, { offerId: offerId });
+    }, function () {
+      openFrame(button, function ($content) {
+        renderCalculator($content, payload, { offerId: offerId });
+      });
     });
   }
 
   function openErrorPopup(button, message) {
-    openFrame(button, function ($content) {
+    openStandardPopup(button, function ($content) {
       renderError($content, message);
+    }, function () {
+      openFrame(button, function ($content) {
+        renderError($content, message);
+      });
     });
   }
 
@@ -2493,7 +2628,25 @@
     );
   }
 
+  prepareStandardPopupTriggers();
+
+  document.addEventListener("click", function (event) {
+    var node = event.target;
+    while (node && node !== document) {
+      if ($(node).is(".js-frontcalc-calculate, .frontcalc_but__openpopup[data-frontcalc-product-id]")) {
+        prepareStandardPopupTrigger(node);
+        return;
+      }
+      node = node.parentNode;
+    }
+  }, true);
+
+  $(document).on("mouseover focusin", ".js-frontcalc-calculate, .frontcalc_but__openpopup[data-frontcalc-product-id]", function () {
+    prepareStandardPopupTrigger(this);
+  });
+
   $(document).on("click", ".js-frontcalc-calculate, .frontcalc_but__openpopup[data-frontcalc-product-id]", function (event) {
+    prepareStandardPopupTrigger(this);
     event.preventDefault();
     openPopup(this);
   });
