@@ -65,10 +65,14 @@
       return "";
     }
 
-    var cartSelector = '.js-item-action[data-action="basket"][data-id], .to_cart[data-id], [data-action="basket"][data-id]';
+    var cartSelector = '[data-action="basket"][data-id]';
     var catalogWrapperSelector = ".catalog-table__wrapper, .catalog-list__wrapper, .catalog-block__wrapper";
 
     function readCartId($scope) {
+      if (!$scope || !$scope.length) {
+        return "";
+      }
+
       var $cartButton = $scope.is(cartSelector) ? $scope : $scope.find(cartSelector).first();
       return normalizePositiveId($cartButton.attr("data-id"));
     }
@@ -78,27 +82,29 @@
       return explicitOfferId;
     }
 
+    var $parent = $button.parent();
+    var parentOfferId = readCartId($parent);
+    if (parentOfferId) {
+      return parentOfferId;
+    }
+
     var $catalogWrapper = $button.closest(catalogWrapperSelector);
-    if ($catalogWrapper.length) {
-      var catalogOfferId = readCartId($catalogWrapper);
-      if (catalogOfferId) {
-        return catalogOfferId;
-      }
+    var catalogOfferId = readCartId($catalogWrapper);
+    if (catalogOfferId) {
+      return catalogOfferId;
     }
 
     var buttonNode = $button.get(0);
     var node = buttonNode ? buttonNode.parentElement : null;
     while (node && node !== document.body && node !== document.documentElement) {
-      var $node = $(node);
-      var $cartButtons = $node.find(cartSelector);
-      if ($cartButtons.length === 1) {
-        return normalizePositiveId($cartButtons.first().attr("data-id"));
+      var nestedOfferId = readCartId($(node));
+      if (nestedOfferId) {
+        return nestedOfferId;
       }
       node = node.parentElement;
     }
 
-    var $pageCartButtons = $(cartSelector);
-    return $pageCartButtons.length === 1 ? normalizePositiveId($pageCartButtons.first().attr("data-id")) : "";
+    return "";
   }
 
   function getCurrentOfferId($button) {
