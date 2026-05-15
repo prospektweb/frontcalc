@@ -868,7 +868,7 @@ class Prices
                         <?php
                         $pricesTablePopover = new \Aspro\Premier\Popover\PricesTable($this);
                         ?>
-
+                        <?if ($frontCalcSettings):?>
                         <button
                             type="button"
                             class="price__popup-toggle xpopover-toggle secondary-color rounded-4"
@@ -876,6 +876,7 @@ class Prices
                         >
                             <?$pricesTablePopover->showContent();?>
                         </button>
+                        <?endif;?>
                     <?endif;?>
 
                     <div class="price__new fw-<?=$this->options['PRICE_WEIGHT'];?>">
@@ -986,9 +987,13 @@ class Prices
                         <?=$this->options['EXTENDED_INFO'];?>
                     </div><?// class="price__row"?>
                 <?endif;?>
+                <?if($this->options['DISPLAY_VAT_INFO'] === 'Y'):?>
+                    <?$this->showVat();?>
+                <?endif;?>
             </div>
             <?php
         }
+
     }
 
     protected function getCalcPropVolumeValue(): ?string
@@ -1326,11 +1331,68 @@ class Prices
             <div class="<?=$pricesClasses;?>">
                 <?if ($this->isWithInlineTable()):?>
                     <?$this->showTable();?>
+                    <?if($this->options['DISPLAY_VAT_INFO'] === 'Y'):?>
+                        <?$this->showVat();?>
+                    <?endif;?>
                 <?else:?>
+                    <?if (!$frontCalcSettings):?>
+                        <button class="frontcalc_but__openpopup" title="Расширенный режим расчёта стоимости" alt="Расширенный режим расчёта стоимости дайте возможность указать произвольный тираж, определить тип сроков и другие параметры">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="130 0 950 1180">
+                            <path fill-rule="evenodd" d="
+                                M230 38H970A92 92 0 0 1 1062 130V1070A92 92 0 0 1 970 1162H230A92 92 0 0 1 138 1070V130A92 92 0 0 1 230 38Z
+                                M230 75A55 55 0 0 0 175 130V1070A55 55 0 0 0 230 1125H970A55 55 0 0 0 1025 1070V130A55 55 0 0 0 970 75H230Z
+
+                                M262 150H938A20 20 0 0 1 958 170V392A20 20 0 0 1 938 412H262A20 20 0 0 1 242 392V170A20 20 0 0 1 262 150Z
+                                M280 188V375H920V188H280Z
+
+                                M338 207A19 19 0 0 1 357 226V337A19 19 0 0 1 319 337V226A19 19 0 0 1 338 207Z
+                                M413 207A19 19 0 0 1 432 226V337A19 19 0 0 1 394 337V226A19 19 0 0 1 413 207Z
+                                M488 207A19 19 0 0 1 507 226V337A19 19 0 0 1 469 337V226A19 19 0 0 1 488 207Z
+                                M563 207A19 19 0 0 1 582 226V337A19 19 0 0 1 544 337V226A19 19 0 0 1 563 207Z
+
+                                M262 506H376A20 20 0 0 1 396 526V638A20 20 0 0 1 376 658H262A20 20 0 0 1 242 638V526A20 20 0 0 1 262 506Z
+                                M282 543V620H356V543H282Z
+
+                                M448 506H562A20 20 0 0 1 582 526V638A20 20 0 0 1 562 658H448A20 20 0 0 1 428 638V526A20 20 0 0 1 448 506Z
+                                M468 543V620H542V543H468Z
+
+                                M634 506H748A20 20 0 0 1 768 526V638A20 20 0 0 1 748 658H634A20 20 0 0 1 614 638V526A20 20 0 0 1 634 506Z
+                                M654 543V620H728V543H654Z
+
+                                M820 506H934A20 20 0 0 1 954 526V638A20 20 0 0 1 934 658H820A20 20 0 0 1 800 638V526A20 20 0 0 1 820 506Z
+                                M840 543V620H914V543H840Z
+
+                                M262 694H376A20 20 0 0 1 396 714V826A20 20 0 0 1 376 846H262A20 20 0 0 1 242 826V714A20 20 0 0 1 262 694Z
+                                M282 731V808H356V731H282Z
+
+                                M448 694H562A20 20 0 0 1 582 714V826A20 20 0 0 1 562 846H448A20 20 0 0 1 428 826V714A20 20 0 0 1 448 694Z
+                                M468 731V808H542V731H468Z
+
+                                M634 694H748A20 20 0 0 1 768 714V826A20 20 0 0 1 748 846H634A20 20 0 0 1 614 826V714A20 20 0 0 1 634 694Z
+                                M654 731V808H728V731H654Z
+
+                                M262 882H376A20 20 0 0 1 396 902V1014A20 20 0 0 1 376 1034H262A20 20 0 0 1 242 1014V902A20 20 0 0 1 262 882Z
+                                M282 919V996H356V919H282Z
+
+                                M448 882H562A20 20 0 0 1 582 902V1014A20 20 0 0 1 562 1034H448A20 20 0 0 1 428 1014V902A20 20 0 0 1 448 882Z
+                                M468 919V996H542V919H468Z
+
+                                M634 882H748A20 20 0 0 1 768 902V1014A20 20 0 0 1 748 1034H634A20 20 0 0 1 614 1014V902A20 20 0 0 1 634 882Z
+                                M654 919V996H728V919H654Z
+
+                                M820 694H934A20 20 0 0 1 954 714V1014A20 20 0 0 1 934 1034H820A20 20 0 0 1 800 1014V714A20 20 0 0 1 820 694Z
+                                M840 731V996H914V731H840Z
+                            "></path>
+                            </svg>
+                        </button>
+                        <style>
+                            .frontcalc_but__openpopup {width:64px;background: none;border: none;fill: #555558;text-align: left;display: flex;align-items: center;padding: 0;}
+                            .prices--with-popup-table{gap:20px;display:flex;flex-direction:row;align-items:center;}
+                            .price__row {gap: 0px 8px;}
+                            .mt {margin-top: 0px;}
+                        </style>
+                    <?endif;?>
                     <?$this->showRow($this->currentPrice, $this->isWithPopupTable());?>
-                <?endif;?>
-                <?if($this->options['DISPLAY_VAT_INFO'] === 'Y'):?>
-                    <?$this->showVat();?>
                 <?endif;?>
                 <?Include\Component::bonusesShow(params: ['ID' => $this->item['ID']]);?>
             </div>
