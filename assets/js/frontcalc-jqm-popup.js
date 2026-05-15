@@ -70,16 +70,13 @@
     var offerId = getCurrentOfferId();
     var divider = ajaxUrl.indexOf("?") === -1 ? "?" : "&";
     var requestUrl = ajaxUrl + divider + "product_id=" + encodeURIComponent(productId);
-    if (offerId) {
-      requestUrl += "&offer_id=" + encodeURIComponent(offerId);
-    }
 
     return {
       productId: String(productId || ""),
       ajaxUrl: ajaxUrl,
       offerId: String(offerId || ""),
       requestUrl: requestUrl,
-      cacheKey: [ajaxUrl, productId, offerId].join("|")
+      cacheKey: [ajaxUrl, productId].join("|")
     };
   }
 
@@ -1744,8 +1741,9 @@
     return /\|\s*(Строгий|Гибкий) срок\s*$/.test(base) ? base.replace(/\|\s*(Строгий|Гибкий) срок\s*$/, "| " + label) : base + " | " + label;
   }
 
-  function renderCalculator($content, payload) {
+  function renderCalculator($content, payload, initialState) {
     var data = payload && payload.data ? payload.data : {};
+    var state = initialState || {};
     var config = data.config || {};
     var offers = Array.isArray(data.offers) ? data.offers : [];
     var priceGroups = collectAvailablePriceGroups(data.price_groups_view, offers);
@@ -1937,7 +1935,8 @@
       return best ? best.offer : null;
     }
 
-    var requestedOfferId = parseNumber(data.requested_offer_id, 0);
+    var stateOfferId = String(state.offerId || "").trim();
+    var requestedOfferId = stateOfferId !== "" ? parseNumber(stateOfferId, 0) : parseNumber(data.requested_offer_id, 0);
     var defaultOffer = null;
     if (requestedOfferId > 0) {
       defaultOffer = offers.find(function (offer) {
@@ -2370,9 +2369,9 @@
     });
   }
 
-  function openCalculatorPopup(button, payload) {
+  function openCalculatorPopup(button, payload, offerId) {
     openFrame(button, function ($content) {
-      renderCalculator($content, payload);
+      renderCalculator($content, payload, { offerId: offerId });
     });
   }
 
@@ -2406,7 +2405,7 @@
     }
 
     if (payloadCache[info.cacheKey]) {
-      openCalculatorPopup(button, payloadCache[info.cacheKey]);
+      openCalculatorPopup(button, payloadCache[info.cacheKey], info.offerId);
       return;
     }
 
@@ -2418,7 +2417,7 @@
         openErrorPopup(button, payload && payload.message ? payload.message : ("Ошибка запроса: " + (errorMessage || "Сервер вернул ошибку.")));
         return;
       }
-      openCalculatorPopup(button, payload);
+      openCalculatorPopup(button, payload, info.offerId);
     };
 
     if (inflightRequests[info.cacheKey]) {
