@@ -913,20 +913,34 @@ class Prices
         return !empty($payload['is_available']);
     }
 
-    protected function renderFrontcalcRuntimeAssets(): string
+    protected function includeFrontcalcRuntimeHelpers(): void
     {
-        if (!function_exists('frontcalc_render_runtime_assets')) {
-            $templateIncludeLocal = $_SERVER['DOCUMENT_ROOT'] . '/local/modules/prospektweb.frontcalc/template_include.php';
-            $templateIncludeBitrix = $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/prospektweb.frontcalc/template_include.php';
-
-            if (is_file($templateIncludeLocal)) {
-                require_once $templateIncludeLocal;
-            } elseif (is_file($templateIncludeBitrix)) {
-                require_once $templateIncludeBitrix;
-            }
+        if (function_exists('frontcalc_render_runtime_assets') && function_exists('frontcalc_get_popup_form_id')) {
+            return;
         }
 
+        $templateIncludeLocal = $_SERVER['DOCUMENT_ROOT'] . '/local/modules/prospektweb.frontcalc/template_include.php';
+        $templateIncludeBitrix = $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/prospektweb.frontcalc/template_include.php';
+
+        if (is_file($templateIncludeLocal)) {
+            require_once $templateIncludeLocal;
+        } elseif (is_file($templateIncludeBitrix)) {
+            require_once $templateIncludeBitrix;
+        }
+    }
+
+    protected function renderFrontcalcRuntimeAssets(): string
+    {
+        $this->includeFrontcalcRuntimeHelpers();
+
         return function_exists('frontcalc_render_runtime_assets') ? frontcalc_render_runtime_assets() : '';
+    }
+
+    protected function getFrontcalcPopupFormId(): int
+    {
+        $this->includeFrontcalcRuntimeHelpers();
+
+        return function_exists('frontcalc_get_popup_form_id') ? frontcalc_get_popup_form_id() : 0;
     }
 
     public function showRow(?array $row, ?bool $bWithPopup = false)
@@ -1442,6 +1456,7 @@ class Prices
                     <?if ($this->isFrontcalcAvailable()):?>
                         <?php
                         $frontcalcPayload = $this->getFrontcalcLightPayload();
+                        $frontcalcPopupFormId = $this->getFrontcalcPopupFormId();
                         echo $this->renderFrontcalcRuntimeAssets();
                         ?>
                         <button
@@ -1449,6 +1464,9 @@ class Prices
                             class="frontcalc_but__openpopup js-frontcalc-calculate"
                             title="Расширенный режим расчёта стоимости"
                             aria-label="Расширенный режим расчёта стоимости"
+                            data-event="jqm"
+                            data-name="frontcalc_popup"
+                            data-param-id="<?= (int)$frontcalcPopupFormId ?>"
                             data-frontcalc-product-id="<?= (int)$frontcalcPayload['product_id']; ?>"
                             data-frontcalc-ajax-url="<?= htmlspecialcharsbx((string)$frontcalcPayload['ajax_url']); ?>"
                         >
