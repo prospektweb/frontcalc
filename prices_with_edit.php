@@ -971,8 +971,9 @@ class Prices
                         <?php
                         $pricesTablePopover = new \Aspro\Premier\Popover\PricesTable($this);
                         ?>
-                        <?if ($this->isFrontcalcAvailable()):?>
+                        <?if (!$this->isFrontcalcAvailable()):?>
                         <button
+                            title="Расширенная информация о ценах"
                             type="button"
                             class="price__popup-toggle xpopover-toggle secondary-color rounded-4"
                             <?$pricesTablePopover->showToggleAttrs();?>
