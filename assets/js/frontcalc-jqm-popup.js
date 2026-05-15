@@ -2359,8 +2359,6 @@
 
   $(document).on("click", ".js-frontcalc-calculate", function (event) {
     event.preventDefault();
-    event.stopPropagation();
-    event.stopImmediatePropagation();
     openPopup(this);
   });
 })(window, document, window.jQuery);

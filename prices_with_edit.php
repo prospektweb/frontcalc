@@ -4,7 +4,6 @@ namespace Aspro\Premier\Product;
 
 use Aspro\Premier\Vendor\Include;
 use Bitrix\Main\Loader;
-use Bitrix\Main\Config\Option;
 use Bitrix\Main\Localization\Loc;
 use CPremier as Solution;
 
@@ -827,189 +826,6 @@ class Prices
         <?php
     }
 
-
-    protected function getFrontcalcPropertyCode(): string
-    {
-        if (class_exists(Option::class)) {
-            $propertyCode = (string)Option::get('prospektweb.frontcalc', 'CALC_PROPERTY_CODE', 'FRONTCALC_CONFIG');
-        } else {
-            $propertyCode = 'FRONTCALC_CONFIG';
-        }
-
-        $propertyCode = trim($propertyCode);
-
-        return $propertyCode !== '' ? $propertyCode : 'FRONTCALC_CONFIG';
-    }
-
-    protected function getFrontcalcProductId(): int
-    {
-        $productId = (int)($this->item['ID'] ?? 0);
-        if ($productId > 0) {
-            return $productId;
-        }
-
-        return (int)($this->params['ELEMENT_ID'] ?? $this->params['ITEM_ID'] ?? 0);
-    }
-
-    protected function getFrontcalcIblockId(): int
-    {
-        $iblockId = (int)($this->item['IBLOCK_ID'] ?? 0);
-        if ($iblockId > 0) {
-            return $iblockId;
-        }
-
-        return (int)($this->params['IBLOCK_ID'] ?? $this->params['CATALOG_IBLOCK_ID'] ?? 0);
-    }
-
-    protected function getFrontcalcAjaxUrl(): string
-    {
-        $ajaxUrl = trim((string)($this->params['FRONTCALC_AJAX_URL'] ?? $this->options['FRONTCALC_AJAX_URL'] ?? ''));
-
-        return $ajaxUrl !== '' ? $ajaxUrl : '/local/ajax/frontcalc.php';
-    }
-
-    protected function hasFrontcalcConfig(): bool
-    {
-        $configValue = $this->getFrontcalcConfigValue();
-        if ($configValue === null) {
-            return false;
-        }
-
-        $decoded = json_decode($configValue, true);
-        if (!is_array($decoded) || json_last_error() !== JSON_ERROR_NONE) {
-            return false;
-        }
-
-        $fields = $decoded['fields'] ?? null;
-        if (!is_array($fields) || !$fields) {
-            return false;
-        }
-
-        foreach ($fields as $field) {
-            if (!is_array($field)) {
-                continue;
-            }
-
-            $propertyCode = trim((string)($field['property_code'] ?? ''));
-            if ($propertyCode !== '') {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    protected function getFrontcalcConfigValue(): ?string
-    {
-        $propertyCode = $this->getFrontcalcPropertyCode();
-
-        foreach (['PROPERTIES', 'DISPLAY_PROPERTIES'] as $propertyBucket) {
-            $value = $this->extractFrontcalcPropertyValue($this->item[$propertyBucket][$propertyCode] ?? null);
-            if ($value !== null) {
-                return $value;
-            }
-        }
-
-        $productId = $this->getFrontcalcProductId();
-        $iblockId = $this->getFrontcalcIblockId();
-        if ($productId <= 0 || $iblockId <= 0) {
-            return null;
-        }
-
-        if (!class_exists('\\CIBlockElement')) {
-            if (class_exists(Loader::class)) {
-                Loader::includeModule('iblock');
-            } elseif (class_exists('\\CModule')) {
-                \CModule::IncludeModule('iblock');
-            }
-        }
-
-        if (!class_exists('\\CIBlockElement')) {
-            return null;
-        }
-
-        $propertyResult = \CIBlockElement::GetProperty($iblockId, $productId, [], ['CODE' => $propertyCode]);
-        if (!is_object($propertyResult) || !method_exists($propertyResult, 'Fetch')) {
-            return null;
-        }
-
-        while ($property = $propertyResult->Fetch()) {
-            $value = $this->extractFrontcalcPropertyValue($property);
-            if ($value !== null) {
-                return $value;
-            }
-        }
-
-        return null;
-    }
-
-    protected function extractFrontcalcPropertyValue($property): ?string
-    {
-        if ($property === null || $property === false) {
-            return null;
-        }
-
-        if (is_string($property) || is_numeric($property)) {
-            $value = trim((string)$property);
-
-            return $value !== '' ? $value : null;
-        }
-
-        if (!is_array($property)) {
-            return null;
-        }
-
-        foreach (['~VALUE', 'VALUE', 'DISPLAY_VALUE'] as $valueKey) {
-            if (!array_key_exists($valueKey, $property)) {
-                continue;
-            }
-
-            $value = $property[$valueKey];
-            if (is_array($value) && array_key_exists('TEXT', $value)) {
-                $value = $value['TEXT'];
-            }
-
-            if (is_array($value)) {
-                foreach ($value as $itemValue) {
-                    $extractedValue = $this->extractFrontcalcPropertyValue($itemValue);
-                    if ($extractedValue !== null) {
-                        return $extractedValue;
-                    }
-                }
-                continue;
-            }
-
-            if (is_string($value) || is_numeric($value)) {
-                $value = trim((string)$value);
-                if ($value !== '') {
-                    return $value;
-                }
-            }
-        }
-
-        return null;
-    }
-
-    protected function renderFrontcalcRuntimeAssets(): string
-    {
-        $localTemplateInclude = $_SERVER['DOCUMENT_ROOT'] . '/local/modules/prospektweb.frontcalc/template_include.php';
-        $bitrixTemplateInclude = $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/prospektweb.frontcalc/template_include.php';
-
-        if (!function_exists('\\frontcalc_render_runtime_assets')) {
-            if (is_file($localTemplateInclude)) {
-                require_once $localTemplateInclude;
-            } elseif (is_file($bitrixTemplateInclude)) {
-                require_once $bitrixTemplateInclude;
-            }
-        }
-
-        if (function_exists('\\frontcalc_render_runtime_assets')) {
-            return \frontcalc_render_runtime_assets();
-        }
-
-        return '';
-    }
-
     public function showRow(?array $row, ?bool $bWithPopup = false)
     {
         if ($row && is_array($row)) {
@@ -1049,30 +865,17 @@ class Prices
                 <?endif;?>
 
                     <?if ($bWithPopup):?>
-                        <?php $hasFrontcalcConfig = $this->hasFrontcalcConfig(); ?>
-                        <?if ($hasFrontcalcConfig):?>
-                            <?=$this->renderFrontcalcRuntimeAssets();?>
-                            <button
-                                type="button"
-                                class="price__popup-toggle secondary-color rounded-4 js-frontcalc-calculate js-frontcalc-price-toggle"
-                                data-frontcalc-product-id="<?=htmlspecialcharsbx((string)$this->getFrontcalcProductId());?>"
-                                data-frontcalc-ajax-url="<?=htmlspecialcharsbx($this->getFrontcalcAjaxUrl());?>"
-                            >
-                                &hellip;
-                            </button>
-                        <?else:?>
-                            <?php
-                            $pricesTablePopover = new \Aspro\Premier\Popover\PricesTable($this);
-                            ?>
+                        <?php
+                        $pricesTablePopover = new \Aspro\Premier\Popover\PricesTable($this);
+                        ?>
 
-                            <button
-                                type="button"
-                                class="price__popup-toggle xpopover-toggle secondary-color rounded-4"
-                                <?$pricesTablePopover->showToggleAttrs();?>
-                            >
-                                <?$pricesTablePopover->showContent();?>
-                            </button>
-                        <?endif;?>
+                        <button
+                            type="button"
+                            class="price__popup-toggle xpopover-toggle secondary-color rounded-4"
+                            <?$pricesTablePopover->showToggleAttrs();?>
+                        >
+                            <?$pricesTablePopover->showContent();?>
+                        </button>
                     <?endif;?>
 
                     <div class="price__new fw-<?=$this->options['PRICE_WEIGHT'];?>">

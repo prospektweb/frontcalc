@@ -105,3 +105,68 @@ HTML
         );
     }
 }
+
+if (!function_exists('frontcalc_get_light_payload')) {
+    function frontcalc_get_light_payload(int $productId, int $iblockId, string $ajaxUrl = ''): array
+    {
+        $serviceClass = '\\Prospektweb\\Frontcalc\\Service\\CalculatorAvailability';
+
+        if (!class_exists($serviceClass)) {
+            if (class_exists('\\Bitrix\\Main\\Loader')) {
+                \Bitrix\Main\Loader::includeModule('prospektweb.frontcalc');
+            } elseif (class_exists('\\CModule')) {
+                \CModule::IncludeModule('prospektweb.frontcalc');
+            }
+        }
+
+        if (!class_exists($serviceClass)) {
+            return [
+                'is_available' => $productId > 0,
+                'product_id' => $productId,
+                'ajax_url' => $ajaxUrl !== '' ? $ajaxUrl : '/local/ajax/frontcalc.php',
+            ];
+        }
+
+        $service = new $serviceClass();
+
+        return $service->getLightPayload($productId, $iblockId, $ajaxUrl);
+    }
+}
+
+if (!function_exists('frontcalc_render_calculate_button')) {
+    function frontcalc_render_calculate_button(int $productId, int $iblockId, string $caption = 'Рассчитать стоимость', string $ajaxUrl = '', string $sizeClass = 'btn-lg'): string
+    {
+        $payload = frontcalc_get_light_payload($productId, $iblockId, $ajaxUrl);
+
+        if (empty($payload['is_available'])) {
+            return '';
+        }
+
+        $sizeClass = trim(preg_replace('/[^a-zA-Z0-9_-]+/', ' ', $sizeClass));
+        if ($sizeClass === '') {
+            $sizeClass = 'btn-lg';
+        }
+
+        return frontcalc_render_runtime_assets() . sprintf(
+            '<button type="button" class="btn btn-default btn-transparent-bg %s frontcalc-calculate-button js-frontcalc-calculate" data-frontcalc-product-id="%d" data-frontcalc-ajax-url="%s">%s</button>',
+            htmlspecialcharsbx($sizeClass),
+            (int)$payload['product_id'],
+            htmlspecialcharsbx((string)$payload['ajax_url']),
+            htmlspecialcharsbx($caption)
+        );
+    }
+}
+
+if (!function_exists('frontcalc_render_catalog_button')) {
+    function frontcalc_render_catalog_button(int $productId, int $iblockId, string $ajaxUrl = ''): string
+    {
+        return frontcalc_render_calculate_button($productId, $iblockId, 'Рассчитать стоимость', $ajaxUrl, 'btn-lg');
+    }
+}
+
+if (!function_exists('frontcalc_render_detail_button')) {
+    function frontcalc_render_detail_button(int $productId, int $iblockId, string $ajaxUrl = ''): string
+    {
+        return frontcalc_render_calculate_button($productId, $iblockId, 'Рассчитать стоимость', $ajaxUrl, 'btn-elg');
+    }
+}
