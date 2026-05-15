@@ -28,7 +28,7 @@
 .frontcalc-input-group{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
 .frontcalc-input-group-divider{display:inline-flex;align-items:center;height:46px;color:#667085;font-size:14px;line-height:1;}
 .frontcalc-input-group .frontcalc-field__title{font-size:20px;color:#5f6a83;}
-.frontcalc-price-panel__inner{position:sticky;top:12px;border:1px solid #d9dee7;background:#fafbff;padding:48px 32px;}
+.frontcalc-price-panel__inner{position:sticky;top:12px;border:1px solid #d9dee7;background:#fafbff;padding:32px 24px;}
 .frontcalc-price-groups{display:flex;flex-wrap:wrap;gap:4px;margin:0;}
 .frontcalc-price-group{min-height:34px;padding:6px 12px;border:1px solid #d9dee7;border-radius:4px;background:none;color:#33405a;font-size:14px;line-height:1.2;cursor:pointer;width:calc(50% - 4px);}
 .frontcalc-price-group:hover{border-color:#2f3a52;}
