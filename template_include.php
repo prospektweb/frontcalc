@@ -93,6 +93,14 @@ if (!function_exists('frontcalc_render_runtime_assets')) {
         }
         event.preventDefault();
         event.stopImmediatePropagation();
+        button.classList.add('is-frontcalc-loading');
+        button.setAttribute('aria-busy', 'true');
+        if (!button.querySelector('.frontcalc-button-spinner')) {
+            var spinner = d.createElement('span');
+            spinner.className = 'frontcalc-button-spinner';
+            spinner.setAttribute('aria-hidden', 'true');
+            button.appendChild(spinner);
+        }
         ensureFrontcalcModule(function(){
             if (button && typeof button.click === 'function') {
                 button.click();
