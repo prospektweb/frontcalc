@@ -152,6 +152,7 @@ class prospektweb_frontcalc extends CModule
         Option::set($this->MODULE_ID, 'OFFERS_IBLOCK_ID', (string)$offersIblockId);
         Option::set($this->MODULE_ID, 'CALC_PROPERTY_CODE', 'FRONTCALC_CONFIG');
 
+        $this->ensurePopupForm();
         $this->ensureCalcConfigProperty($productsIblockId, 'FRONTCALC_CONFIG');
         $this->registerAdminHandlers();
 
@@ -166,6 +167,7 @@ class prospektweb_frontcalc extends CModule
         $this->unregisterAdminHandlers();
 
         if ($removeData) {
+            $this->removePopupForm();
             $this->removeCalcConfigProperty($productsIblockId, $propertyCode);
             Option::delete($this->MODULE_ID);
         } else {
@@ -176,6 +178,90 @@ class prospektweb_frontcalc extends CModule
         return true;
     }
 
+
+    protected function ensurePopupForm()
+    {
+        if (!Loader::includeModule('form')) {
+            throw new \RuntimeException('Не найден обязательный модуль: form');
+        }
+
+        $popupSid = 'frontcalc_popup';
+        $savedFormId = (int)Option::get($this->MODULE_ID, 'POPUP_FORM_ID', '0');
+        if ($savedFormId > 0) {
+            $savedForm = $this->getPopupFormById($savedFormId);
+            if ($savedForm && (string)$savedForm['SID'] === $popupSid) {
+                return $savedFormId;
+            }
+        }
+
+        $existingForm = $this->getPopupFormBySid($popupSid);
+        if ($existingForm && !empty($existingForm['ID'])) {
+            $formId = (int)$existingForm['ID'];
+            Option::set($this->MODULE_ID, 'POPUP_FORM_ID', (string)$formId);
+            return $formId;
+        }
+
+        $formId = \CForm::Set([
+            'SID' => $popupSid,
+            'NAME' => 'Popup Container',
+            'BUTTON' => 'Рассчитать стоимость',
+            'USE_CAPTCHA' => 'N',
+        ], false, 'N');
+
+        $formId = (int)$formId;
+        if ($formId <= 0) {
+            throw new \RuntimeException('Не удалось создать веб-форму Popup Container');
+        }
+
+        Option::set($this->MODULE_ID, 'POPUP_FORM_ID', (string)$formId);
+
+        return $formId;
+    }
+
+    protected function removePopupForm()
+    {
+        $formId = (int)Option::get($this->MODULE_ID, 'POPUP_FORM_ID', '0');
+        if ($formId <= 0 || !Loader::includeModule('form')) {
+            return;
+        }
+
+        $form = $this->getPopupFormById($formId);
+        if (!$form || (string)$form['SID'] !== 'frontcalc_popup') {
+            return;
+        }
+
+        \CForm::Delete($formId, 'N');
+    }
+
+    protected function getPopupFormById($formId)
+    {
+        $formId = (int)$formId;
+        if ($formId <= 0) {
+            return false;
+        }
+
+        $formResult = \CForm::GetByID($formId);
+        if (!is_object($formResult)) {
+            return false;
+        }
+
+        return $formResult->Fetch();
+    }
+
+    protected function getPopupFormBySid($sid)
+    {
+        $sid = (string)$sid;
+        if ($sid === '') {
+            return false;
+        }
+
+        $formResult = \CForm::GetBySID($sid);
+        if (!is_object($formResult)) {
+            return false;
+        }
+
+        return $formResult->Fetch();
+    }
 
     protected function getAsproPricesPath()
     {
