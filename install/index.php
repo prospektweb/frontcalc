@@ -182,17 +182,8 @@ class prospektweb_frontcalc extends CModule
     protected function ensurePopupForm()
     {
         if (!Loader::includeModule('form')) {
-            $message = 'Модуль form не установлен, служебная веб-форма frontcalc_popup не создана. ' .
-                'Будет использован ручной popup fallback из assets/js/frontcalc-jqm-popup.js';
-            Option::set($this->MODULE_ID, 'POPUP_FORM_FALLBACK', 'Y');
-            Option::set($this->MODULE_ID, 'POPUP_FORM_WARNING', $message);
-            $this->frontcalcInstallLogWarning($message);
-
-            return 0;
+            throw new \RuntimeException('Не найден обязательный модуль: form');
         }
-
-        Option::set($this->MODULE_ID, 'POPUP_FORM_FALLBACK', 'N');
-        Option::set($this->MODULE_ID, 'POPUP_FORM_WARNING', '');
 
         $popupSid = 'frontcalc_popup';
         $savedFormId = (int)Option::get($this->MODULE_ID, 'POPUP_FORM_ID', '0');
@@ -914,20 +905,11 @@ class prospektweb_frontcalc extends CModule
         global $APPLICATION;
 
         $required = ['iblock', 'catalog', 'sale'];
-        $optional = ['form'];
         $errors = [];
 
         foreach ($required as $moduleId) {
             if (!Loader::includeModule($moduleId)) {
                 $errors[] = 'Не найден обязательный модуль: ' . $moduleId;
-            }
-        }
-
-        foreach ($optional as $moduleId) {
-            if (!Loader::includeModule($moduleId)) {
-                $this->frontcalcInstallLogWarning(
-                    'Не найден необязательный модуль: ' . $moduleId . '. FrontCalc продолжит установку с ручным popup fallback.'
-                );
             }
         }
 
