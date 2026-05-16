@@ -20,9 +20,24 @@
 
   function createFrame() {
     ensureWrapper();
-    return $(
-      '<div class="frontcalc_frame jqmWindow jqmWindow--mobile-fill popup"><span class="jqmClose top-close fill-grey-hover" title="Закрыть"><i class="svg inline inline" aria-hidden="true">×</i></span><div class="scrollbar"><div class="flexbox"><div class="form popup frontcalc-popup-shell"><div class="frontcalc-popup-content js-frontcalc-popup-content"></div></div></div></div></div>'
-    ).appendTo("#popup_iframe_wrapper");
+
+    var $frame = $('<div class="frontcalc_frame jqmWindow jqmWindow--mobile-fill popup"></div>')
+      .appendTo("#popup_iframe_wrapper");
+
+    $frame.html(
+      '<span class="jqmClose top-close fill-grey-hover" onclick="window.b24form = false;" title="Закрыть">' +
+        '<i class="svg inline inline" aria-hidden="true">' +
+          '<svg width="14" height="14">' +
+            '<use xlink:href="/bitrix/templates/aspro-premier/images/svg/header_icons.svg#close-14-14"></use>' +
+          '</svg>' +
+        '</i>' +
+      '</span>' +
+      '<div class="form popup frontcalc-popup-shell">' +
+        '<div class="frontcalc-popup-content js-frontcalc-popup-content"></div>' +
+      '</div>'
+    );
+
+    return $frame;
   }
 
   var payloadCache = window.FrontcalcPopupCache = window.FrontcalcPopupCache || {};
@@ -207,22 +222,6 @@
       success: onSuccess,
       error: function (_, __, error) { onError(error || "ajax_failed"); }
     });
-  }
-
-  function loadJqmScript(callback) {
-    if ($.fn.jqm) {
-      callback();
-      return;
-    }
-
-    var config = window.FrontcalcPopupConfig || {};
-    var src = config.jqModalPath || "/bitrix/modules/aspro.popup/install/js/jqModal.js";
-    var script = document.createElement("script");
-    script.src = src;
-    script.async = true;
-    script.onload = callback;
-    script.onerror = callback;
-    document.head.appendChild(script);
   }
 
   function parseNumber(raw, fallback) {
@@ -2398,40 +2397,33 @@
     updatePrice();
   }
 
-  function openFrame(button, renderCallback) {
-    loadJqmScript(function () {
-      var $frame = createFrame();
-      $frame.jqm({
-        overlay: 50,
-        overlayClass: "jqmOverlay",
-        closeClass: "jqmClose",
-        onHide: function (hash) {
-          hash.w.remove();
-          hash.o && hash.o.remove();
-          var $wrapper = $("#popup_iframe_wrapper");
-          if ($wrapper.find(".jqmWindow").length === 0 && $wrapper.find(".jqmOverlay").length === 0) {
-            $wrapper.css({ "z-index": "", display: "" });
-          }
-          $("body").removeClass("jqm-initied swipeignore");
-        },
-      });
+  function openFrame(renderCallback) {
+    var $frame = createFrame();
 
-      $frame.jqmShow(button);
-      $("body").addClass("jqm-initied swipeignore");
-      $frame.closest("#popup_iframe_wrapper").css({ "z-index": 3000, display: "flex" });
-
-      renderCallback($frame.find(".js-frontcalc-popup-content"));
+    $frame.jqm({
+      onHide: function (hash) {
+        hash.w.remove();
+        hash.o.remove();
+        $("body").css({ overflow: "", height: "" }).removeClass("jqm-initied swipeignore");
+        $("#popup_iframe_wrapper").css({ "z-index": "", display: "" });
+      }
     });
+
+    $("body").addClass("jqm-initied swipeignore").css({ overflow: "hidden", height: "100vh" });
+    $("#popup_iframe_wrapper").css({ "z-index": 3000, display: "flex" });
+
+    $frame.jqmShow();
+    renderCallback($frame.find(".js-frontcalc-popup-content"));
   }
 
-  function openCalculatorPopup(button, payload, offerId) {
-    openFrame(button, function ($content) {
+  function openCalculatorPopup(payload, offerId) {
+    openFrame(function ($content) {
       renderCalculator($content, payload, { offerId: offerId });
     });
   }
 
-  function openErrorPopup(button, message) {
-    openFrame(button, function ($content) {
+  function openErrorPopup(message) {
+    openFrame(function ($content) {
       renderError($content, message);
     });
   }
@@ -2460,7 +2452,7 @@
     }
 
     if (payloadCache[info.cacheKey]) {
-      openCalculatorPopup(button, payloadCache[info.cacheKey], info.offerId);
+      openCalculatorPopup(payloadCache[info.cacheKey], info.offerId);
       return;
     }
 
@@ -2469,10 +2461,10 @@
     var onReady = function (payload, errorMessage) {
       setButtonLoading($button, false);
       if (!payload || payload.success !== true) {
-        openErrorPopup(button, payload && payload.message ? payload.message : ("Ошибка запроса: " + (errorMessage || "Сервер вернул ошибку.")));
+        openErrorPopup(payload && payload.message ? payload.message : ("Ошибка запроса: " + (errorMessage || "Сервер вернул ошибку.")));
         return;
       }
-      openCalculatorPopup(button, payload, info.offerId);
+      openCalculatorPopup(payload, info.offerId);
     };
 
     if (inflightRequests[info.cacheKey]) {
@@ -2481,7 +2473,6 @@
     }
 
     inflightRequests[info.cacheKey] = [onReady];
-    loadJqmScript(function () {});
     requestData(
       info.requestUrl,
       function (payload) {
