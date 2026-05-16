@@ -3,11 +3,6 @@
 .frontcalc-popup-shell{width:100%;max-width:100%;box-sizing:border-box;}
 .frontcalc-popup-shell.form.popup{display:block;padding:0;background:#fff;}
 .frontcalc-popup-content{min-height:220px;}
-.frontcalc-jqm-window [name="frontcalc_popup"],
-.frontcalc-jqm-window .form-header,
-.frontcalc-jqm-window .form-body,
-.frontcalc-jqm-window .form-footer,
-.frontcalc-jqm-window .form_result{display:none!important;}
 .frontcalc-button-spinner{display:none;width:1.15em;height:1.15em;border-radius:50%;border:2px solid rgba(85,85,88,.25);border-top-color:var(--theme-base-color,#2a65d0);animation:frontcalc-spin .8s linear infinite;box-sizing:border-box;}
 .js-frontcalc-calculate.is-frontcalc-loading{position:relative;justify-content:center;cursor:wait;}
 .js-frontcalc-calculate.is-frontcalc-loading>svg{display:none;}
